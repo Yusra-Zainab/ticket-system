@@ -1,0 +1,21 @@
+'use client';
+
+import { useState } from 'react';
+import { Check, Eye, LogOut, Pencil, ShieldCheck, Upload, X } from 'lucide-react';
+import Button from '@/components/ui/Button';
+
+const initial = { firstName: 'Ahmed', lastName: 'Khan', email: 'amasood@datapulsetechnologies.org', phone: '+353-5222-5669', jobTitle: 'Project Coordinator', timeZone: 'GMT+1 IST (Ireland)', role: 'Admin', password: 'delivery-secure' };
+
+export default function ProfileForm() {
+  const [editing, setEditing] = useState(false);
+  const [tab, setTab] = useState<'personal' | 'security'>('personal');
+  const [profile, setProfile] = useState(initial);
+  const [draft, setDraft] = useState(initial);
+  const save = () => { setProfile(draft); setEditing(false); };
+  const cancel = () => { setDraft(profile); setEditing(false); };
+  return <section>
+    <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-center gap-5"><div className="relative grid size-24 place-items-center rounded-full bg-gradient-to-br from-sky-100 to-slate-200 text-2xl font-black text-sky-700">AK{editing && <button aria-label="Upload avatar" className="absolute -bottom-1 -right-1 grid size-9 place-items-center rounded-full bg-sky-500 text-white"><Upload size={16} /></button>}</div><div><h2 className="text-2xl font-bold text-slate-950">{profile.firstName} {profile.lastName}</h2><p className="mt-1 text-lg font-semibold text-slate-700">{profile.role}</p></div></div>{!editing ? <Button variant="secondary" onClick={() => setEditing(true)}><Pencil size={16} />Edit Profile</Button> : <div className="flex gap-2"><Button variant="secondary" onClick={cancel}><X size={16} />Cancel</Button><Button onClick={save}><Check size={16} />Save Changes</Button></div>}</div>
+    <div className="mt-8 flex border-b border-slate-200"><button onClick={() => setTab('personal')} className={tab === 'personal' ? 'border-b-2 border-cyan-500 px-4 py-3 font-semibold text-sky-600' : 'px-4 py-3 font-semibold text-slate-500'}>Personal Information</button><button onClick={() => setTab('security')} className={tab === 'security' ? 'border-b-2 border-cyan-500 px-4 py-3 font-semibold text-sky-600' : 'px-4 py-3 font-semibold text-slate-500'}>Account Security</button></div>
+    {tab === 'personal' ? <div className="py-7"><h3 className="mb-8 text-xl font-bold text-slate-950">Personal &amp; Role Information</h3>{editing ? <div className="grid gap-x-12 gap-y-6 md:grid-cols-2">{(['firstName','lastName','email','phone','jobTitle','timeZone'] as const).map((field) => <label key={field}><span className="label">{field.replace(/([A-Z])/g, ' $1').replace(/^./, (letter) => letter.toUpperCase())}</span><input className="field" value={draft[field]} onChange={(event) => setDraft((value) => ({ ...value, [field]: event.target.value }))} /></label>)}</div> : <dl className="grid gap-x-12 gap-y-8 md:grid-cols-2">{[['Email Address',profile.email],['Phone Number',profile.phone],['Job Title',profile.jobTitle],['Time Zone',profile.timeZone]].map(([label,value]) => <div key={label}><dt className="font-medium text-slate-700">{label}</dt><dd className="mt-3 text-lg text-slate-500">{value}</dd></div>)}</dl>}</div> : <div className="max-w-4xl space-y-7 py-7"><h3 className="text-xl font-bold text-slate-950">Account Security</h3><div className="grid gap-3"><span className="label">Password</span><div className="flex items-center gap-3"><div className="field flex-1 tracking-[.3em]">••••••••••••</div><button className="button-secondary" aria-label="Show password"><Eye size={17} /></button></div></div><div className="flex items-center justify-between border-y border-slate-200 py-6"><span><strong className="block text-slate-900">Two-factor authentication</strong><small className="mt-1 block text-slate-500">Add an extra layer of protection to your account.</small></span><button aria-label="Toggle two-factor authentication" className="relative h-7 w-12 rounded-full bg-sky-500"><span className="absolute right-1 top-1 size-5 rounded-full bg-white" /></button></div><button className="button-secondary text-red-600"><LogOut size={17} />Log out all sessions</button><p className="flex items-center gap-2 text-xs text-slate-400"><ShieldCheck size={15} />Your account activity is encrypted and monitored.</p></div>}
+  </section>;
+}

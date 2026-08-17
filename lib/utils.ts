@@ -5,6 +5,21 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+export function formatDate(value: string) {
+  return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(value));
+}
+
+export function initials(name: string) {
+  return name.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase();
+}
+
+export function sanitizeRichText(value: string) {
+  return value
+    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')
+    .replace(/\son\w+\s*=\s*(["']).*?\1/gi, '')
+    .replace(/javascript:/gi, '');
+}
+
 export const brandColors = {
   gradientStart: '#0284C7',
   gradientMiddle: '#06B6D4',

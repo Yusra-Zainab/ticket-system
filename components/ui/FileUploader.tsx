@@ -1,0 +1,11 @@
+'use client';
+
+import { useRef, useState } from 'react';
+import { File, UploadCloud, X } from 'lucide-react';
+
+export interface FileUploaderProps { onUpload: (files: globalThis.File[]) => void; maxSizeMB?: number; acceptedTypes?: string[]; multiple?: boolean }
+export default function FileUploader({ onUpload, maxSizeMB = 10, acceptedTypes = [], multiple = true }: FileUploaderProps) {
+  const input = useRef<HTMLInputElement>(null); const [files, setFiles] = useState<globalThis.File[]>([]); const [error, setError] = useState('');
+  const accept = (incoming: globalThis.File[]) => { const valid = incoming.filter((file) => file.size <= maxSizeMB * 1024 * 1024 && (!acceptedTypes.length || acceptedTypes.includes(file.type))); if (valid.length !== incoming.length) setError(`Some files were rejected. Maximum size is ${maxSizeMB} MB.`); else setError(''); const next = multiple ? [...files, ...valid] : valid.slice(0, 1); setFiles(next); onUpload(next); };
+  return <div><button type="button" onClick={() => input.current?.click()} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); accept(Array.from(event.dataTransfer.files)); }} className="flex w-full flex-col items-center rounded-xl border-2 border-dashed border-slate-300 px-6 py-8 text-center hover:border-sky-400 hover:bg-sky-50/40"><UploadCloud className="text-sky-500" /><span className="mt-2 text-sm font-semibold text-slate-800">Drop files here or click to browse</span><span className="mt-1 text-xs text-slate-400">Up to {maxSizeMB} MB per file</span></button><input ref={input} className="hidden" type="file" multiple={multiple} accept={acceptedTypes.join(',')} onChange={(event) => accept(Array.from(event.target.files ?? []))} />{error && <p className="mt-2 text-xs text-red-600">{error}</p>}<ul className="mt-3 space-y-2">{files.map((file) => <li key={`${file.name}-${file.size}`} className="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-sm"><File size={16} className="text-slate-400" /><span className="min-w-0 flex-1 truncate">{file.name}</span><button type="button" aria-label={`Remove ${file.name}`} onClick={() => { const next = files.filter((item) => item !== file); setFiles(next); onUpload(next); }}><X size={15} /></button></li>)}</ul></div>;
+}

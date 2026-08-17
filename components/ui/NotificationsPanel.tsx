@@ -1,0 +1,13 @@
+'use client';
+
+import Link from 'next/link';
+import { Popover, PopoverButton, PopoverPanel, Tab, TabGroup, TabList, TabPanel, TabPanels } from '@headlessui/react';
+import { Bell, CheckCheck } from 'lucide-react';
+import { useApp } from '@/components/providers/AppProvider';
+import { cn } from '@/lib/utils';
+
+const tabs = ['All', 'Tickets', 'Mentions', 'Deadlines', 'System'] as const;
+export default function NotificationsPanel() {
+  const { notifications, unreadCount, markRead, markAllRead } = useApp();
+  return <Popover className="relative"><PopoverButton aria-label="Open notifications" className="relative grid size-9 place-items-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900"><Bell size={19} />{unreadCount > 0 && <span className="absolute right-1.5 top-1.5 size-2 rounded-full bg-red-500 ring-2 ring-white" />}</PopoverButton><PopoverPanel anchor="bottom end" className="z-50 mt-2 w-[min(92vw,420px)] rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl [--anchor-gap:8px]"><div className="flex items-center justify-between px-3 py-2"><div><h2 className="font-bold text-slate-900">Notifications</h2><p className="text-xs text-slate-400">{unreadCount} unread updates</p></div><button onClick={markAllRead} className="inline-flex items-center gap-1 text-xs font-semibold text-sky-600"><CheckCheck size={14} />Mark all read</button></div><TabGroup><TabList className="flex gap-1 overflow-x-auto border-b border-slate-100 px-2">{tabs.map((tab) => <Tab key={tab} className="border-b-2 border-transparent px-2 py-2 text-xs font-semibold text-slate-500 outline-none data-selected:border-sky-500 data-selected:text-sky-600">{tab}</Tab>)}</TabList><TabPanels>{tabs.map((tab) => <TabPanel key={tab} className="max-h-80 overflow-y-auto py-1">{notifications.filter((item) => tab === 'All' || item.category === tab).map((item) => <Link key={item.id} onClick={() => markRead(item.id)} href={item.href} className={cn('block rounded-xl px-3 py-3 hover:bg-slate-50', item.unread && 'bg-sky-50/60')}><div className="flex gap-3"><span className={cn('mt-1 size-2 shrink-0 rounded-full', item.unread ? 'bg-sky-500' : 'bg-slate-200')} /><div><div className="flex items-center justify-between gap-3"><p className="text-sm font-semibold text-slate-800">{item.title}</p><time className="shrink-0 text-[11px] text-slate-400">{item.time}</time></div><p className="mt-0.5 text-xs leading-5 text-slate-500">{item.body}</p></div></div></Link>)}{notifications.filter((item) => tab === 'All' || item.category === tab).length === 0 && <p className="p-8 text-center text-sm text-slate-400">No notifications here.</p>}</TabPanel>)}</TabPanels></TabGroup></PopoverPanel></Popover>;
+}

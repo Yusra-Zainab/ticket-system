@@ -1,0 +1,2 @@
+import { Plus } from 'lucide-react'; import DirectoryTable from '@/components/features/DirectoryTable'; import PageHeader from '@/components/ui/PageHeader';
+export default function ClientsPage() { return <div className="space-y-6"><PageHeader title="Clients" description="Manage client relationships and connected projects." action="New client" actionHref="/clients/new" actionIcon={Plus} /><DirectoryTable type="clients" /></div>; }

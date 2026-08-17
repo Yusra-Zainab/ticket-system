@@ -1,0 +1,2 @@
+import { Plus } from 'lucide-react'; import AdminUsers from '@/components/features/AdminUsers'; import PageHeader from '@/components/ui/PageHeader';
+export default function AdminUsersPage() { return <div className="space-y-6"><PageHeader title="User management" description="Manage internal members, client users, and access status." action="Invite user" actionHref="/resources/new" actionIcon={Plus} /><AdminUsers /></div>; }
