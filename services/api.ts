@@ -1,15 +1,12 @@
-import { mockClients, mockProjects, mockTickets, mockUsers } from '@/data/mockData';
-
-const delay = (ms = 250) => new Promise((resolve) => setTimeout(resolve, ms));
-
 export const api = {
-  async projects() { await delay(); return structuredClone(mockProjects); },
-  async tickets() { await delay(); return structuredClone(mockTickets); },
-  async clients() { await delay(); return structuredClone(mockClients); },
-  async resources() { await delay(); return structuredClone(mockUsers); },
+  async projects() { return request('/api/projects'); },
+  async tickets() { return request('/api/tickets'); },
+  async clients() { return request('/api/clients'); },
+  async resources() { return request('/api/users'); },
   async submit<T>(resource: string, payload: T) {
-    await delay(450);
     if (!resource) throw new Error('A resource is required.');
-    return { id: crypto.randomUUID(), ...payload };
+    return request(`/api/${resource}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
   },
 };
+
+async function request(url: string, init?: RequestInit) { const response = await fetch(url, init); const body = await response.json().catch(() => ({})); if (!response.ok) throw new Error(typeof body.error === 'string' ? body.error : 'Request failed'); return body; }

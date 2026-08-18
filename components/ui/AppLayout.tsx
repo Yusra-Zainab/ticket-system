@@ -23,10 +23,22 @@ function Shell({ children, breadcrumbs }: AppLayoutProps) {
   if (bareRoutes.some((route) => pathname.startsWith(route))) return <>{children}</>;
 
   const parts = pathname.split('/').filter(Boolean);
-  const crumbs = breadcrumbs ?? parts.map((part, index) => ({
+  const crumbs = breadcrumbs ?? (pathname === '/tickets/drafts' ? [
+    { label: 'Tickets', href: '/tickets' },
+    { label: '…', href: undefined },
+    { label: 'Ticket Drafts', href: undefined },
+  ] : pathname === '/tickets/new' ? [
+    { label: 'Tickets', href: '/tickets' },
+    { label: '…', href: undefined },
+    { label: 'Create Ticket', href: undefined },
+  ] : parts[0] === 'tickets' && parts.length === 2 ? [
+    { label: 'Tickets', href: '/tickets' },
+    { label: '…', href: undefined },
+    { label: 'Ticket Details', href: undefined },
+  ] : parts.map((part, index) => ({
     label: part === 'new' ? `New ${parts[index - 1]?.replace(/s$/, '') ?? ''}` : part.replace(/-/g, ' ').replace(/^./, (letter) => letter.toUpperCase()),
     href: index < parts.length - 1 ? `/${parts.slice(0, index + 1).join('/')}` : undefined,
-  }));
+  })));
 
   return <div className="min-h-screen bg-white">
     <div className="mx-auto max-w-[1800px] px-5 pb-36 pt-7 sm:px-8 lg:px-12 xl:px-16">

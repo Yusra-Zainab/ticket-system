@@ -1,0 +1,4 @@
+import { z } from 'zod'; import { db, listClients } from '@/lib/db';
+const schema=z.object({name:z.string().min(2).max(255),email:z.email(),phone:z.string().max(50).nullable().optional(),company:z.string().max(255).nullable().optional(),status:z.enum(['active','inactive']).default('active')});
+export async function GET(){try{return Response.json(await listClients())}catch{return Response.json({error:'Unable to load clients'},{status:503})}}
+export async function POST(r:Request){try{const v=schema.parse(await r.json());const [x]=await db.execute<import('mysql2/promise').ResultSetHeader>('INSERT INTO clients (name,email,phone,company,status) VALUES (?,?,?,?,?)',[v.name,v.email,v.phone??null,v.company??null,v.status]);return Response.json({id:String(x.insertId),...v},{status:201})}catch(e){if(e instanceof z.ZodError)return Response.json({error:'Invalid client',details:e.flatten()},{status:400});return Response.json({error:'Unable to create client'},{status:409})}}

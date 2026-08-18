@@ -1,7 +1,12 @@
 import { Plus } from "lucide-react";
 import TicketsTable from "@/components/features/TicketsTable";
 import PageHeader from "@/components/ui/PageHeader";
-export default function TicketsPage() {
+import { connection } from "next/server";
+import { listTickets } from "@/lib/db";
+import type { Ticket } from "@/types";
+export default async function TicketsPage() {
+  await connection();
+  let stored: Ticket[] = []; try { stored = await listTickets("OPEN"); } catch { stored = []; }
   return (
     <div className="space-y-7">
       <PageHeader
@@ -10,7 +15,7 @@ export default function TicketsPage() {
         actionHref="/tickets/new"
         actionIcon={Plus}
       />
-      <TicketsTable />
+      <TicketsTable initialTickets={stored} />
     </div>
   );
 }

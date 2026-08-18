@@ -1,4 +1,2 @@
-import { Plus } from 'lucide-react';
-import ProjectsTable from '@/components/features/ProjectsTable';
-import PageHeader from '@/components/ui/PageHeader';
-export default function ProjectsPage() { return <div className="space-y-6"><PageHeader title="Projects" description="Monitor delivery health, ownership, and client timelines." action="New project" actionHref="/projects/new" actionIcon={Plus} /><ProjectsTable /></div>; }
+import { Plus } from 'lucide-react'; import ProjectsTable from '@/components/features/ProjectsTable'; import PageHeader from '@/components/ui/PageHeader'; import { listProjects } from '@/lib/db';
+export default async function ProjectsPage() { const projects = await listProjects(); return <div className="space-y-6"><PageHeader title="Projects" description="Monitor delivery health, ownership, and client timelines." action="New project" actionHref="/projects/new" actionIcon={Plus} /><ProjectsTable initialProjects={projects} /></div>; }

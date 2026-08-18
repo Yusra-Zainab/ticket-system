@@ -5,13 +5,12 @@ import { useMemo, useState } from 'react';
 import { Search } from 'lucide-react';
 import DataTable, { type Column } from '@/components/ui/DataTable';
 import StatusBadge from '@/components/ui/StatusBadge';
-import { mockClients, mockUsers } from '@/data/mockData';
 import type { Client, Status, User } from '@/types';
 
-export default function DirectoryTable({ type }: { type: 'clients' | 'resources' }) {
+export default function DirectoryTable({ type, clients: initialClients = [], users: initialUsers = [] }: { type: 'clients' | 'resources'; clients?: Client[]; users?: User[] }) {
   const [query, setQuery] = useState('');
-  const clients = useMemo(() => mockClients.filter((item) => (item.name + item.company + item.email).toLowerCase().includes(query.toLowerCase())), [query]);
-  const resources = useMemo(() => mockUsers.filter((item) => (item.name + item.role + item.email).toLowerCase().includes(query.toLowerCase())), [query]);
+  const clients = useMemo(() => initialClients.filter((item) => (item.name + item.company + item.email).toLowerCase().includes(query.toLowerCase())), [query, initialClients]);
+  const resources = useMemo(() => initialUsers.filter((item) => (item.name + item.role + item.email).toLowerCase().includes(query.toLowerCase())), [query, initialUsers]);
   const clientColumns: Column<Client>[] = [
     { key: 'name', label: 'Client', sortable: true, render: (_, row) => <Link className="font-semibold text-slate-900 hover:text-sky-600" href={`/clients/${row.id}`}>{row.company}<span className="mt-0.5 block text-xs font-normal text-slate-400">{row.name}</span></Link> },
     { key: 'email', label: 'Email', sortable: true }, { key: 'projects', label: 'Projects', sortable: true }, { key: 'status', label: 'Status', render: (value) => <StatusBadge status={value as Status} /> }, { key: 'joined', label: 'Client since', sortable: true },

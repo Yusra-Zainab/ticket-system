@@ -8,14 +8,11 @@ import ActivityTimeline from "@/components/ui/ActivityTimeline";
 import MetricCard from "@/components/ui/MetricCard";
 import PageHeader from "@/components/ui/PageHeader";
 import StatusBadge from "@/components/ui/StatusBadge";
-import {
-  mockActivities,
-  mockProjects,
-  mockTickets,
-  mockUsers,
-} from "@/data/mockData";
+import { listProjects, listTickets, listUsers } from "@/lib/db";
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
+  const [mockProjects, mockTickets, mockUsers] = await Promise.all([listProjects(), listTickets('OPEN'), listUsers()]);
+  const mockActivities: never[] = [];
   const overdue = mockTickets.filter(
     (ticket) => ticket.status === "Critical" || ticket.status === "Overdue",
   ).length;

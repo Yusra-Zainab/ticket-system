@@ -51,7 +51,21 @@ export interface Ticket {
   dueDate: string;
   description: string;
   tags: string[];
+  formData?: TicketFormData;
 }
+
+export interface TicketAttachment {
+  id: string;
+  name: string;
+  mimeType: string;
+  size: number;
+  url: string;
+  uploadedAt: string;
+}
+
+export type TicketFormData = Record<string, unknown> & {
+  attachments?: TicketAttachment[];
+};
 
 export interface User {
   id: string;

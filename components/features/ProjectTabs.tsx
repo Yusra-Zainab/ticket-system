@@ -1,15 +1,15 @@
 'use client';
 
 import { useState } from 'react';
-import { mockActivities, mockTickets, mockUsers } from '@/data/mockData';
 import ActivityTimeline from '@/components/ui/ActivityTimeline';
 import StatusBadge from '@/components/ui/StatusBadge';
-import type { Project } from '@/types';
+import type { Project, Ticket, User } from '@/types';
 
 const tabs = ['Overview', 'Tickets', 'Modules', 'Team', 'Files', 'Timeline', 'Reports', 'Settings'] as const;
-export default function ProjectTabs({ project }: { project: Project }) {
+export default function ProjectTabs({ project, tickets, users }: { project: Project; tickets: Ticket[]; users: User[] }) {
   const [active, setActive] = useState<(typeof tabs)[number]>('Overview');
-  const tickets = mockTickets.filter((ticket) => ticket.project === project.name); const members = mockUsers.filter((user) => project.team.includes(user.name));
+  const mockActivities: never[] = [];
+  const members = project.team.length ? users.filter((user) => project.team.includes(user.name)) : users;
   return <div><div className="mb-5 overflow-x-auto border-b border-slate-200"><div className="flex min-w-max">{tabs.map((tab) => <button key={tab} onClick={() => setActive(tab)} className={active === tab ? 'border-b-2 border-sky-500 px-4 py-3 text-sm font-bold text-sky-600' : 'border-b-2 border-transparent px-4 py-3 text-sm font-semibold text-slate-500 hover:text-slate-800'}>{tab}</button>)}</div></div>{active === 'Overview' && <div className="grid gap-6 lg:grid-cols-2"><section className="card p-5"><h2 className="font-bold">Project summary</h2><p className="mt-3 text-sm leading-7 text-slate-600">{project.description}</p><dl className="mt-5 grid grid-cols-2 gap-4"><Info label="Client" value={project.client} /><Info label="Budget" value={`$${project.budget.toLocaleString()}`} /><Info label="Start date" value={project.startDate} /><Info label="Due date" value={project.dueDate} /></dl></section><section className="card p-5"><h2 className="font-bold">Delivery progress</h2><div className="mt-5 flex items-end justify-between"><span className="text-4xl font-black text-slate-900">{project.progress}%</span><StatusBadge status={project.status} /></div><div className="mt-4 h-3 rounded-full bg-slate-100"><div className="h-3 rounded-full bg-sky-500" style={{ width: `${project.progress}%` }} /></div></section></div>}{active === 'Tickets' && <section className="card divide-y divide-slate-100">{tickets.length ? tickets.map((ticket) => <a className="flex items-center justify-between gap-4 p-4 hover:bg-slate-50" key={ticket.id} href={`/tickets/${ticket.id}`}><div><p className="text-sm font-semibold text-slate-800">{ticket.title}</p><p className="text-xs text-slate-400">Assigned to {ticket.assignedTo}</p></div><StatusBadge status={ticket.status} /></a>) : <p className="p-8 text-center text-sm text-slate-400">No tickets for this project.</p>}</section>}{active === 'Team' && <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{members.map((member) => <article className="card p-4" key={member.id}><p className="font-bold text-slate-800">{member.name}</p><p className="text-sm text-slate-500">{member.role}</p><p className="mt-3 text-xs font-semibold text-slate-400">{member.workload}% allocated</p></article>)}</div>}{active === 'Timeline' && <section className="card max-w-2xl p-5"><ActivityTimeline activities={mockActivities} /></section>}{!['Overview', 'Tickets', 'Team', 'Timeline'].includes(active) && <section className="card p-8"><h2 className="font-bold text-slate-900">{active}</h2><p className="mt-2 text-sm text-slate-500">Manage {active.toLowerCase()} for {project.name}. This workspace is ready for backend data integration.</p></section>}</div>;
 }
 function Info({ label, value }: { label: string; value: string }) { return <div><dt className="text-xs font-bold uppercase tracking-wide text-slate-400">{label}</dt><dd className="mt-1 text-sm font-semibold text-slate-800">{value}</dd></div>; }

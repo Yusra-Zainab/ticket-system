@@ -15,7 +15,7 @@ export default function PageHeader({
   actionIcon?: LucideIcon;
 }) {
   return (
-    <header className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+    <header className="sticky top-0 z-30 -mx-3 flex flex-col gap-5 border-b border-slate-100 bg-white/95 px-3 py-3 backdrop-blur sm:flex-row sm:items-center sm:justify-between">
       <div>
         <h1 className="text-[2rem] font-bold tracking-[-0.025em] text-slate-950 sm:text-[2.35rem]">
           {title}

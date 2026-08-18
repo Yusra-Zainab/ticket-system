@@ -2,18 +2,19 @@ import { notFound } from "next/navigation";
 import ActivityTimeline from "@/components/ui/ActivityTimeline";
 import PageHeader from "@/components/ui/PageHeader";
 import StatusBadge from "@/components/ui/StatusBadge";
-import { mockActivities, mockProjects, mockUsers } from "@/data/mockData";
+import { findUser, listProjects } from "@/lib/db";
 export default async function ResourceDetailPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const user = mockUsers.find((item) => item.id === id);
+  const user = await findUser(id);
   if (!user) notFound();
-  const assignments = mockProjects.filter((project) =>
+  const assignments = (await listProjects()).filter((project) =>
     project.team.includes(user.name),
   );
+  const mockActivities: never[] = [];
   return (
     <div className="space-y-6">
       <PageHeader

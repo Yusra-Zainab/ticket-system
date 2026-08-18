@@ -1,2 +1,30 @@
-'use client';
-export default function ErrorPage({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) { return <main className="grid min-h-[70vh] place-items-center text-center"><div><p className="text-sm font-black uppercase tracking-[.2em] text-red-500">Something went wrong</p><h1 className="mt-3 text-3xl font-black text-slate-950">We could not load this view</h1><p className="mx-auto mt-3 max-w-md text-sm text-slate-500">{error.message || 'An unexpected application error occurred.'}</p><button className="button-primary mt-6" onClick={reset}>Try again</button></div></main>; }
+"use client";
+
+import {
+  Error403Screen,
+  Error404Screen,
+  Error502Screen,
+} from "@/components/errors/ErrorScreens";
+
+export default function ErrorPage({
+  error,
+  reset,
+}: {
+  error: Error & { digest?: string };
+  reset: () => void;
+}) {
+  const message = error.message.toLowerCase();
+  if (
+    message.includes("403") ||
+    message.includes("forbidden") ||
+    message.includes("permission")
+  ) {
+    return <Error403Screen />;
+  }
+  if (message.includes("404") || message.includes("not found")) {
+    return <Error404Screen />;
+  }
+  return (
+    <Error502Screen message={error.message || undefined} onRetry={reset} />
+  );
+}

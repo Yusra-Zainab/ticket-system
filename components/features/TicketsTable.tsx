@@ -3,10 +3,14 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import {
-  CheckCircle,
+  ArrowRight,
   ChevronDown,
   Clock3,
   Edit3,
+  ExternalLink,
+  File,
+  FileImage,
+  FileText,
   FilePenLine,
   Filter,
   FolderOpen,
@@ -16,11 +20,10 @@ import {
   Trash2,
   Undo2,
   X,
-  XCircle,
 } from "lucide-react";
-import { mockTickets } from "@/data/mockData";
 import { cn, formatDate } from "@/lib/utils";
-import type { Ticket } from "@/types";
+import type { Ticket, TicketAttachment } from "@/types";
+import { useApp } from "@/components/providers/AppProvider";
 
 const statuses = [
   "Open",
@@ -61,6 +64,8 @@ const priorities = [
 type TicketStatus = (typeof statuses)[number];
 type TicketType = (typeof ticketTypes)[number];
 type Priority = (typeof priorities)[number]["value"];
+type FileCategory = "Photos and videos" | "Files" | "Links";
+type TicketFile = { id: string; category: FileCategory; name: string; detail: string; date: string; url: string };
 type SortKey =
   | "title"
   | "priority"
@@ -80,13 +85,13 @@ type TicketRow = Omit<Ticket, "status" | "priority"> & {
 };
 
 const statusColors: Record<TicketStatus, string> = {
-  Open: "bg-blue-50 text-blue-700 ring-1 ring-blue-600/20",
-  Reviewed: "bg-gray-50 text-gray-700 ring-1 ring-gray-600/20",
-  Assigned: "bg-indigo-50 text-indigo-700 ring-1 ring-indigo-600/20",
-  Active: "bg-teal-50 text-teal-700 ring-1 ring-teal-600/20",
-  Blocked: "bg-orange-50 text-orange-700 ring-1 ring-orange-600/20",
-  Awaiting: "bg-pink-50 text-pink-700 ring-1 ring-pink-600/20",
-  QA: "bg-green-50 text-green-700 ring-1 ring-green-600/20",
+  Open: "bg-violet-600 text-white ring-1 ring-violet-700",
+  Reviewed: "bg-slate-700 text-white ring-1 ring-slate-800",
+  Assigned: "bg-blue-600 text-white ring-1 ring-blue-700",
+  Active: "bg-teal-600 text-white ring-1 ring-teal-700",
+  Blocked: "bg-orange-600 text-white ring-1 ring-orange-700",
+  Awaiting: "bg-pink-600 text-white ring-1 ring-pink-700",
+  QA: "bg-green-600 text-white ring-1 ring-green-700",
   Validation: "bg-blue-600 text-white ring-1 ring-blue-700",
   Resolved: "bg-green-600 text-white ring-1 ring-green-700",
   Closed: "bg-gray-700 text-white ring-1 ring-gray-800",
@@ -100,35 +105,91 @@ const priorityColors = {
   4: "bg-green-600 text-white ring-1 ring-green-700",
   5: "bg-gray-400 text-white ring-1 ring-gray-500",
 } as const;
-const initialRows: TicketRow[] = mockTickets.map((ticket, index) => ({
-  ...ticket,
-  status: (["Closed", "Reviewed", "Assigned", "Blocked", "Active", "QA"][
-    index
-  ] ?? "Open") as TicketStatus,
-  priority: Math.min(ticket.priority, 4) as Priority,
-  priorityNumber: index + 1,
-  type: ([
-    "Bug",
-    "Support Request",
-    "UI/UX Issue",
-    "Task",
-    "Change Request",
-    "Technical Issue",
-  ][index] ?? "Task") as TicketType,
-  createdBy:
-    [
-      "Customer Owner",
-      "Coordinator",
-      "Admin",
-      "Customer Support",
-      "Admin",
-      "QA Team",
-    ][index] ?? "Admin",
-  history: [],
-}));
-
-export default function TicketsTable() {
-  const [tickets, setTickets] = useState(initialRows);
+const ticketTypeColors: Record<TicketType, string> = { Bug: "bg-red-600 text-white ring-red-700", Task: "bg-blue-600 text-white ring-blue-700", "Change Request": "bg-violet-600 text-white ring-violet-700", "New Feature": "bg-purple-600 text-white ring-purple-700", Feedback: "bg-orange-500 text-white ring-orange-600", "Support Request": "bg-teal-600 text-white ring-teal-700", "UI/UX Issue": "bg-pink-600 text-white ring-pink-700", "Content Update": "bg-emerald-600 text-white ring-emerald-700", "Technical Issue": "bg-amber-600 text-white ring-amber-700", "Testing / QA": "bg-cyan-600 text-white ring-cyan-700", Maintenance: "bg-slate-500 text-white ring-slate-600", "Urgent Fix": "bg-red-700 text-white ring-red-800", "System Down": "bg-indigo-700 text-white ring-indigo-800" };
+const fileCategories: FileCategory[] = ["Photos and videos", "Files", "Links"];
+const asStringArray = (value: unknown) =>
+  Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+    : [];
+const asAttachments = (ticket: TicketRow): TicketAttachment[] => {
+  const data = (ticket.formData ?? {}) as Record<string, unknown>;
+  return Array.isArray(data.attachments)
+    ? data.attachments.filter(
+        (item): item is TicketAttachment =>
+          typeof item === "object" &&
+          item !== null &&
+          typeof (item as TicketAttachment).id === "string" &&
+          typeof (item as TicketAttachment).name === "string" &&
+          typeof (item as TicketAttachment).url === "string",
+      )
+    : [];
+};
+const asLinks = (ticket: TicketRow): TicketFile[] => {
+  const data = (ticket.formData ?? {}) as Record<string, unknown>;
+  return asStringArray(data.urls).map((url, index) => ({
+    id: `link-${ticket.id}-${index}`,
+    category: "Links" as const,
+    name: url.replace(/^https?:\/\//, ""),
+    detail: "Linked reference",
+    date: formatDate(String(data.updatedAt ?? ticket.created)),
+    url,
+  }));
+};
+const formatSize = (size: number) => {
+  if (!size) return "0 B";
+  const units = ["B", "KB", "MB", "GB"];
+  const index = Math.min(Math.floor(Math.log(size) / Math.log(1024)), units.length - 1);
+  const value = size / 1024 ** index;
+  return `${value.toFixed(value >= 10 || index === 0 ? 0 : 1)} ${units[index]}`;
+};
+const ticketFiles = (ticket: TicketRow): TicketFile[] => [
+  ...asAttachments(ticket).map((attachment) => {
+    const isMedia =
+      attachment.mimeType.startsWith("image/") ||
+      attachment.mimeType.startsWith("video/");
+    return {
+      id: attachment.id,
+      category: isMedia ? ("Photos and videos" as const) : ("Files" as const),
+      name: attachment.name,
+      detail: isMedia
+        ? attachment.mimeType
+            .split("/")[0]
+            .replace(/^./, (c) => c.toUpperCase())
+        : formatSize(attachment.size),
+      date: formatDate(attachment.uploadedAt),
+      url: attachment.url,
+    };
+  }),
+  ...asLinks(ticket).map((link) => ({ ...link, detail: "External link" })),
+];
+const fileCategoryLabel: Record<FileCategory, string> = {
+  "Photos and videos": "Photos and videos",
+  Files: "Files",
+  Links: "Links",
+};
+const toRows = (source: Ticket[]): TicketRow[] => source.map((ticket) => {
+  const data = (ticket.formData ?? {}) as Record<string, unknown>;
+  return {
+    ...ticket,
+    status: (ticket.status === "Critical" ? "Open" : ticket.status) as TicketStatus,
+    priority: Math.min(ticket.priority, 4) as Priority,
+    priorityNumber: Number(data.priorityNumber ?? ticket.priority) || ticket.priority,
+    type: String(data.type ?? "Task") as TicketType,
+    createdBy: String(data.createdBy ?? ticket.reporter ?? ""),
+    history: [],
+  };
+});
+const timeRemainingLabel = (dueDate: string) => {
+  const date = new Date(dueDate);
+  if (!dueDate || Number.isNaN(date.getTime())) return "Not set";
+  const diffDays = Math.ceil((date.getTime() - Date.now()) / 86400000);
+  if (diffDays === 0) return "Due today";
+  if (diffDays < 0) return `Overdue by ${Math.abs(diffDays)} day${Math.abs(diffDays) === 1 ? "" : "s"}`;
+  return `${diffDays} day${diffDays === 1 ? "" : "s"} remaining`;
+};
+export default function TicketsTable({ variant = "tickets", initialTickets }: { variant?: "tickets" | "drafts"; initialTickets?: Ticket[] }) {
+  const { draftTickets, submittedTickets, removeStoredTicket } = useApp();
+  const [tickets, setTickets] = useState(() => toRows(initialTickets ?? (variant === "drafts" ? draftTickets : submittedTickets)));
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<"All" | TicketStatus>("All");
   const [type, setType] = useState<"All" | TicketType>("All");
@@ -141,6 +202,7 @@ export default function TicketsTable() {
   const [renameConfirmationOpen, setRenameConfirmationOpen] = useState(false);
   const [historyId, setHistoryId] = useState<string>();
   const [deleteId, setDeleteId] = useState<string>();
+  const [filesTicketId, setFilesTicketId] = useState<string>();
   const [sort, setSort] = useState<{
     key: SortKey;
     direction: "asc" | "desc";
@@ -184,23 +246,56 @@ export default function TicketsTable() {
         kind === "rename" ? 2000 : 3000,
       );
   };
+  const patchTicket = async (id: string, payload: Record<string, unknown>) => {
+    const response = await fetch(`/api/tickets/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (response.ok) return;
+    let message = "Unable to update ticket.";
+    try {
+      const data = await response.json();
+      if (typeof data?.error === "string") message = data.error;
+    } catch {
+      // keep default message
+    }
+    throw new Error(message);
+  };
   const toggleSort = (key: SortKey) =>
     setSort((current) => ({
       key,
       direction:
         current?.key === key && current.direction === "asc" ? "desc" : "asc",
     }));
-  const applySelected = (patch: Partial<TicketRow>, message: string) => {
+  const applySelected = async (patch: Partial<TicketRow>, message: string) => {
     if (!selected.length)
       return notify("error", "Select at least one ticket first");
-    setTickets((rows) =>
-      rows.map((row) =>
-        selected.includes(row.id) ? { ...row, ...patch } : row,
-      ),
-    );
-    setSelected([]);
-    setBulkDialog(undefined);
-    notify("success", message);
+    try {
+      await Promise.all(selected.map((id) => {
+        const payload =
+          patch.status
+            ? { status: patch.status }
+            : patch.priority
+              ? {
+                  priorityType:
+                    priorities.find((item) => item.value === patch.priority)?.label ?? "Low",
+                  priorityNumber: patch.priority,
+                }
+              : patch;
+        return patchTicket(id, payload);
+      }));
+      setTickets((rows) =>
+        rows.map((row) =>
+          selected.includes(row.id) ? { ...row, ...patch } : row,
+        ),
+      );
+      setSelected([]);
+      setBulkDialog(undefined);
+      notify("success", message);
+    } catch (error) {
+      notify("error", error instanceof Error ? error.message : "Unable to update ticket.");
+    }
   };
   const reorderTicket = (draggedId: string, targetId: string) => {
     setSort(undefined);
@@ -260,13 +355,14 @@ export default function TicketsTable() {
     setTickets((rows) => rows.filter((row) => row.id !== id));
     setSelected((ids) => ids.filter((item) => item !== id));
     setDeleteId(undefined);
+    removeStoredTicket(id);
     notify("success", "Ticket has been deleted");
   };
 
   return (
     <div className="space-y-5">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-        <div className="flex flex-wrap gap-3">
+        {variant === "tickets" && <div className="flex flex-wrap gap-3">
           <button
             onClick={() => setFiltersOpen((value) => !value)}
             className={cn(
@@ -291,8 +387,8 @@ export default function TicketsTable() {
           >
             Change Priority Type of Selected
           </button>
-        </div>
-        <label className="relative w-full xl:w-64">
+        </div>}
+        <label className="relative ml-auto w-full xl:w-64">
           <Search
             size={16}
             className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
@@ -300,44 +396,28 @@ export default function TicketsTable() {
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            className="h-10 w-full rounded-full border border-gray-300 bg-white pl-10 pr-4 text-sm text-gray-900 outline-none focus:border-transparent focus:ring-2 focus:ring-[#0284C7]"
+            className="h-10 w-full rounded-xl border border-gray-300 bg-white pl-10 pr-4 text-sm text-gray-900 outline-none focus:border-transparent focus:ring-2 focus:ring-[#0284C7]"
             placeholder="Search tickets..."
           />
         </label>
       </div>
-      {filtersOpen && (
-        <div className="grid gap-3 rounded-xl border border-slate-200 bg-[#F8FAFC] p-4 sm:grid-cols-4">
-          <FilterSelect
-            label="Status"
-            value={status}
-            onChange={(value) => setStatus(value as typeof status)}
-            options={statuses}
-          />
-          <FilterSelect
-            label="Ticket Type"
-            value={type}
-            onChange={(value) => setType(value as typeof type)}
-            options={ticketTypes}
-          />
-          <FilterSelect
-            label="Priority"
-            value={String(priority)}
-            onChange={(value) =>
-              setPriority(value === "All" ? "All" : (Number(value) as Priority))
-            }
-            options={priorities.map((item) => String(item.value))}
-          />
+      {variant === "tickets" && filtersOpen && (
+        <div className="space-y-4 rounded-xl border border-slate-200 bg-[#F8FAFC] p-4">
+          <div className="grid gap-3 md:grid-cols-3"><TagDropdown label="Status" value={status} options={statuses.map((item) => ({ value: item, label: item, color: statusColors[item] }))} onChange={(value) => setStatus(value as typeof status)} /><TagDropdown label="Priority Type" value={String(priority)} options={priorities.map((item) => ({ value: String(item.value), label: item.label, color: priorityColors[item.value] }))} onChange={(value) => setPriority(value === "All" ? "All" : Number(value) as Priority)} /><TagDropdown label="Ticket Type" value={type} options={ticketTypes.map((item) => ({ value: item, label: item, color: ticketTypeColors[item] }))} onChange={(value) => setType(value as typeof type)} /></div>
+          <div className="flex justify-end">
           <button
+            disabled={status === "All" && type === "All" && priority === "All"}
             onClick={() => {
               setStatus("All");
               setType("All");
               setPriority("All");
               setQuery("");
             }}
-            className="button-secondary self-end"
+            className="self-end rounded-lg border border-red-500 px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-600 hover:text-white disabled:cursor-not-allowed disabled:border-slate-300 disabled:text-slate-400 disabled:hover:bg-transparent"
           >
             Clear filters
           </button>
+          </div>
         </div>
       )}
       <div className="ticket-table-frame">
@@ -490,15 +570,12 @@ export default function TicketsTable() {
                         <div className="ticket-title-popover">
                           <strong>{ticket.title}</strong>
                           <div>
-                            <button
-                              title="Rename ticket"
-                              onClick={() => {
-                                setRenameId(ticket.id);
-                                setRenameValue("");
-                              }}
+                            <Link
+                              href={`/tickets/new?draft=${ticket.id}`}
+                              title="Edit ticket"
                             >
                               <FilePenLine size={17} />
-                            </button>
+                            </Link>
                             <button
                               title="Review previous names"
                               onClick={() => setHistoryId(ticket.id)}
@@ -544,7 +621,7 @@ export default function TicketsTable() {
                     <td>
                       {formatDate(ticket.dueDate)}
                       <small className="mt-1 block text-slate-500">
-                        1 day remaining
+                        {timeRemainingLabel(ticket.dueDate)}
                       </small>
                     </td>
                     <td>
@@ -559,23 +636,23 @@ export default function TicketsTable() {
                     </td>
                     <td>
                       <div className="flex items-center justify-center gap-1">
-                        <Link
-                          href={`/tickets/${ticket.id}`}
-                          className="row-icon"
+                        {variant === "tickets" && <button
+                          onClick={() => setFilesTicketId(ticket.id)}
+                          className="row-icon hover:!bg-transparent hover:text-[#0284C7]"
                           title="Ticket files"
                         >
                           <FolderOpen />
-                        </Link>
+                        </button>}
                         <Link
-                          href={`/tickets/${ticket.id}`}
-                          className="row-icon"
-                          title="Write or edit ticket"
+                          href={`/tickets/new?draft=${ticket.id}`}
+                          className="row-icon hover:!bg-transparent hover:text-[#0284C7]"
+                          title="Edit ticket"
                         >
                           <Edit3 />
                         </Link>
                         <button
                           onClick={() => setDeleteId(ticket.id)}
-                          className="row-icon text-red-500 hover:bg-red-100"
+                          className="row-icon text-slate-500 hover:!bg-transparent hover:!text-red-600"
                           title="Delete ticket"
                         >
                           <Trash2 />
@@ -592,7 +669,7 @@ export default function TicketsTable() {
               No tickets match your search and filters.
             </div>
           )}
-          <footer className="flex items-center justify-end gap-4 border-t border-slate-200 px-5 py-4 text-sm text-slate-500">
+          <footer className="flex items-center justify-center gap-4 border-t border-slate-200 px-5 py-4 text-sm text-slate-500">
             <span>1 - {filtered.length} of 3,037</span>
             <select className="rounded-lg border border-slate-300 px-4 py-2">
               <option>10 per page</option>
@@ -763,6 +840,7 @@ export default function TicketsTable() {
           </div>
         </div>
       )}
+      {filesTicketId && <TicketFilesModal ticket={tickets.find((item) => item.id === filesTicketId)!} onClose={() => setFilesTicketId(undefined)} />}
       {deleteId && (
         <div className="modal-backdrop">
           <div role="alertdialog" aria-modal="true" className="ticket-modal">
@@ -824,35 +902,47 @@ export default function TicketsTable() {
   );
 }
 
-function FilterSelect({
-  label,
-  value,
-  onChange,
-  options,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  options: readonly string[];
-}) {
-  return (
-    <label>
-      <span className="label">{label}</span>
-      <select
-        className="field"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-      >
-        <option>All</option>
-        {options.map((option) => (
-          <option key={option}>{option}</option>
-        ))}
-      </select>
-    </label>
-  );
+function TicketFilesModal({ ticket, onClose }: { ticket: TicketRow; onClose: () => void }) {
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [category, setCategory] = useState<FileCategory>();
+  const [query, setQuery] = useState("");
+  const files = ticketFiles(ticket);
+  const visibleCategories = category ? [category] : fileCategories;
+  const matches = (file: TicketFile) =>
+    !query.trim() ||
+    `${file.name} ${file.detail} ${file.url}`.toLowerCase().includes(query.toLowerCase());
+  const reset = () => { setCategory(undefined); setQuery(""); setSearchOpen(false); };
+
+  return <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+    <div role="dialog" aria-modal="true" aria-labelledby="ticket-files-title" className="ticket-modal !max-h-[90vh] !w-[1035px] overflow-y-auto !p-0">
+      <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-5 py-4"><div><h2 id="ticket-files-title" className="text-2xl font-bold text-slate-700">Files</h2><p className="mt-0.5 max-w-2xl truncate text-xs text-slate-400">{ticket.title}</p></div><button onClick={onClose} className="row-icon hover:!bg-transparent hover:text-[#0284C7]" aria-label="Close files"><X /></button></div>
+      <div className="p-5">
+        <div className="overflow-hidden rounded-xl border border-slate-300 bg-white">
+          <label className="flex h-14 items-center"><input value={query} onFocus={() => setSearchOpen(true)} onClick={() => setSearchOpen(true)} onChange={(event) => setQuery(event.target.value)} className="min-w-0 flex-1 px-4 text-lg text-slate-700 outline-none placeholder:text-slate-500" placeholder="Search in files" /><span className="grid h-full w-16 place-items-center border-l border-slate-300 text-slate-600"><Search size={27} /></span></label>
+          {searchOpen && !category && <div className="flex flex-wrap gap-3 border-t border-slate-200 px-4 py-3">{fileCategories.map((item) => <button key={item} onClick={() => setCategory(item)} className="rounded-full bg-slate-100 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-[#0284C7] hover:text-white">{fileCategoryLabel[item]}</button>)}</div>}
+        </div>
+        {category && <div className="mt-3 flex justify-start"><button onClick={reset} className="inline-flex items-center gap-2 text-sm font-semibold text-cyan-500 hover:text-cyan-600"><ArrowRight className="rotate-180" size={18} />Back</button></div>}
+        <div className="mt-3 space-y-5">{files.length ? visibleCategories.map((item) => { const sectionFiles = files.filter((file) => file.category === item && matches(file)); return <section key={item}><div className="mb-3 flex items-center justify-between"><h3 className="text-lg font-semibold text-slate-700">{item}</h3>{!category && <button onClick={() => setCategory(item)} className="inline-flex items-center gap-2 text-base font-semibold text-cyan-500 hover:text-cyan-600">See All<ArrowRight size={20} /></button>}</div>{sectionFiles.length ? item === "Photos and videos" ? <div className="flex flex-wrap gap-3">{sectionFiles.slice(0, category ? undefined : 5).map((file) => <a key={file.id} href={file.url} target="_blank" rel="noreferrer" title={file.name} className="group block w-32"><span className="grid h-20 place-items-center overflow-hidden rounded-lg border border-slate-200 bg-slate-50 group-hover:border-sky-400"><FileImage className="text-sky-500" /></span><span className="mt-2 inline-flex rounded-full bg-sky-50 px-2 py-1 text-[11px] font-semibold text-sky-700 ring-1 ring-inset ring-sky-200">{file.category}</span><span className="mt-1 block truncate text-xs text-slate-500 group-hover:text-sky-600">{file.name}</span></a>)}</div> : <div className="space-y-3">{sectionFiles.slice(0, category ? undefined : 2).map((file) => <TicketFileRow key={file.id} file={file} />)}</div> : <p className="rounded-xl border border-dashed border-slate-200 py-8 text-center text-sm text-slate-400">No matching {item.toLowerCase()}.</p>}</section>; }) : <p className="rounded-xl border border-dashed border-slate-200 py-10 text-center text-sm text-slate-400">No attachments have been uploaded for this ticket yet.</p>}</div>
+      </div>
+    </div>
+  </div>;
 }
 
+function TicketFileRow({ file }: { file: TicketFile }) {
+  const icon = file.category === "Links"
+    ? <ExternalLink className="text-cyan-600" />
+    : file.name.endsWith(".pdf")
+      ? <FileText className="text-red-500" />
+      : <File className="text-blue-600" />;
+  return <a href={file.url} target="_blank" rel="noreferrer" className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white px-5 py-4 hover:border-sky-300 hover:bg-sky-50"><span className="grid size-11 shrink-0 place-items-center">{icon}</span><span className="min-w-0 flex-1"><span className="mb-1 inline-flex rounded-full bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-600 ring-1 ring-inset ring-slate-200">{file.category}</span><strong className="block truncate text-base font-medium text-slate-700">{file.name}</strong><span className="block truncate text-sm text-slate-500">{file.detail}</span></span><time className="w-28 shrink-0 text-right text-sm leading-5 text-slate-500">{file.date.replace(" ", "\n")}</time></a>;
+}
+
+function TagDropdown({ label, value, options, onChange }: { label: string; value: string; options: Array<{ value: string; label: string; color: string }>; onChange: (value: string) => void }) { const [open, setOpen] = useState(false); const selected = options.find((option) => option.value === value); return <div className="relative"><span className="label">{label}</span><button type="button" onClick={() => setOpen((current) => !current)} className="field flex items-center justify-between"><span className={cn("rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-inset", selected ? selected.color : "bg-slate-100 text-slate-600 ring-slate-300")}>{selected?.label ?? "All"}</span><ChevronDown size={16} className={open ? "rotate-180" : ""} /></button>{open && <div className="absolute z-30 mt-1 grid max-h-64 w-full gap-1 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2 shadow-xl"><button type="button" onClick={() => { onChange("All"); setOpen(false); }} className="rounded-lg px-3 py-2 text-left text-xs font-semibold text-slate-600 hover:bg-slate-50">All</button>{options.map((option) => <button type="button" key={option.value} onClick={() => { onChange(option.value); setOpen(false); }} className="rounded-lg p-1 text-left hover:bg-slate-50"><span className={cn("inline-flex rounded-full px-3 py-1.5 text-xs font-semibold ring-1 ring-inset", option.color)}>{option.label}</span></button>)}</div>}</div>; }
+
 function PersonCell({ name }: { name: string }) {
+  if (!name.trim()) {
+    return <span className="text-sm text-gray-400">Not set</span>;
+  }
   const initials = name
     .split(" ")
     .map((part) => part[0])

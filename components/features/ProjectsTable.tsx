@@ -5,12 +5,11 @@ import { useMemo, useState } from 'react';
 import { Search, Trash2 } from 'lucide-react';
 import DataTable, { type Column } from '@/components/ui/DataTable';
 import StatusBadge from '@/components/ui/StatusBadge';
-import { mockProjects } from '@/data/mockData';
 import { formatDate } from '@/lib/utils';
 import type { Project, Status } from '@/types';
 
-export default function ProjectsTable() {
-  const [projects, setProjects] = useState(mockProjects); const [query, setQuery] = useState(''); const [status, setStatus] = useState('All'); const [selected, setSelected] = useState<string[]>([]);
+export default function ProjectsTable({ initialProjects }: { initialProjects: Project[] }) {
+  const [projects, setProjects] = useState(initialProjects); const [query, setQuery] = useState(''); const [status, setStatus] = useState('All'); const [selected, setSelected] = useState<string[]>([]);
   const filtered = useMemo(() => projects.filter((project) => (project.name + project.client).toLowerCase().includes(query.toLowerCase()) && (status === 'All' || project.status === status)), [projects, query, status]);
   const updateStatus = (next: Status) => { setProjects((items) => items.map((item) => selected.includes(item.id) ? { ...item, status: next } : item)); setSelected([]); };
   const columns: Column<Project>[] = [
