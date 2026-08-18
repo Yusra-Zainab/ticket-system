@@ -11,6 +11,10 @@ import type {
 } from "@/types";
 
 const globalDb = globalThis as typeof globalThis & { ticketPool?: mysql.Pool };
+const globalSchema = globalThis as typeof globalThis & {
+  projectPrioritySetup?: Promise<void>;
+  tableChecks?: Map<string, Promise<boolean>>;
+};
 
 export const db =
   globalDb.ticketPool ??
@@ -31,6 +35,68 @@ export const db =
   });
 
 if (process.env.NODE_ENV !== "production") globalDb.ticketPool = db;
+
+export async function ensureProjectPriorityColumn() {
+  if (!globalSchema.projectPrioritySetup) {
+    globalSchema.projectPrioritySetup = (async () => {
+      const [rows] = await db.query<RowDataPacket[]>(
+        `
+          SELECT COUNT(*) AS count
+          FROM INFORMATION_SCHEMA.COLUMNS
+          WHERE TABLE_SCHEMA = DATABASE()
+            AND TABLE_NAME = 'projects'
+            AND COLUMN_NAME = 'priority_type'
+        `,
+      );
+
+      const count = Number((rows[0] as { count?: number } | undefined)?.count ?? 0);
+
+      if (!count) {
+        await db.execute(
+          `
+            ALTER TABLE projects
+            ADD COLUMN priority_type VARCHAR(32) NOT NULL DEFAULT 'Not Assigned'
+            AFTER client_id
+          `,
+        );
+      }
+    })().catch((error) => {
+      globalSchema.projectPrioritySetup = undefined;
+      throw error;
+    });
+  }
+
+  return globalSchema.projectPrioritySetup;
+}
+
+async function tableExists(tableName: string) {
+  if (!globalSchema.tableChecks) {
+    globalSchema.tableChecks = new Map();
+  }
+
+  const cached = globalSchema.tableChecks.get(tableName);
+  if (cached) {
+    return cached;
+  }
+
+  const check = (async () => {
+    const [rows] = await db.query<RowDataPacket[]>(
+      `
+        SELECT COUNT(*) AS count
+        FROM INFORMATION_SCHEMA.TABLES
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = ?
+      `,
+      [tableName],
+    );
+
+    return Number((rows[0] as { count?: number } | undefined)?.count ?? 0) > 0;
+  })();
+
+  globalSchema.tableChecks.set(tableName, check);
+
+  return check;
+}
 
 const json = <T,>(value: string | T | null, fallback: T): T =>
   value == null
@@ -159,33 +225,218 @@ type ProjectRow = RowDataPacket & {
   description: string | null;
   client_name: string | null;
   status: Project["status"];
-  progress: number;
+  priority_type: Project["priority"] | null;
+  progress: number | null;
   due_date: string | null;
   created_at: string;
+  updated_at: string;
 };
 
-export async function listProjects() {
-  const [rows] = await db.query<ProjectRow[]>(
-    "SELECT p.*, c.company client_name FROM projects p LEFT JOIN clients c ON c.id=p.client_id ORDER BY p.updated_at DESC",
-  );
-  return rows.map(
-    (r): Project => ({
-      id: String(r.id),
-      name: r.name,
-      client: r.client_name ?? "Unassigned",
-      status: r.status,
-      progress: r.progress ?? 0,
-      dueDate: r.due_date ?? "",
-      startDate: String(r.created_at).slice(0, 10),
+type ProjectResourceRow = RowDataPacket & {
+  project_id: number;
+  user_id: number;
+  user_name: string;
+  user_role: string;
+  avatar: string | null;
+};
+
+type ProjectTicketRow = RowDataPacket & {
+  project_id: number;
+  form_data: string | Record<string, unknown> | null;
+  creator_name: string | null;
+  assignee_name: string | null;
+};
+
+export async function listProjects(): Promise<Project[]> {
+  await ensureProjectPriorityColumn();
+  const hasProjectResources = await tableExists("project_resources");
+
+  const [projectRows, ticketRows] = await Promise.all([
+    db.query<ProjectRow[]>(
+      `
+        SELECT
+          p.id,
+          p.name,
+          p.description,
+          p.status,
+          p.priority_type,
+          p.progress,
+          p.due_date,
+          p.created_at,
+          p.updated_at,
+          c.company AS client_name
+        FROM projects p
+        LEFT JOIN clients c
+          ON c.id = p.client_id
+        ORDER BY p.updated_at DESC
+      `,
+    ),
+
+    db.query<ProjectTicketRow[]>(
+      `
+        SELECT
+          t.project_id,
+          t.form_data,
+          c.name AS creator_name,
+          a.name AS assignee_name
+        FROM tickets t
+        LEFT JOIN users c
+          ON c.id = t.created_by
+        LEFT JOIN users a
+          ON a.id = t.assigned_to
+        WHERE t.lifecycle = 'OPEN'
+          AND t.project_id IS NOT NULL
+      `,
+    ),
+  ]);
+
+  const projects = projectRows[0];
+  const tickets = ticketRows[0];
+
+  const resourceMap = new Map<
+    number,
+    Project["teamMembers"]
+  >();
+
+  if (hasProjectResources) {
+    const [resourceRows] = await db.query<ProjectResourceRow[]>(
+      `
+        SELECT
+          pr.project_id,
+          u.id AS user_id,
+          u.name AS user_name,
+          u.role AS user_role,
+          u.avatar
+        FROM project_resources pr
+        INNER JOIN users u
+          ON u.id = pr.user_id
+        ORDER BY pr.created_at ASC
+      `,
+    );
+
+    for (const resource of resourceRows) {
+      const members = resourceMap.get(resource.project_id) ?? [];
+
+      members.push({
+        id: String(resource.user_id),
+        name: resource.user_name,
+        role: resource.user_role
+          .replaceAll("_", " ")
+          .replace(/\b\w/g, (char) => char.toUpperCase()),
+        avatar: resource.avatar,
+      });
+
+      resourceMap.set(resource.project_id, members);
+    }
+  } else {
+    for (const ticket of tickets) {
+      if (!ticket.project_id) continue;
+
+      const members = resourceMap.get(ticket.project_id) ?? [];
+      const seen = new Set(members.map((member) => member.name));
+
+      for (const candidate of [ticket.creator_name, ticket.assignee_name]) {
+        if (!candidate || seen.has(candidate)) continue;
+
+        members.push({
+          id: `${ticket.project_id}-${candidate}`,
+          name: candidate,
+          role: "Project Member",
+          avatar: null,
+        });
+        seen.add(candidate);
+      }
+
+      resourceMap.set(ticket.project_id, members);
+    }
+  }
+
+  const ticketCountMap = new Map<
+    number,
+    {
+      open: number;
+      critical: number;
+    }
+  >();
+
+  const priorityMap: Record<string, Project["priority"]> = {
+    Critical: "Critical",
+    High: "High",
+    Medium: "Medium",
+    Low: "Low",
+    "Not Assigned": "Not Assigned",
+  };
+
+  for (const ticket of tickets) {
+    const current = ticketCountMap.get(ticket.project_id) ?? {
+      open: 0,
+      critical: 0,
+    };
+
+    current.open += 1;
+
+    let formData: Record<string, unknown> = {};
+
+    try {
+      formData =
+        typeof ticket.form_data === "string"
+          ? JSON.parse(ticket.form_data)
+          : ticket.form_data ?? {};
+    } catch {
+      formData = {};
+    }
+
+    const tags = Array.isArray(formData.tags)
+      ? formData.tags
+          .filter(
+            (tag): tag is string =>
+              typeof tag === "string",
+          )
+          .map((tag) => tag.trim().toLowerCase())
+      : [];
+
+    if (tags.includes("critical")) {
+      current.critical += 1;
+    }
+
+    ticketCountMap.set(ticket.project_id, current);
+  }
+
+  return projects.map((row): Project => {
+    const members = resourceMap.get(row.id) ?? [];
+    const ticketCounts = ticketCountMap.get(row.id) ?? {
+      open: 0,
+      critical: 0,
+    };
+
+    return {
+      id: String(row.id),
+      name: row.name,
+      client: row.client_name ?? "Unassigned",
+      status: row.status,
+      priority: priorityMap[row.priority_type ?? ""] ?? "Not Assigned",
+
+      progress: Number(row.progress ?? 0),
+      dueDate: row.due_date ?? "",
+      startDate: String(row.created_at).slice(0, 10),
       budget: 0,
-      description: r.description ?? "",
-      team: [],
-    }),
-  );
+      description: row.description ?? "",
+
+      team: members.map((member) => member.name),
+      teamMembers: members,
+
+      openTickets: ticketCounts.open,
+      criticalTickets: ticketCounts.critical,
+
+      lastUpdated: row.updated_at,
+    };
+  });
 }
 
 export async function findProject(id: string) {
-  return (await listProjects()).find((item) => item.id === id);
+  return (await listProjects()).find(
+    (project) => project.id === id,
+  );
 }
 
 type ClientRow = RowDataPacket & {
@@ -233,16 +484,20 @@ export async function listUsers() {
   const [rows] = await db.query<UserRow[]>(
     "SELECT id,name,email,role,avatar FROM users ORDER BY updated_at DESC",
   );
+
   return rows.map(
     (r): User => ({
       id: String(r.id),
       name: r.name,
       email: r.email,
       phone: "",
-      role: r.role.replaceAll("_", " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+      role: r.role
+        .replaceAll("_", " ")
+        .replace(/\b\w/g, (c) => c.toUpperCase()),
       status: "Active",
       workload: 0,
       skills: [],
+      avatar: r.avatar,
     }),
   );
 }

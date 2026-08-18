@@ -155,62 +155,184 @@ button:not(:disabled),
 .crumb-button:hover {
   background: #d8f3f8;
 }
+/* =========================================================
+   FLOATING ACTION BAR
+   ========================================================= */
+
 .floating-dock {
   position: fixed;
   z-index: 50;
-  bottom: 1.5rem;
+  bottom: 24px;
   left: 50%;
   display: flex;
   transform: translateX(-50%);
   align-items: center;
-  gap: 0.22rem;
-  border: 2px solid #08bddd;
-  border-radius: 9999px;
-  background: rgb(255 255 255 / 0.97);
-  padding: 0.38rem 0.55rem;
-  color: #078dcc;
+  flex-wrap: nowrap;
+
+  border: 2px solid #06b6d4;
+  border-radius: 100px;
+
+  background: rgba(255, 255, 255, 0.96);
+
+  padding: 7px 10px;
+
+  color: #0284c7;
+
   box-shadow:
-    0 10px 25px rgb(15 23 42 / 0.18),
-    0 2px 5px rgb(14 165 233 / 0.16);
-  backdrop-filter: blur(14px);
+    0 4px 9px rgba(0, 0, 0, 0.17),
+    0 1px 2px rgba(16, 24, 40, 0.05);
+
+  backdrop-filter: blur(7px);
+  -webkit-backdrop-filter: blur(7px);
+
+  white-space: nowrap;
 }
+
+/*
+ * Full dock:
+ *
+ * Search
+ * |
+ * dashboard tickets projects resources clients admin
+ * |
+ * notifications account
+ */
+.floating-full-mode {
+  gap: 8px;
+}
+
+/*
+ * Feature-specific dock:
+ *
+ * Search | Feature + List | Back
+ */
+.floating-feature-mode {
+  gap: 8px;
+}
+
+/*
+ * Search dock.
+ */
+.floating-search-mode {
+  width: min(440px, calc(100vw - 32px));
+  gap: 8px;
+  padding: 7px 10px;
+}
+
+/* Every circular icon */
 .dock-action {
+  position: relative;
+
   display: grid;
-  width: 2.65rem;
-  height: 2.65rem;
-  flex: none;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
   place-items: center;
+
+  border: 0;
   border-radius: 9999px;
+
+  background: transparent;
+  color: #0284c7;
+
   transition:
-    background 0.15s,
-    color 0.15s;
+    background-color 0.15s ease,
+    color 0.15s ease,
+    transform 0.15s ease;
 }
+
 .dock-action:hover {
-  background: #e0f2fe;
+  background: #e6f8fb;
+  color: #0284c7;
 }
+
+.dock-action:active {
+  transform: scale(0.96);
+}
+
+/* Selected feature */
 .dock-action-active {
-  background: #078dcc;
-  color: white;
+  background: #0284c7;
+  color: #ffffff;
 }
+
 .dock-action-active:hover {
   background: #0284c7;
+  color: #ffffff;
 }
+
+/* Vertical blue/cyan separators */
 .dock-divider {
   width: 1px;
-  height: 2.25rem;
-  margin: 0 0.25rem;
-  background: #078dcc;
+  height: 40px;
+  flex: 0 0 1px;
+
+  margin: 0 4px;
+
+  background: #0284c7;
 }
+
+/* Active search circle */
+.dock-search-active {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  place-items: center;
+
+  border-radius: 9999px;
+
+  background: #0284c7;
+  color: #ffffff;
+}
+
+/* Search input itself */
+.dock-search-input {
+  min-width: 0;
+  flex: 1;
+
+  height: 36px;
+
+  border: 1px solid #06b6d4;
+  border-radius: 8px;
+
+  background: #ffffff;
+
+  padding: 0 12px;
+
+  color: #344054;
+
+  font-family: var(--font-inter), Inter, sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 20px;
+
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+
+  outline: none;
+}
+
+.dock-search-input::placeholder {
+  color: #667085;
+}
+
+.dock-search-input:focus {
+  border-color: #0284c7;
+  box-shadow:
+    0 0 0 3px rgba(2, 132, 199, 0.1),
+    0 1px 2px rgba(16, 24, 40, 0.05);
+}
+
 .notification-count {
   position: absolute;
-  right: 0.05rem;
-  top: 0.05rem;
+  right: -0.15rem;
+  top: -0.1rem;
   display: grid;
   min-width: 1rem;
   height: 1rem;
   place-items: center;
   border-radius: 9999px;
-  background: #ef4444;
+  background: #ff4444;
   padding: 0 0.2rem;
   color: white;
   font-size: 0.6rem;
@@ -335,7 +457,7 @@ button:not(:disabled),
   width: 1.35rem;
   height: 1.35rem;
   border-radius: 0.35rem;
-  accent-color: #0284C7;
+  accent-color: #0284c7;
 }
 .ticket-pill {
   display: inline-flex;
@@ -467,6 +589,137 @@ button:not(:disabled),
   border-color: #bfdbfe;
   background: #eff6ff;
   color: #1d4ed8;
+}
+
+.project-action-outline {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #06b6d4;
+  border-radius: 0.625rem;
+  background: white;
+  padding: 0.7rem 1rem;
+  color: #0284c7;
+  font-size: 0.875rem;
+  font-weight: 700;
+  box-shadow: 0 1px 2px rgb(16 24 40 / 0.05);
+}
+
+.project-action-outline:hover {
+  background: #f0fbfd;
+}
+
+.project-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.project-metric-card {
+  min-height: 98px;
+  border-radius: 0.75rem;
+  background: white;
+  padding: 1rem;
+  box-shadow: 0 1px 2px rgb(16 24 40 / 0.05);
+}
+
+.project-tabs {
+  display: flex;
+  width: 100%;
+  gap: 1rem;
+  overflow-x: auto;
+  border-bottom: 1px solid #eaecf0;
+}
+
+.project-tab {
+  flex: none;
+  border-bottom: 2px solid transparent;
+  padding: 0.9rem 0.25rem 0.75rem;
+  color: #667085;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.project-tab:hover {
+  color: #344054;
+}
+
+.project-tab-active {
+  border-bottom-color: #06b6d4;
+  color: #0284c7;
+}
+
+.project-table-shell {
+  width: 100%;
+}
+.project-detail-subtitle {
+  color: #101828;
+  font-family: var(--font-inter), Inter, sans-serif;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 24px;
+}
+
+.project-detail-field-label {
+  color: #344054;
+  font-family: var(--font-inter), Inter, sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+}
+.project-list-table {
+  overflow: hidden;
+  border: 1px solid #e4e7ec;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgb(16 24 40 / 0.05);
+}
+.project-list-table thead {
+  height: 56px;
+  background: #f9fafb;
+}
+.project-list-table th {
+  padding: 0 18px;
+  color: #475467;
+  font-family: var(--font-inter), Inter, sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 20px;
+  vertical-align: middle;
+}
+.project-list-table tbody tr {
+  height: 82px;
+  border-bottom: 1px solid #eaecf0;
+}
+.project-list-table tbody tr:last-child {
+  border-bottom: 0;
+}
+.project-list-table td {
+  padding: 0 18px;
+  color: #475467;
+  font-family: var(--font-inter), Inter, sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 20px;
+  vertical-align: middle;
+}
+.project-checkbox {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  border-radius: 6px;
+  accent-color: #0284c7;
+}
+.project-pagination {
+  display: flex;
+  min-height: 68px;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 14px;
+  border-top: 1px solid #eaecf0;
+  background: #ffffff;
+  padding: 12px 24px;
 }
 .ticket-detail-page {
   color: #475467;
@@ -651,15 +904,210 @@ button:not(:disabled),
 }
 @media (max-width: 640px) {
   .floating-dock {
-    bottom: 0.75rem;
-    max-width: calc(100vw - 1rem);
+    bottom: 12px;
+    max-width: calc(100vw - 16px);
     overflow-x: auto;
+    padding: 6px 8px;
+    scrollbar-width: none;
   }
-  .dock-action {
-    width: 2.35rem;
-    height: 2.35rem;
-  }
-  .dock-divider {
+
+  .floating-dock::-webkit-scrollbar {
     display: none;
+  }
+
+  .dock-action,
+  .dock-search-active {
+    width: 36px;
+    height: 36px;
+    flex-basis: 36px;
+  }
+
+  .dock-divider {
+    height: 32px;
+    margin: 0 2px;
+  }
+
+  .floating-full-mode,
+  .floating-feature-mode {
+    gap: 4px;
+  }
+
+  .floating-search-mode {
+    width: calc(100vw - 20px);
+  }
+
+  .project-pagination {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+/* =========================================================
+   NEW PROJECT
+   ========================================================= */
+
+.new-project-input {
+  width: 100%;
+  height: 44px;
+
+  border: 1px solid #d0d5dd;
+  border-radius: 8px;
+
+  background: #ffffff;
+
+  padding: 10px 14px;
+
+  color: #101828;
+
+  font-family:
+    var(--font-inter),
+    Inter,
+    sans-serif;
+
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 24px;
+
+  box-shadow:
+    0 1px 2px
+    rgb(16 24 40 / 0.05);
+
+  outline: none;
+}
+
+.new-project-input::placeholder {
+  color: #667085;
+}
+
+.new-project-input:focus {
+  border-color: #0284c7;
+
+  box-shadow:
+    0 0 0 3px
+      rgb(2 132 199 / 0.1),
+    0 1px 2px
+      rgb(16 24 40 / 0.05);
+}
+
+.new-project-secondary-button {
+  display: inline-flex;
+
+  height: 40px;
+
+  align-items: center;
+  justify-content: center;
+
+  border: 1px solid #d0d5dd;
+  border-radius: 8px;
+
+  background: #ffffff;
+
+  padding: 10px 14px;
+
+  color: #344054;
+
+  font-family:
+    var(--font-inter),
+    Inter,
+    sans-serif;
+
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+
+  box-shadow:
+    0 1px 2px
+      rgb(16 24 40 / 0.05);
+}
+
+.new-project-secondary-button:hover {
+  background: #f9fafb;
+}
+
+.new-project-secondary-button:disabled,
+.new-project-register-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.new-project-register-button {
+  display: inline-flex;
+
+  height: 40px;
+
+  align-items: center;
+  justify-content: center;
+
+  gap: 8px;
+
+  border: 0;
+  border-radius: 8px;
+
+  background:
+    linear-gradient(
+      66.43deg,
+      #0284c7 12.82%,
+      #06b6d4 47.68%,
+      #22d3ee 82.54%
+    );
+
+  padding: 10px 14px;
+
+  color: #ffffff;
+
+  font-family:
+    var(--font-inter),
+    Inter,
+    sans-serif;
+
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+
+  box-shadow:
+    0 1px 2px
+      rgb(16 24 40 / 0.05);
+}
+
+.new-project-register-button:hover {
+  filter: brightness(0.97);
+}
+
+.new-project-editor {
+  overflow: hidden;
+
+  border: 1px solid #d0d5dd;
+  border-radius: 8px;
+
+  background: #ffffff;
+
+  box-shadow:
+    0 1px 2px
+      rgb(16 24 40 / 0.05);
+}
+
+/*
+ * RichTextEditor already owns
+ * its internal layout.
+ */
+.new-project-editor
+  [contenteditable="true"] {
+  min-height: 210px;
+}
+
+@media (max-width: 1023px) {
+  .new-project-editor
+    [contenteditable="true"] {
+    min-height: 180px;
+  }
+}
+
+@media (max-width: 640px) {
+  .new-project-input {
+    font-size: 14px;
+  }
+
+  .new-project-secondary-button,
+  .new-project-register-button {
+    flex: 1;
   }
 }

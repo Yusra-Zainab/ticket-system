@@ -1,19 +1,52 @@
 export type Status =
-  | 'Active'
-  | 'Critical'
-  | 'In Progress'
-  | 'Open'
-  | 'Closed'
-  | 'Overdue'
-  | 'Blocked'
-  | 'Paused'
-  | 'On Track'
-  | 'Ready for Review'
-  | 'Low'
-  | 'Medium'
-  | 'High'
-  | 'New'
-  | 'Assigned';
+  | "Active"
+  | "Critical"
+  | "In Progress"
+  | "Open"
+  | "Closed"
+  | "Overdue"
+  | "Blocked"
+  | "Paused"
+  | "On Track"
+  | "Ready for Review"
+  | "Low"
+  | "Medium"
+  | "High"
+  | "New"
+  | "Assigned"
+  | "Completed"
+  | "Reviewed"
+  | "Awaiting"
+  | "QA"
+  | "Validation"
+  | "Resolved"
+  | "Reopened"
+  | "Cancelled";
+
+export type ProjectStatus =
+  | "Planning"
+  | "Not Started"
+  | "Active"
+  | "On Hold"
+  | "At Risk"
+  | "Delayed"
+  | "Completed"
+  | "Cancelled"
+  | "Archived";
+
+export type ProjectPriority =
+  | "Critical"
+  | "High"
+  | "Medium"
+  | "Low"
+  | "Not Assigned";
+
+export interface ProjectTeamMember {
+  id: string;
+  name: string;
+  role: string;
+  avatar?: string | null;
+}
 
 export interface Client {
   id: string;
@@ -30,13 +63,18 @@ export interface Project {
   id: string;
   name: string;
   client: string;
-  status: Status;
+  status: ProjectStatus;
   progress: number;
   dueDate: string;
   startDate: string;
   budget: number;
   description: string;
   team: string[];
+  teamMembers: ProjectTeamMember[];
+  openTickets: number;
+  criticalTickets: number;
+  lastUpdated: string;
+  priority: ProjectPriority;
 }
 
 export interface Ticket {
@@ -76,6 +114,7 @@ export interface User {
   status: Status;
   workload: number;
   skills: string[];
+  avatar?: string | null;
 }
 
 export interface Activity {
@@ -89,7 +128,7 @@ export interface Activity {
 
 export interface Notification {
   id: string;
-  category: 'Tickets' | 'Mentions' | 'Deadlines' | 'System';
+  category: "Tickets" | "Mentions" | "Deadlines" | "System";
   title: string;
   body: string;
   href: string;

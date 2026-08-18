@@ -1,2 +1,30 @@
-import EntityForm from '@/components/features/EntityForm'; import PageHeader from '@/components/ui/PageHeader'; import { listUsers } from '@/lib/db';
-export default async function NewProjectPage({ searchParams }: { searchParams: Promise<{ returnTo?: string }> }) { const { returnTo } = await searchParams; const users = await listUsers(); return <div className="mx-auto max-w-4xl space-y-6"><PageHeader title="Create project" description="Set the scope, team, and delivery timeline." /><EntityForm kind="project" returnTo={returnTo} users={users} /></div>; }
+import NewProjectForm from "@/components/features/NewProjectForm";
+import {
+  listClients,
+  listUsers,
+} from "@/lib/db";
+
+export default async function NewProjectPage({
+  searchParams,
+}: {
+  searchParams: Promise<{
+    returnTo?: string;
+  }>;
+}) {
+  const { returnTo } =
+    await searchParams;
+
+  const [users, clients] =
+    await Promise.all([
+      listUsers(),
+      listClients(),
+    ]);
+
+  return (
+    <NewProjectForm
+      users={users}
+      clients={clients}
+      returnTo={returnTo}
+    />
+  );
+}

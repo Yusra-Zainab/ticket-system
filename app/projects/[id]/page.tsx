@@ -1,3 +1,26 @@
-import { notFound } from 'next/navigation';
-import PageHeader from '@/components/ui/PageHeader'; import ProjectTabs from '@/components/features/ProjectTabs'; import { findProject, listTickets, listUsers } from '@/lib/db';
-export default async function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) { const { id } = await params; const project = await findProject(id); if (!project) notFound(); const [tickets, users] = await Promise.all([listTickets('OPEN'), listUsers()]); return <div className="space-y-6"><PageHeader title={project.name} description={`${project.client} · Project workspace`} /><ProjectTabs project={project} tickets={tickets.filter((ticket) => ticket.project === project.name)} users={users} /></div>; }
+import { notFound } from "next/navigation";
+
+import ProjectDetailsView from "@/components/features/ProjectDetailsView";
+import { findProject, listTickets, listUsers } from "@/lib/db";
+
+export default async function ProjectDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+
+  const [project, tickets, users] = await Promise.all([
+    findProject(id),
+    listTickets("OPEN"),
+    listUsers(),
+  ]);
+
+  if (!project) {
+    notFound();
+  }
+
+  return (
+    <ProjectDetailsView project={project} tickets={tickets} users={users} />
+  );
+}

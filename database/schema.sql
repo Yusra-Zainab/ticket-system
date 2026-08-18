@@ -34,3 +34,27 @@ CREATE TABLE IF NOT EXISTS ticket_attachments (
   KEY idx_ticket_attachments_ticket_id (ticket_id),
   CONSTRAINT fk_ticket_attachments_ticket FOREIGN KEY (ticket_id) REFERENCES tickets (ticket_id) ON DELETE CASCADE
 );
+
+ALTER TABLE projects
+ADD COLUMN priority_type VARCHAR(32) NOT NULL DEFAULT 'Not Assigned';
+
+CREATE TABLE IF NOT EXISTS project_resources (
+    project_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    PRIMARY KEY (project_id, user_id),
+
+    CONSTRAINT fk_project_resources_project
+        FOREIGN KEY (project_id)
+        REFERENCES projects(id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_project_resources_user
+        FOREIGN KEY (user_id)
+        REFERENCES users(id)
+        ON DELETE CASCADE
+);
+
+CREATE INDEX idx_project_resources_user
+ON project_resources(user_id);
