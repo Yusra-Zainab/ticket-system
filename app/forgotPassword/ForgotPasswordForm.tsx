@@ -1,99 +1,90 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import Button from '@/components/ui/Button';
-import Input from '@/components/ui/Input';
+import Link from "next/link";
+import { useState } from "react";
 
 export default function ForgotPasswordForm() {
-  const [email, setEmail] = useState('');
-  const [emailError, setEmailError] = useState('');
+  const [email, setEmail] = useState("");
+
+  const [emailError, setEmailError] = useState("");
+
   const [isSent, setIsSent] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
 
-    if (!email) {
-      setEmailError('Email is required');
-      return;
-    } else if (!email.includes('@')) {
-      setEmailError('Please enter a valid email');
+    if (!email.trim()) {
+      setEmailError("Email is required");
+
       return;
     }
 
-    setEmailError('');
-    // Handle send-reset-link logic
-    console.log('Password reset requested for:', email);
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setEmailError("Please enter a valid email");
+
+      return;
+    }
+
+    setEmailError("");
+
+    /*
+     * Replace with your real password-reset API.
+     */
+    console.log("Password reset requested for:", email);
+
     setIsSent(true);
   };
 
   return (
-    <div className="relative overflow-hidden">
+    <div className="auth-content auth-forgot-content">
+      <header className="auth-header">
+        <h1 className="auth-title">Forgot Password</h1>
 
-      <div className="relative z-10">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <h2
-            className="text-[#0284C7] font-semibold text-3xl tracking-tight"
-            style={{ fontSize: '30px', lineHeight: '38px', fontWeight: 700 }}
-          >
-            Forgot Password
-          </h2>
-          <p
-            className="mt-2"
-            style={{ fontSize: '16px', lineHeight: '24px', color: '#475467' }}
-          >
-            Enter your email and we&apos;ll send you a link to reset your password.
-          </p>
-        </div>
+        <p className="auth-description">
+          Enter your email and we&apos;ll send you a link to reset your
+          password.
+        </p>
+      </header>
 
-        {isSent ? (
-          <div className="text-center py-2">
-            <p className="text-sm text-gray-600">
-              If an account exists for <span className="font-medium text-gray-900">{email}</span>,
-              you&apos;ll receive a password reset link shortly.
-            </p>
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Email */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Email
-              </label>
-              <Input
+      <div className="auth-form-content">
+        {!isSent ? (
+          <form onSubmit={handleSubmit} className="auth-form auth-forgot-form">
+            <div className="auth-field">
+              <label className="auth-label">Email</label>
+
+              <input
                 type="email"
                 value={email}
-                onChange={(e) => {
-                  setEmail(e.target.value);
-                  if (emailError) setEmailError('');
+                autoComplete="email"
+                onChange={(event) => {
+                  setEmail(event.target.value);
+
+                  if (emailError) {
+                    setEmailError("");
+                  }
                 }}
                 placeholder="Enter your email"
-                error={emailError}
+                className="auth-input"
               />
+
+              {emailError && <span className="auth-error">{emailError}</span>}
             </div>
 
-            {/* Submit */}
-            <Button
-              type="submit"
-              variant="gradient"
-              size="lg"
-              fullWidth
-              className="mt-2"
-            >
+            <button type="submit" className="auth-primary-button">
               Send Link
-            </Button>
+            </button>
           </form>
+        ) : (
+          <div className="auth-sent-message">
+            <p>
+              If an account exists for <strong>{email}</strong>, you&apos;ll
+              receive a password reset link shortly.
+            </p>
+          </div>
         )}
-
-        {/* Back link */}
-        <div className="text-center mt-4">
-          <a
-            href="/login"
-            className="text-sm font-medium text-brand-blue hover:text-brand-light-blue transition-colors duration-200"
-          >
-            Back
-          </a>
-        </div>
+      </div>
+      <div className="auth-bottom-link">
+        <Link href="/login">Back</Link>
       </div>
     </div>
   );

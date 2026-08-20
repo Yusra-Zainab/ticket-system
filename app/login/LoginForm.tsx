@@ -1,135 +1,265 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import Button from '@/components/ui/Button';
-import Input from '@/components/ui/Input';
+import Link from "next/link";
+import {
+  Check,
+  ChevronDown,
+} from "lucide-react";
+import {
+  useState,
+} from "react";
+
+const roles = [
+  "Admin",
+  "Super Admin",
+  "Project Manager",
+  "Developer",
+  "Support Agent",
+  "Client User",
+] as const;
 
 export default function LoginForm() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [role, setRole] = useState('Admin');
-  const [emailError, setEmailError] = useState('');
-  const [passwordError, setPasswordError] = useState('');
+  const [email, setEmail] =
+    useState("");
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const [password, setPassword] =
+    useState("");
 
-    let isValid = true;
+  const [role, setRole] =
+    useState("Admin");
 
-    if (!email) {
-      setEmailError('Email is required');
-      isValid = false;
-    } else if (!email.includes('@')) {
-      setEmailError('Please enter a valid email');
-      isValid = false;
+  const [roleOpen, setRoleOpen] =
+    useState(false);
+
+  const [emailError, setEmailError] =
+    useState("");
+
+  const [passwordError, setPasswordError] =
+    useState("");
+
+  const handleSubmit = (
+    event: React.FormEvent<HTMLFormElement>,
+  ) => {
+    event.preventDefault();
+
+    let valid = true;
+
+    if (!email.trim()) {
+      setEmailError("Email is required");
+      valid = false;
+    } else if (
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
+        email,
+      )
+    ) {
+      setEmailError(
+        "Please enter a valid email",
+      );
+
+      valid = false;
     } else {
-      setEmailError('');
+      setEmailError("");
     }
 
     if (!password) {
-      setPasswordError('Password is required');
-      isValid = false;
-    } else if (password.length < 6) {
-      setPasswordError('Password must be at least 6 characters');
-      isValid = false;
+      setPasswordError(
+        "Password is required",
+      );
+
+      valid = false;
+    } else if (
+      password.length < 6
+    ) {
+      setPasswordError(
+        "Password must be at least 6 characters",
+      );
+
+      valid = false;
     } else {
-      setPasswordError('');
+      setPasswordError("");
     }
 
-    if (isValid) {
-      console.log('Login attempt:', { email, password, role });
+    if (!valid) {
+      return;
     }
+
+    /*
+     * Connect this to your real authentication
+     * endpoint when ready.
+     */
+    console.log("Login attempt", {
+      email,
+      role,
+    });
   };
 
   return (
-    <div className="relative overflow-hidden">
+    <div className="auth-form-content">
+      <form
+        onSubmit={handleSubmit}
+        className="auth-form"
+      >
+        <AuthField
+          label="Email"
+          error={emailError}
+        >
+          <input
+            type="email"
+            value={email}
+            autoComplete="email"
+            onChange={(event) => {
+              setEmail(
+                event.target.value,
+              );
 
-      <div className="relative z-10">
+              if (emailError) {
+                setEmailError("");
+              }
+            }}
+            placeholder="Enter your email"
+            className="auth-input"
+          />
+        </AuthField>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-5">
-          {/* Email */}
-          <div>
-            <label className="block text-md font-semibold text-gray-700 mb-1.5">
-              Email
-            </label>
-            <Input
-              type="email"
-              value={email}
-              onChange={(e) => {
-                setEmail(e.target.value);
-                if (emailError) setEmailError('');
-              }}
-              placeholder="Enter your email"
-              error={emailError}
-            />
-          </div>
+        <AuthField
+          label="Password"
+          error={passwordError}
+        >
+          <input
+            type="password"
+            value={password}
+            autoComplete="current-password"
+            onChange={(event) => {
+              setPassword(
+                event.target.value,
+              );
 
-          {/* Password */}
-          <div>
-            <label className="block text-md font-semibold text-gray-700 mb-1.5">
-              Password
-            </label>
-            <Input
-              type="password"
-              value={password}
-              onChange={(e) => {
-                setPassword(e.target.value);
-                if (passwordError) setPasswordError('');
-              }}
-              placeholder="Enter your password"
-              error={passwordError}
-            />
-          </div>
+              if (passwordError) {
+                setPasswordError("");
+              }
+            }}
+            placeholder="Enter your password"
+            className="auth-input"
+          />
+        </AuthField>
 
-          {/* Role */}
-          <div>
-            <label className="block text-md font-semibold text-gray-700 mb-1.5">
-              Role
-            </label>
-            <div className="relative">
-              <select
-                value={role}
-                onChange={(e) => setRole(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-900
-                           focus:outline-none focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue
-                           transition-all duration-200 appearance-none pr-10"
-              >
-                <option value="Admin">Admin</option>
-                <option value="Manager">Client</option>
-                <option value="Agent">Resource</option>
-              </select>
-              {/* Custom chevron */}
-              <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </div>
-            </div>
-          </div>
-
-          {/* Submit */}
-          <Button
-            type="submit"
-            variant="gradient"
-            size="lg"
-            fullWidth
-            className="mt-2"
-          >
-            Sign in
-          </Button>
-
-          {/* Forgot password */}
-          <div className="text-center mt-4">
-            <a
-              href="/forgotPassword"
-              className="text-sm text-brand-blue hover:text-brand-light-blue transition-colors duration-200"
+        <AuthField label="Role">
+          <div className="auth-select">
+            <button
+              type="button"
+              aria-haspopup="listbox"
+              aria-expanded={roleOpen}
+              onClick={() =>
+                setRoleOpen(
+                  (current) => !current,
+                )
+              }
+              className="auth-select-trigger"
             >
-              Forgot password?
-            </a>
+              <span>
+                {role}
+              </span>
+
+              <ChevronDown
+                size={20}
+                className={
+                  roleOpen
+                    ? "rotate-180"
+                    : ""
+                }
+              />
+            </button>
+
+            {roleOpen && (
+              <>
+                <button
+                  type="button"
+                  aria-label="Close role menu"
+                  className="auth-dropdown-backdrop"
+                  onClick={() =>
+                    setRoleOpen(false)
+                  }
+                />
+
+                <div
+                  role="listbox"
+                  className="auth-select-menu"
+                >
+                  {roles.map(
+                    (option) => (
+                      <button
+                        key={option}
+                        type="button"
+                        role="option"
+                        aria-selected={
+                          role === option
+                        }
+                        onClick={() => {
+                          setRole(option);
+                          setRoleOpen(
+                            false,
+                          );
+                        }}
+                        className="auth-select-option"
+                      >
+                        <span>
+                          {option}
+                        </span>
+
+                        {role ===
+                          option && (
+                          <Check
+                            size={16}
+                          />
+                        )}
+                      </button>
+                    ),
+                  )}
+                </div>
+              </>
+            )}
           </div>
-        </form>
-      </div>
+        </AuthField>
+
+        <button
+          type="submit"
+          className="auth-primary-button"
+        >
+          Sign in
+        </button>
+
+        <div className="auth-bottom-link">
+          <Link href="/forgotPassword">
+            Forgot password
+          </Link>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function AuthField({
+  label,
+  error,
+  children,
+}: {
+  label: string;
+  error?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="auth-field">
+      <label className="auth-label">
+        {label}
+      </label>
+
+      {children}
+
+      {error && (
+        <span className="auth-error">
+          {error}
+        </span>
+      )}
     </div>
   );
 }

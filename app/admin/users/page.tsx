@@ -1,2 +1,15 @@
-import { Plus } from 'lucide-react'; import AdminUsers from '@/components/features/AdminUsers'; import PageHeader from '@/components/ui/PageHeader'; import { listClients, listUsers } from '@/lib/db';
-export default async function AdminUsersPage() { const [users, clients] = await Promise.all([listUsers(), listClients()]); return <div className="space-y-6"><PageHeader title="User management" description="Manage internal members, client users, and access status." action="Invite user" actionHref="/resources/new" actionIcon={Plus} /><AdminUsers users={users} clients={clients} /></div>; }
+import AdminUsers from "@/components/features/AdminUsers";
+
+import { listAdminUserRows, listClientRows, listResourceRows } from "@/lib/db";
+
+export default async function AdminUsersPage() {
+  const [admins, resources, clients] = await Promise.all([
+    listAdminUserRows(),
+
+    listResourceRows("OPEN"),
+
+    listClientRows(),
+  ]);
+
+  return <AdminUsers admins={admins} resources={resources} clients={clients} />;
+}

@@ -120,8 +120,13 @@ export default function TicketForm({
   const [customTimeOpen, setCustomTimeOpen] = useState(false);
   const [customDateTime, setCustomDateTime] = useState("");
   const [customStartedAt, setCustomStartedAt] = useState(0);
-  const [ticketId] = useState(() => initialTicket?.id ?? createTicketId());
   const fileInput = useRef<HTMLInputElement>(null);
+
+  function createTicketId() {
+    return `TKT-${crypto.randomUUID().replaceAll("-", "").slice(0, 32)}`;
+  }
+
+  const [ticketId] = useState(() => initialTicket?.id ?? createTicketId());
   const {
     register,
     control,
@@ -184,7 +189,6 @@ export default function TicketForm({
       setUploadMenu(false);
     }
   };
-  const createTicketId = () => `TKT-${crypto.randomUUID().replaceAll("-", "").slice(0, 32)}`;
   const captureScreenshot = async () => {
     try {
       const stream = await navigator.mediaDevices.getDisplayMedia({
@@ -297,7 +301,6 @@ export default function TicketForm({
         </h1>
         <div className="flex flex-wrap gap-2">
           <Link href="/tickets/drafts" className="button-secondary">
-            <FileText size={16} />
             Drafts
           </Link>
           <button

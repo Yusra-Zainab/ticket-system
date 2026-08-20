@@ -1,2 +1,29 @@
-import { Plus } from 'lucide-react'; import DirectoryTable from '@/components/features/DirectoryTable'; import PageHeader from '@/components/ui/PageHeader'; import { listUsers } from '@/lib/db';
-export default async function ResourcesPage() { const users = await listUsers(); return <div className="space-y-6"><PageHeader title="Resources" description="Balance team capacity, expertise, and project assignments." action="New resource" actionHref="/resources/new" actionIcon={Plus} /><DirectoryTable type="resources" users={users} /></div>; }
+import { Plus } from "lucide-react";
+
+import ResourcesTable from "@/components/features/ResourcesTable";
+import PageHeader from "@/components/ui/PageHeader";
+import { listResourceRows } from "@/lib/db";
+
+export default async function ResourcesPage() {
+  const resources =
+    await listResourceRows(
+      "OPEN",
+    );
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Resources List"
+        action="New Resource"
+        actionHref="/resources/new"
+        actionIcon={Plus}
+      />
+
+      <ResourcesTable
+        initialResources={
+          resources
+        }
+      />
+    </div>
+  );
+}

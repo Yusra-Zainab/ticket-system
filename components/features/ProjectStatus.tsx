@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import type { ProjectStatus as ProjectStatusType } from "@/types";
 
 export interface ProjectStatusProps {
-  status: ProjectStatusType | string;
+  status?: ProjectStatusType | string | null;
   size?: "sm" | "md";
   subtle?: boolean;
   className?: string;
@@ -18,20 +18,7 @@ type StatusStyle = {
   color: string;
 };
 
-/*
- * Exact project-status colors from the Figma reference.
- *
- * Planning     #7C3AED
- * Not Started  #4B5563
- * Active       #2563EB
- * On Hold      #D97706
- * At Risk      #EA580C
- * Delayed      #DC2626
- * Completed    #16A34A
- * Cancelled    #BE123C
- * Archived     #6B7280
- */
-const solidStyles: Record<string, StatusStyle> = {
+const solidStyles: Record<ProjectStatusType, StatusStyle> = {
   Planning: {
     background: "#7C3AED",
     border: "#7C3AED",
@@ -87,7 +74,7 @@ const solidStyles: Record<string, StatusStyle> = {
   },
 };
 
-const subtleStyles: Record<string, StatusStyle> = {
+const subtleStyles: Record<ProjectStatusType, StatusStyle> = {
   Planning: {
     background: "#F5F3FF",
     border: "#DDD6FE",
@@ -143,30 +130,50 @@ const subtleStyles: Record<string, StatusStyle> = {
   },
 };
 
-/*
- * Temporary compatibility for existing projects that may still
- * contain the old project status values.
- *
- * Once the database has been migrated to the new nine statuses,
- * these aliases can be removed.
- */
-function normalizeProjectStatus(
-  status: string,
-): string {
+export function normalizeProjectStatus(
+  value?: string | null,
+): ProjectStatusType {
+  const status = value?.trim();
+
   switch (status) {
+    case "Planning":
+      return "Planning";
+
+    case "Not Started":
+      return "Not Started";
+
+    case "Active":
+      return "Active";
+
+    case "On Hold":
+      return "On Hold";
+
+    case "At Risk":
+      return "At Risk";
+
+    case "Delayed":
+      return "Delayed";
+
+    case "Completed":
+      return "Completed";
+
+    case "Cancelled":
+      return "Cancelled";
+
+    case "Archived":
+      return "Archived";
+
+    // Old project values
     case "Open":
       return "Planning";
 
     case "New":
-      return "Not Started";
-
     case "Assigned":
       return "Not Started";
 
     case "In Progress":
-      return "Active";
-
     case "On Track":
+    case "Ready for Review":
       return "Active";
 
     case "Paused":
@@ -176,16 +183,15 @@ function normalizeProjectStatus(
       return "At Risk";
 
     case "Blocked":
+    case "Overdue":
       return "Delayed";
 
     case "Closed":
       return "Completed";
 
-    case "Ready for Review":
-      return "Active";
-
+    // Blank / null / unknown database values
     default:
-      return status;
+      return "Not Started";
   }
 }
 
@@ -195,26 +201,26 @@ export default function ProjectStatus({
   subtle = false,
   className,
 }: ProjectStatusProps) {
-  const normalizedStatus =
-    normalizeProjectStatus(String(status));
+  const normalized =
+    normalizeProjectStatus(status);
 
   const palette = subtle
     ? subtleStyles
     : solidStyles;
 
-  const statusStyle =
-    palette[normalizedStatus] ??
-    palette.Archived;
+  const colors =
+    palette[normalized];
 
   const style: CSSProperties = {
     backgroundColor:
-      statusStyle.background,
-    borderColor: statusStyle.border,
-    color: statusStyle.color,
+      colors.background,
+    borderColor: colors.border,
+    color: colors.color,
   };
 
   return (
     <span
+      style={style}
       className={cn(
         "inline-flex items-center justify-center whitespace-nowrap rounded-[16px] border font-medium",
         size === "sm" &&
@@ -223,9 +229,8 @@ export default function ProjectStatus({
           "h-[28px] min-w-[122px] px-3 text-[14px] leading-5",
         className,
       )}
-      style={style}
     >
-      {normalizedStatus}
+      {normalized}
     </span>
   );
 }

@@ -13,6 +13,8 @@ import {
   MessageSquare,
   MonitorUp,
   Paperclip,
+  RotateCcw,
+  Save,
   Send,
   UploadCloud,
   UserCheck,
@@ -28,6 +30,7 @@ import { cn } from "@/lib/utils";
 
 import type {
   Client,
+  Project,
   ProjectPriority,
   ProjectStatus as ProjectStatusType,
   TicketAttachment,
@@ -143,6 +146,55 @@ const initialValues: ProjectFormValues = {
   internalNotes: "",
 };
 
+function valuesFromProject(project?: Project): ProjectFormValues {
+  if (!project) return initialValues;
+
+  const data = project.formData ?? {};
+  const links =
+    data.links && typeof data.links === "object"
+      ? (data.links as Record<string, unknown>)
+      : {};
+
+  return {
+    name: project.name ?? "",
+    projectType:
+      typeof data.projectType === "string" ? data.projectType : "",
+    description: project.description ?? "",
+
+    clientId: project.clientId ?? "",
+    clientOwnerId:
+      typeof data.clientOwnerId === "string" ? data.clientOwnerId : "",
+
+    startDate: project.startDate ?? "",
+    endDate: project.dueDate ?? "",
+    status: project.status ?? "",
+    priority: project.priority ?? "Not Assigned",
+
+    coordinatorId:
+      typeof data.coordinatorId === "string" ? data.coordinatorId : "",
+    teamIds: Array.isArray(data.teamIds)
+      ? data.teamIds.filter((value): value is string => typeof value === "string")
+      : project.teamMembers.map((member) => member.id),
+    department:
+      typeof data.department === "string" ? data.department : "",
+
+    moduleName:
+      typeof data.moduleName === "string" ? data.moduleName : "",
+    subModule:
+      typeof data.subModule === "string" ? data.subModule : "",
+    moduleOwnerId:
+      typeof data.moduleOwnerId === "string" ? data.moduleOwnerId : "",
+
+    stagingUrl: typeof links.staging === "string" ? links.staging : "",
+    liveUrl: typeof links.live === "string" ? links.live : "",
+    figmaUrl: typeof links.figma === "string" ? links.figma : "",
+    githubUrl: typeof links.github === "string" ? links.github : "",
+
+    internalNotes:
+      typeof data.internalNotes === "string" ? data.internalNotes : "",
+  };
+}
+
 const steps: Array<{
   id: SectionId;
   label: string;
@@ -187,22 +239,22 @@ const steps: Array<{
   },
 ];
 
-function createProjectUploadId() {
-  return `PRJ-${crypto.randomUUID().replaceAll("-", "").slice(0, 32)}`;
-}
-
 export default function NewProjectForm({
   users,
   clients,
   returnTo,
+  initialProject,
 }: {
   users: User[];
   clients: Client[];
   returnTo?: string;
+  initialProject?: Project;
 }) {
   const router = useRouter();
 
-  const [values, setValues] = useState<ProjectFormValues>(initialValues);
+  const [values, setValues] = useState<ProjectFormValues>(() =>
+    valuesFromProject(initialProject),
+  );
   const [activeSection, setActiveSection] =
     useState<SectionId>("project-details");
 
@@ -221,8 +273,10 @@ export default function NewProjectForm({
    *
    * This expects the project attachment API routes described below.
    */
-  const [uploadId] = useState(createProjectUploadId);
-  const [attachments, setAttachments] = useState<TicketAttachment[]>([]);
+  const [attachments, setAttachments] = useState<TicketAttachment[]>(
+    () => initialProject?.formData?.attachments ?? [],
+  );
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [uploadMenu, setUploadMenu] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -252,70 +306,78 @@ export default function NewProjectForm({
   };
 
   const resetForm = () => {
-    setValues(initialValues);
-    setAttachments([]);
+    setValues(valuesFromProject(initialProject));
+    setAttachments(initialProject?.formData?.attachments ?? []);
+    setPendingFiles([]);
+    setTeamOpen(false);
+    setUploadMenu(false);
     setError("");
     setNotice("");
     setActiveSection("project-details");
     jump("project-details");
   };
 
-  const uploadAttachments = async (incoming: File[]) => {
-    if (!incoming.length) return;
+  const queueAttachments = (incoming: File[]) => {
+    const accepted = incoming.filter((file) => file.size <= 10 * 1024 * 1024);
+
+    if (accepted.length !== incoming.length) {
+      setNotice("Files larger than 10 MB were skipped.");
+    }
+
+    setPendingFiles((current) => {
+      const existing = new Set(
+        current.map((file) => `${file.name}:${file.size}:${file.lastModified}`),
+      );
+
+      return [
+        ...current,
+        ...accepted.filter(
+          (file) =>
+            !existing.has(`${file.name}:${file.size}:${file.lastModified}`),
+        ),
+      ];
+    });
+
+    setUploadMenu(false);
+  };
+
+  const uploadPendingFiles = async (projectId: string) => {
+    if (!pendingFiles.length) return [] as TicketAttachment[];
 
     setUploading(true);
-    setNotice("");
 
     try {
       const formData = new FormData();
 
-      incoming.forEach((file) => {
+      pendingFiles.forEach((file) => {
         formData.append("files", file, file.name);
       });
 
-      const response = await fetch(
-        `/api/projects/${uploadId}/attachments`,
-        {
-          method: "POST",
-          body: formData,
-        },
-      );
+      const response = await fetch(`/api/projects/${projectId}/attachments`, {
+        method: "POST",
+        body: formData,
+      });
 
       if (!response.ok) {
-        let message = "Unable to upload attachments.";
+        const result = await response.json().catch(() => ({}));
 
-        try {
-          const data = await response.json();
-
-          if (typeof data?.error === "string") {
-            message = data.error;
-          }
-        } catch {
-          // Keep fallback.
-        }
-
-        throw new Error(message);
+        throw new Error(
+          typeof result?.error === "string"
+            ? result.error
+            : "Unable to upload project attachments.",
+        );
       }
 
       const data = (await response.json()) as {
         attachments?: TicketAttachment[];
       };
 
-      setAttachments((current) => [
-        ...(data.attachments ?? []),
-        ...current,
-      ]);
-
-      setNotice("Attachment uploaded successfully.");
-    } catch (cause) {
-      setNotice(
-        cause instanceof Error
-          ? cause.message
-          : "Unable to upload attachments.",
-      );
+      const uploaded = data.attachments ?? [];
+      setAttachments((current) => [...current, ...uploaded]);
+      setPendingFiles([]);
+      return uploaded;
     } finally {
       setUploading(false);
-      setUploadMenu(false);
     }
   };
 
@@ -342,7 +404,7 @@ export default function NewProjectForm({
         (blob) => {
           if (!blob) return;
 
-          void uploadAttachments([
+          queueAttachments([
             new globalThis.File(
               [blob],
               `project-screenshot-${Date.now()}.png`,
@@ -391,8 +453,6 @@ export default function NewProjectForm({
     const client = clients.find((item) => item.id === values.clientId);
 
     return {
-      id: uploadId,
-
       name: values.name,
       description: values.description,
 
@@ -468,25 +528,43 @@ export default function NewProjectForm({
     return "";
   };
 
-  const submitProject = async (register: boolean) => {
-    const validationError = validate();
+  const saveProject = async (state: "draft" | "open") => {
+    if (state === "open") {
+      const validationError = validate();
 
-    if (validationError) {
-      setError(validationError);
-      return;
+      if (validationError) {
+        setError(validationError);
+        return;
+      }
     }
 
     setError("");
     setSaving(true);
 
     try {
-      const response = await fetch("/api/projects", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(buildPayload()),
-      });
+      const payload = buildPayload();
+
+      const response = initialProject
+        ? await fetch(`/api/projects/${initialProject.id}`, {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              ...payload,
+              lifecycle: state === "draft" ? "DRAFT" : "OPEN",
+            }),
+          })
+        : await fetch("/api/projects", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              project: payload,
+              state,
+            }),
+          });
 
       const result = await response.json().catch(() => ({}));
 
@@ -494,26 +572,29 @@ export default function NewProjectForm({
         throw new Error(
           typeof result?.error === "string"
             ? result.error
-            : "Unable to create project.",
+            : "Unable to save project.",
         );
       }
 
-      setNotice("Project saved successfully.");
+      const projectId = String(result.id ?? initialProject?.id ?? "");
 
-      if (register) {
-        router.push(returnTo || `/projects/${result.id}`);
-        router.refresh();
+      if (!projectId) {
+        throw new Error("The project was saved without an id.");
+      }
+
+      await uploadPendingFiles(projectId);
+
+      router.refresh();
+
+      if (state === "draft") {
+        router.push("/projects/drafts");
         return;
       }
 
-      if (result.id) {
-        router.replace(`/projects/${result.id}/edit`);
-      }
+      router.push(returnTo || `/projects/${projectId}`);
     } catch (cause) {
       setError(
-        cause instanceof Error
-          ? cause.message
-          : "Unable to create project.",
+        cause instanceof Error ? cause.message : "Unable to save project.",
       );
     } finally {
       setSaving(false);
@@ -530,37 +611,50 @@ export default function NewProjectForm({
               fontFamily: "Satoshi, Arial, sans-serif",
             }}
           >
-            New Project
+            {initialProject ? "Edit Project" : "New Project"}
           </h1>
 
           <div className="flex flex-wrap items-center gap-3">
+            <Link
+              href="/projects/drafts"
+              className="new-project-secondary-button"
+            >
+              Drafts
+            </Link>
+
             <button
               type="button"
-              disabled={saving}
+              disabled={saving || uploading}
               onClick={resetForm}
               className="new-project-secondary-button"
             >
+              <RotateCcw size={16} />
               Reset
             </button>
 
             <button
               type="button"
-              disabled={saving}
-              onClick={() => void submitProject(false)}
+              disabled={saving || uploading}
+              onClick={() => void saveProject("draft")}
               className="new-project-secondary-button"
             >
+              <Save size={16} />
               Save Info
             </button>
 
             <button
               type="button"
-              disabled={saving}
-              onClick={() => void submitProject(true)}
+              disabled={saving || uploading}
+              onClick={() => void saveProject("open")}
               className="new-project-register-button"
             >
               <Send size={18} />
 
-              {saving ? "Saving..." : "Save and Register"}
+              {saving
+                ? "Saving..."
+                : initialProject?.lifecycle === "OPEN"
+                  ? "Save Project"
+                  : "Save and Register"}
             </button>
           </div>
         </div>
@@ -765,17 +859,9 @@ export default function NewProjectForm({
               </Field>
 
               <Field label="Project Priority">
-                <SearchDropdown
+                <PriorityDropdown
                   value={values.priority}
-                  onChange={(value) =>
-                    setField("priority", value as ProjectPriority)
-                  }
-                  placeholder="Select priority"
-                  searchPlaceholder="Search priority."
-                  options={priorities.map((priority) => ({
-                    value: priority,
-                    label: priority,
-                  }))}
+                  onChange={(value) => setField("priority", value)}
                 />
               </Field>
             </div>
@@ -994,9 +1080,7 @@ export default function NewProjectForm({
                 onDragOver={(event) => event.preventDefault()}
                 onDrop={(event) => {
                   event.preventDefault();
-                  void uploadAttachments(
-                    Array.from(event.dataTransfer.files),
-                  );
+                  queueAttachments(Array.from(event.dataTransfer.files));
                 }}
                 className="flex w-full max-w-[672px] flex-col items-center rounded-xl border border-[#EAECF0] bg-white px-6 py-5 transition hover:border-[#0284C7] hover:bg-[#F8FDFF] disabled:cursor-wait disabled:opacity-60"
               >
@@ -1023,13 +1107,45 @@ export default function NewProjectForm({
                 className="hidden"
                 accept=".svg,.png,.jpg,.jpeg,.gif,.pdf,.txt"
                 onChange={(event) => {
-                  void uploadAttachments(
-                    Array.from(event.target.files ?? []),
-                  );
+                  queueAttachments(Array.from(event.target.files ?? []));
 
                   event.target.value = "";
                 }}
               />
+
+              {pendingFiles.length > 0 && (
+                <ul className="mt-3 grid max-w-[672px] gap-2 sm:grid-cols-2">
+                  {pendingFiles.map((file) => (
+                    <li
+                      key={`${file.name}-${file.size}-${file.lastModified}`}
+                      className="flex min-w-0 items-center gap-2 rounded-lg border border-[#B2DDFF] bg-[#EFF8FF] p-3 text-sm"
+                    >
+                      <File size={16} className="shrink-0 text-[#175CD3]" />
+
+                      <span className="min-w-0 flex-1 truncate text-[#344054]">
+                        {file.name}
+                      </span>
+
+                      <span className="shrink-0 text-[11px] font-medium text-[#175CD3]">
+                        Pending
+                      </span>
+
+                      <button
+                        type="button"
+                        aria-label={`Remove ${file.name}`}
+                        onClick={() =>
+                          setPendingFiles((items) =>
+                            items.filter((item) => item !== file),
+                          )
+                        }
+                        className="grid size-7 shrink-0 place-items-center rounded-md text-[#667085] hover:bg-white hover:text-[#D92D20]"
+                      >
+                        <X size={15} />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
 
               {attachments.length > 0 && (
                 <ul className="mt-3 grid max-w-[672px] gap-2 sm:grid-cols-2">
@@ -1451,6 +1567,118 @@ function StatusDropdown({
                     size="sm"
                     className="!min-w-[122px]"
                   />
+                </button>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+
+const priorityStyles: Record<ProjectPriority, string> = {
+  Critical: "border-[#DC2626] bg-[#DC2626] text-white",
+  High: "border-[#EA580C] bg-[#EA580C] text-white",
+  Medium: "border-[#D97706] bg-[#D97706] text-white",
+  Low: "border-[#16A34A] bg-[#16A34A] text-white",
+  "Not Assigned": "border-[#6B7280] bg-[#6B7280] text-white",
+};
+
+function ProjectPriorityTag({
+  priority,
+}: {
+  priority: ProjectPriority;
+}) {
+  return (
+    <span
+      className={cn(
+        "inline-flex h-[22px] min-w-[122px] items-center justify-center rounded-[16px] border px-2 text-[12px] font-medium leading-[18px]",
+        priorityStyles[priority],
+      )}
+    >
+      {priority}
+    </span>
+  );
+}
+
+function PriorityDropdown({
+  value,
+  onChange,
+}: {
+  value: ProjectPriority;
+  onChange: (value: ProjectPriority) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+
+  const filtered = priorities.filter((priority) =>
+    priority.toLowerCase().includes(query.trim().toLowerCase()),
+  );
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+        className={cn(
+          "new-project-input flex items-center justify-between gap-3 text-left",
+          open && "!border-[#98A2B3]",
+        )}
+      >
+        <ProjectPriorityTag priority={value} />
+
+        <ChevronDown
+          size={18}
+          className={cn(
+            "shrink-0 text-[#98A2B3] transition-transform",
+            open && "rotate-180",
+          )}
+        />
+      </button>
+
+      {open && (
+        <>
+          <button
+            type="button"
+            aria-label="Close priority dropdown"
+            className="fixed inset-0 z-30 cursor-default"
+            onClick={() => {
+              setOpen(false);
+              setQuery("");
+            }}
+          />
+
+          <div className="absolute left-0 top-[43px] z-40 w-full overflow-hidden rounded-b-[8px] border border-[#D0D5DD] bg-white p-3 shadow-[0_4px_12px_rgba(16,24,40,0.08)]">
+            <input
+              autoFocus
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search priority."
+              className="h-[50px] w-full rounded-[8px] border border-[#D0D5DD] bg-white px-4 text-[16px] text-[#344054] shadow-[0_1px_2px_rgba(16,24,40,0.05)] outline-none placeholder:text-[#98A2B3] focus:border-[#0284C7]"
+            />
+
+            <div className="mt-2 max-h-[280px] overflow-y-auto">
+              {filtered.map((priority) => (
+                <button
+                  key={priority}
+                  type="button"
+                  role="option"
+                  aria-selected={value === priority}
+                  onClick={() => {
+                    onChange(priority);
+                    setOpen(false);
+                    setQuery("");
+                  }}
+                  className={cn(
+                    "flex min-h-[51px] w-full items-center border-b border-[#EAECF0] px-4 text-left transition last:border-b-0 hover:bg-[#F9FAFB]",
+                    value === priority && "bg-[#F9FAFB]",
+                  )}
+                >
+                  <ProjectPriorityTag priority={priority} />
                 </button>
               ))}
             </div>

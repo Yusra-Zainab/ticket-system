@@ -1,2 +1,40 @@
-import { notFound } from 'next/navigation'; import { Mail, Phone } from 'lucide-react'; import ActivityTimeline from '@/components/ui/ActivityTimeline'; import PageHeader from '@/components/ui/PageHeader'; import StatusBadge from '@/components/ui/StatusBadge'; import { findClient, listProjects } from '@/lib/db';
-export default async function ClientDetailPage({ params }: { params: Promise<{ id: string }> }) { const { id } = await params; const client = await findClient(id); if (!client) notFound(); const projects = (await listProjects()).filter((item) => item.client === client.company); const mockActivities: never[] = []; return <div className="space-y-6"><PageHeader title={client.company} description="Client profile and account activity" /><div className="grid gap-6 lg:grid-cols-[320px_1fr]"><aside className="card p-5"><div className="grid size-14 place-items-center rounded-2xl bg-sky-100 text-xl font-black text-sky-700">{client.company[0]}</div><h2 className="mt-4 font-bold">{client.name}</h2><StatusBadge status={client.status} /><div className="mt-5 space-y-3 text-sm text-slate-600"><p className="flex gap-2"><Mail size={16} />{client.email}</p><p className="flex gap-2"><Phone size={16} />{client.phone}</p></div></aside><div className="space-y-6"><section className="card p-5"><h2 className="font-bold">Projects</h2><div className="mt-4 space-y-3">{projects.map((project) => <a href={`/projects/${project.id}`} key={project.id} className="flex items-center justify-between rounded-xl border border-slate-100 p-4 hover:bg-slate-50"><div><p className="font-semibold text-slate-800">{project.name}</p><p className="text-xs text-slate-400">{project.progress}% complete</p></div><StatusBadge status={project.status} /></a>)}</div></section><section className="card p-5"><h2 className="mb-5 font-bold">Activity</h2><ActivityTimeline activities={mockActivities} maxItems={3} /></section></div></div></div>; }
+import { notFound } from "next/navigation";
+
+import ClientDetailsView from "@/components/features/ClientDetailsView";
+
+import {
+  findClientRecord,
+  listProjects,
+  listTickets,
+  listUsers,
+} from "@/lib/db";
+
+export default async function ClientDetailsPage({
+  params,
+}: {
+  params: Promise<{
+    id: string;
+  }>;
+}) {
+  const { id } = await params;
+
+  const [client, projects, tickets, users] = await Promise.all([
+    findClientRecord(id),
+    listProjects("OPEN"),
+    listTickets("OPEN"),
+    listUsers(),
+  ]);
+
+  if (!client || client.lifecycle !== "OPEN") {
+    notFound();
+  }
+
+  return (
+    <ClientDetailsView
+      client={client}
+      projects={projects}
+      tickets={tickets}
+      users={users}
+    />
+  );
+}

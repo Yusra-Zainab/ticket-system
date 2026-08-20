@@ -1,129 +1,190 @@
 import { z } from "zod";
-import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
+import type { ResultSetHeader } from "mysql2/promise";
 
-import { db, ensureProjectPriorityColumn, findProject, listProjects } from "@/lib/db";
+import { db, findProject, hasProjectPriorityColumn } from "@/lib/db";
 
-const projectStatuses = [
+const statusSchema = z.enum([
+  "Planning",
+  "Not Started",
   "Active",
-  "Open",
-  "In Progress",
-  "Ready for Review",
-  "Assigned",
-  "Blocked",
-  "Paused",
-  "On Track",
-  "Critical",
+  "On Hold",
+  "At Risk",
+  "Delayed",
   "Completed",
-] as const;
+  "Cancelled",
+  "Archived",
+]);
 
-const projectPriorities = ["Critical", "High", "Medium", "Low", "Not Assigned"] as const;
+const prioritySchema = z.enum([
+  "Critical",
+  "High",
+  "Medium",
+  "Low",
+  "Not Assigned",
+]);
 
-const updateSchema = z.object({
-  name: z.string().min(3).max(255).optional(),
+const patchSchema = z.object({
+  lifecycle: z.enum(["DRAFT", "OPEN"]).optional(),
+  name: z.string().min(1).max(255).optional(),
   description: z.string().max(10000).optional(),
   clientId: z.coerce.number().int().positive().nullable().optional(),
-  client: z.string().max(255).optional(),
-  status: z.enum(projectStatuses).optional(),
-  priority: z.enum(projectPriorities).optional(),
+  status: statusSchema.optional(),
+  priority: prioritySchema.optional(),
   progress: z.coerce.number().int().min(0).max(100).optional(),
+  startDate: z.string().nullable().optional(),
   dueDate: z.string().nullable().optional(),
-  team: z.array(z.string()).optional(),
+  projectType: z.string().max(255).optional(),
+  clientOwnerId: z.string().nullable().optional(),
+  coordinatorId: z.string().nullable().optional(),
+  department: z.string().max(255).optional(),
+  teamIds: z.array(z.string()).optional(),
+  moduleName: z.string().max(255).optional(),
+  subModule: z.string().max(255).optional(),
+  moduleOwnerId: z.string().nullable().optional(),
+  links: z
+    .object({
+      staging: z.string().default(""),
+      live: z.string().default(""),
+      figma: z.string().default(""),
+      github: z.string().default(""),
+    })
+    .optional(),
+  internalNotes: z.string().max(10000).optional(),
 });
 
 export async function GET(
   _request: Request,
-  context: { params: Promise<{ id: string }> },
+  { params }: { params: Promise<{ id: string }> },
 ) {
+  const { id } = await params;
+
   try {
-    await ensureProjectPriorityColumn();
-    const { id } = await context.params;
     const project = await findProject(id);
 
-    return project
-      ? Response.json(project)
-      : Response.json({ error: "Project not found" }, { status: 404 });
+    if (!project) {
+      return Response.json({ error: "Project not found" }, { status: 404 });
+    }
+
+    return Response.json(project);
   } catch (error) {
     console.error(error);
-    return Response.json({ error: "Unable to load project" }, { status: 503 });
+    return Response.json({ error: "Unable to load project" }, { status: 500 });
   }
 }
 
 export async function PATCH(
   request: Request,
-  context: { params: Promise<{ id: string }> },
+  { params }: { params: Promise<{ id: string }> },
 ) {
+  const { id } = await params;
+  const projectId = Number(id);
+
+  if (!Number.isInteger(projectId) || projectId <= 0) {
+    return Response.json({ error: "Invalid project id" }, { status: 400 });
+  }
+
   const connection = await db.getConnection();
-  const { id } = await context.params;
 
   try {
-    await ensureProjectPriorityColumn();
-    const values = updateSchema.parse(await request.json());
+    const values = patchSchema.parse(await request.json());
+    const current = await findProject(id);
+
+    if (!current) {
+      return Response.json({ error: "Project not found" }, { status: 404 });
+    }
+
+    const currentForm = current.formData ?? {};
+    const formData = {
+      ...currentForm,
+      ...(values.priority !== undefined ? { priority: values.priority } : {}),
+      ...(values.projectType !== undefined
+        ? { projectType: values.projectType }
+        : {}),
+      ...(values.clientOwnerId !== undefined
+        ? { clientOwnerId: values.clientOwnerId ?? "" }
+        : {}),
+      ...(values.coordinatorId !== undefined
+        ? { coordinatorId: values.coordinatorId ?? "" }
+        : {}),
+      ...(values.department !== undefined
+        ? { department: values.department }
+        : {}),
+      ...(values.teamIds !== undefined ? { teamIds: values.teamIds } : {}),
+      ...(values.moduleName !== undefined
+        ? { moduleName: values.moduleName }
+        : {}),
+      ...(values.subModule !== undefined ? { subModule: values.subModule } : {}),
+      ...(values.moduleOwnerId !== undefined
+        ? { moduleOwnerId: values.moduleOwnerId ?? "" }
+        : {}),
+      ...(values.links !== undefined ? { links: values.links } : {}),
+      ...(values.internalNotes !== undefined
+        ? { internalNotes: values.internalNotes }
+        : {}),
+    };
 
     await connection.beginTransaction();
 
-    const clientFieldProvided =
-      values.client !== undefined || values.clientId !== undefined;
-    let clientId = values.clientId;
+    const columns: string[] = [];
+    const args: unknown[] = [];
 
-    if (clientFieldProvided && !clientId && values.client) {
-      const [clientRows] = await connection.query<(RowDataPacket & { id: number })[]>(
-        `
-          SELECT id
-          FROM clients
-          WHERE company = ?
-             OR name = ?
-          LIMIT 1
-        `,
-        [values.client, values.client],
-      );
-
-      clientId = clientRows[0]?.id ?? null;
-    }
-
-    const updates: string[] = [];
-    const params: Array<string | number | null> = [];
-
-    const push = (column: string, value: string | number | null | undefined) => {
-      if (value === undefined) return;
-      updates.push(`${column} = ?`);
-      params.push(value);
+    const add = (column: string, value: unknown) => {
+      columns.push(`${column}=?`);
+      args.push(value);
     };
 
-    push("name", values.name);
-    push("description", values.description);
-    if (clientFieldProvided) push("client_id", clientId ?? null);
-    push("status", values.status);
-    push("priority_type", values.priority);
-    push("progress", values.progress);
-    push("due_date", values.dueDate ?? null);
-
-    if (!updates.length) {
-      const existing = await findProject(id);
-      return existing
-        ? Response.json(existing)
-        : Response.json({ error: "Project not found" }, { status: 404 });
+    if (values.lifecycle !== undefined) add("lifecycle", values.lifecycle);
+    if (values.name !== undefined) add("name", values.name);
+    if (values.description !== undefined) add("description", values.description);
+    if (values.clientId !== undefined) add("client_id", values.clientId);
+    if (values.status !== undefined) add("status", values.status);
+    if (values.priority !== undefined && (await hasProjectPriorityColumn())) {
+      add("priority_type", values.priority);
     }
+    if (values.progress !== undefined) add("progress", values.progress);
+    if (values.startDate !== undefined) add("start_date", values.startDate || null);
+    if (values.dueDate !== undefined) add("due_date", values.dueDate || null);
 
-    const [result] = await connection.execute<ResultSetHeader>(
-      `UPDATE projects SET ${updates.join(", ")}, updated_at = NOW() WHERE id = ?`,
-      [...params, Number(id)],
-    );
+    const touchesFormData = [
+      "projectType",
+      "clientOwnerId",
+      "coordinatorId",
+      "department",
+      "teamIds",
+      "moduleName",
+      "subModule",
+      "moduleOwnerId",
+      "links",
+      "priority",
+      "internalNotes",
+    ].some((key) => key in values);
 
-    if (result.affectedRows === 0) {
-      await connection.rollback();
-      return Response.json({ error: "Project not found" }, { status: 404 });
+    if (touchesFormData) add("form_data", JSON.stringify(formData));
+
+    if (columns.length) {
+      args.push(projectId);
+
+      const [result] = await connection.execute<ResultSetHeader>(
+        `UPDATE projects SET ${columns.join(",")},updated_at=CURRENT_TIMESTAMP WHERE id=?`,
+        args,
+      );
+
+      if (!result.affectedRows) {
+        await connection.rollback();
+        return Response.json({ error: "Project not found" }, { status: 404 });
+      }
     }
 
     await connection.commit();
 
-    const project = (await listProjects()).find((item) => item.id === id);
-    return Response.json(project ?? { id, ...values }, { status: 200 });
+    const updated = await findProject(id);
+    return Response.json(updated);
   } catch (error) {
     await connection.rollback();
 
     if (error instanceof z.ZodError) {
       return Response.json(
-        { error: "Invalid project", details: error.flatten() },
+        { error: "Invalid project update", details: error.flatten() },
         { status: 400 },
       );
     }
@@ -137,19 +198,22 @@ export async function PATCH(
 
 export async function DELETE(
   _request: Request,
-  context: { params: Promise<{ id: string }> },
+  { params }: { params: Promise<{ id: string }> },
 ) {
-  const connection = await db.getConnection();
-  const { id } = await context.params;
+  const { id } = await params;
+  const projectId = Number(id);
+
+  if (!Number.isInteger(projectId) || projectId <= 0) {
+    return Response.json({ error: "Invalid project id" }, { status: 400 });
+  }
 
   try {
-    await ensureProjectPriorityColumn();
-    const [result] = await connection.execute<ResultSetHeader>(
-      "DELETE FROM projects WHERE id = ?",
-      [Number(id)],
+    const [result] = await db.execute<ResultSetHeader>(
+      "DELETE FROM projects WHERE id=?",
+      [projectId],
     );
 
-    if (result.affectedRows === 0) {
+    if (!result.affectedRows) {
       return Response.json({ error: "Project not found" }, { status: 404 });
     }
 
@@ -157,7 +221,5 @@ export async function DELETE(
   } catch (error) {
     console.error(error);
     return Response.json({ error: "Unable to delete project" }, { status: 500 });
-  } finally {
-    connection.release();
   }
 }

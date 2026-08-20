@@ -12,20 +12,11 @@ import ProjectStatus from "@/components/features/ProjectStatus";
 import { usePageSearch } from "@/components/providers/PageSearchProvider";
 import { Avatar } from "@/components/ui/Avatar";
 import { cn, formatDate } from "@/lib/utils";
-import type { Project, Ticket, User } from "@/types";
+import type { Project, Ticket, TicketAttachment, User } from "@/types";
 
-type UpdateRow = {
-  id: string;
-  date: string;
+type ProjectLink = {
   title: string;
-  user: string;
-};
-
-type LinkRow = {
-  id: string;
-  title: string;
-  url: string;
-  date: string;
+  href: string;
 };
 
 export default function ProjectDetailsView({
@@ -41,73 +32,91 @@ export default function ProjectDetailsView({
   const { query } = usePageSearch();
   const [activeTab, setActiveTab] = useState<ProjectTab>("Overview");
 
+  const formData = (project.formData ?? {}) as Record<string, unknown>;
   const projectTickets = useMemo(
     () => tickets.filter((ticket) => ticket.project === project.name),
     [project.name, tickets],
   );
 
-  const team = useMemo(
+  const teamMembers = useMemo(() => {
+    if (project.teamMembers?.length) return project.teamMembers;
+
+    const ids = Array.isArray(formData.teamIds)
+      ? formData.teamIds.filter(
+          (value): value is string => typeof value === "string",
+        )
+      : [];
+
+    return ids
+      .map((id) => users.find((user) => user.id === id))
+      .filter((user): user is User => Boolean(user))
+      .map((user) => ({
+        id: user.id,
+        name: user.name,
+        role: user.role,
+        avatar: user.avatar ?? null,
+      }));
+  }, [formData.teamIds, project.teamMembers, users]);
+
+  const attachments = useMemo<TicketAttachment[]>(
     () =>
-      project.teamMembers?.length
-        ? project.teamMembers
-        : users
-            .filter((user) => project.team.includes(user.name))
-            .map((user) => ({
-              id: user.id,
-              name: user.name,
-              role: user.role,
-              avatar: user.avatar ?? null,
-            })),
-    [project.team, project.teamMembers, users],
+      Array.isArray(formData.attachments)
+        ? formData.attachments.filter((value): value is TicketAttachment =>
+            Boolean(
+              value &&
+              typeof value === "object" &&
+              "id" in value &&
+              "name" in value &&
+              "url" in value,
+            ),
+          )
+        : [],
+    [formData.attachments],
   );
 
-  const modules = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          projectTickets.flatMap((ticket) => {
-            const data = (ticket.formData ?? {}) as Record<string, unknown>;
-            return [data.module, data.subModule].filter(
-              (value): value is string =>
-                typeof value === "string" && value.trim().length > 0,
-            );
-          }),
-        ),
-      ),
-    [projectTickets],
-  );
+  const projectLinks = useMemo<ProjectLink[]>(() => {
+    const links = formData.links;
+    if (!links || typeof links !== "object") return [];
 
-  const links = useMemo<LinkRow[]>(
-    () =>
-      projectTickets.flatMap((ticket) => {
-        const data = (ticket.formData ?? {}) as Record<string, unknown>;
-        const urls = Array.isArray(data.urls)
-          ? data.urls.filter(
-              (value): value is string => typeof value === "string",
-            )
-          : [];
+    return [
+      {
+        title: "Staging",
+        href: String((links as Record<string, unknown>).staging ?? ""),
+      },
+      {
+        title: "Live",
+        href: String((links as Record<string, unknown>).live ?? ""),
+      },
+      {
+        title: "Figma",
+        href: String((links as Record<string, unknown>).figma ?? ""),
+      },
+      {
+        title: "GitHub",
+        href: String((links as Record<string, unknown>).github ?? ""),
+      },
+    ].filter((item) => item.href.trim().length > 0);
+  }, [formData.links]);
 
-        return urls.map((url, index) => ({
-          id: `${ticket.id}-${index}`,
-          title: url.replace(/^https?:\/\//, ""),
-          url,
-          date: ticket.created,
-        }));
-      }),
-    [projectTickets],
-  );
+  const modules = useMemo(() => {
+    const values = [
+      typeof formData.projectType === "string" ? formData.projectType : "",
+      typeof formData.moduleName === "string" ? formData.moduleName : "",
+      typeof formData.subModule === "string" ? formData.subModule : "",
+      typeof formData.department === "string" ? formData.department : "",
+    ];
 
-  const updates = useMemo<UpdateRow[]>(
-    () =>
-      projectTickets.map((ticket) => ({
-        id: ticket.id,
-        date: ticket.created,
-        title: `${ticket.title} - ${ticket.status}`,
-        user: ticket.assignedTo || ticket.reporter || "-",
-      })),
-    [projectTickets],
-  );
+    return Array.from(
+      new Set(values.map((value) => value.trim()).filter(Boolean)),
+    );
+  }, [
+    formData.department,
+    formData.moduleName,
+    formData.projectType,
+    formData.subModule,
+  ]);
 
+  const openTickets = project.openTickets ?? projectTickets.length;
   const search = query.trim().toLowerCase();
 
   const filteredTickets = search
@@ -119,16 +128,30 @@ export default function ProjectDetailsView({
     : projectTickets;
 
   const filteredTeam = search
-    ? team.filter((member) =>
+    ? teamMembers.filter((member) =>
         `${member.name} ${member.role}`.toLowerCase().includes(search),
       )
-    : team;
+    : teamMembers;
 
-  const filteredUpdates = search
-    ? updates.filter((row) =>
-        `${row.date} ${row.title} ${row.user}`.toLowerCase().includes(search),
+  const filteredAttachments = search
+    ? attachments.filter((attachment) =>
+        `${attachment.name} ${attachment.mimeType}`
+          .toLowerCase()
+          .includes(search),
       )
-    : updates;
+    : attachments;
+
+  const filteredLinks = search
+    ? projectLinks.filter((link) =>
+        `${link.title} ${link.href}`.toLowerCase().includes(search),
+      )
+    : projectLinks;
+
+  const filteredModules = search
+    ? modules.filter((module) => module.toLowerCase().includes(search))
+    : modules;
+
+  const latestUpdates = projectTickets.slice(0, 5);
 
   return (
     <div className="space-y-6 pb-28">
@@ -142,8 +165,8 @@ export default function ProjectDetailsView({
               {project.name}
             </h1>
             <p className="mt-2 text-[16px] font-normal leading-6 text-[#475467]">
-              <span className="font-semibold text-[#344054]">Client:</span>{" "}
-              <span className="font-normal">{project.client}</span>
+              <span className="font-bold text-[#344054]">Client:</span>{" "}
+              {project.client}
             </p>
           </div>
 
@@ -154,11 +177,8 @@ export default function ProjectDetailsView({
             >
               Edit Project
             </Link>
-            <Link
-              href={`/modules/new?project=${encodeURIComponent(project.id)}&projectName=${encodeURIComponent(project.name)}`}
-              className="project-action-outline"
-            >
-              Add Module
+            <Link href="/projects/new" className="project-action-outline">
+              Create New Project
             </Link>
             <Link
               href={`/tickets/new?project=${encodeURIComponent(project.name)}`}
@@ -172,25 +192,28 @@ export default function ProjectDetailsView({
 
       <section className="project-metrics-grid rounded-[10px] bg-[#06B6D4] p-2">
         <article className="project-metric-card">
-          <div className="grid h-full grid-cols-2 gap-4">
+          <div className="grid h-full grid-cols-2 gap-2">
             <MetricGroup label="Status">
-              <ProjectStatus status={project.status} subtle size="md" />
+              <ProjectStatus
+                status={project.status}
+                subtle
+                size="sm"
+                className="!h-[24px] !min-w-0 !max-w-[112px] !px-2.5 !text-[12px]"
+              />
             </MetricGroup>
+
             <MetricGroup label="Priority">
-              <PriorityBadge priority={project.priority} />
+              <PriorityBadge priority={project.priority} compact />
             </MetricGroup>
           </div>
         </article>
 
-        <MetricCard
-          label="Open Tickets"
-          value={String(project.openTickets ?? filteredTickets.length)}
-        />
-        <MetricCard
-          label="Assigned Team"
-          value={`${team.length} ${team.length === 1 ? "Member" : "Members"}`}
-        />
-        <MetricCard label="Progress %" value={`${project.progress}%`} />
+        <MetricCard label="Open Tickets" value={String(openTickets)} />
+
+        <MetricCard label="Team Members" value={`${teamMembers.length}`} />
+
+        <MetricCard label="Progress %" value={`${project.progress ?? 0}%`} />
+
         <MetricCard
           label="Last Updated"
           value={formatProjectDate(project.lastUpdated)}
@@ -201,64 +224,94 @@ export default function ProjectDetailsView({
 
       {activeTab === "Overview" && (
         <div className="space-y-6">
-          <Section
-            title="Project Brief"
-            body={
-              project.description?.trim() ||
-              "Project brief is not stored in the current database record."
-            }
-          />
+          <section>
+            <h2 className="project-detail-field-label">Project Brief</h2>
+            <p className="mt-2 text-[16px] leading-7 text-[#475467]">
+              {project.description?.trim() ||
+                "Project brief is not stored in the current database record."}
+            </p>
+          </section>
 
           <div className="grid gap-6 lg:grid-cols-2">
             <Section
-              title="Key Modules"
+              title="Project Type"
               body={
-                modules.length
-                  ? modules.join(", ")
-                  : "No module records found in ticket data."
+                typeof formData.projectType === "string" &&
+                formData.projectType.trim().length
+                  ? formData.projectType
+                  : "No project type saved."
               }
             />
             <Section
-              title="Current Focus"
+              title="Department"
               body={
-                stripHtml(projectTickets[0]?.description ?? "") ||
-                "No current focus found in project ticket data."
+                typeof formData.department === "string" &&
+                formData.department.trim().length
+                  ? formData.department
+                  : "No department saved."
+              }
+            />
+          </div>
+
+          <div className="grid gap-6 lg:grid-cols-2">
+            <Section
+              title="Module"
+              body={
+                typeof formData.moduleName === "string" &&
+                formData.moduleName.trim().length
+                  ? formData.moduleName
+                  : "No module saved."
+              }
+            />
+            <Section
+              title="Sub Module"
+              body={
+                typeof formData.subModule === "string" &&
+                formData.subModule.trim().length
+                  ? formData.subModule
+                  : "No sub module saved."
               }
             />
           </div>
 
           <Section
-            title="Important Links"
+            title="Project Links"
             body={
-              links.length ? (
+              filteredLinks.length ? (
                 <div className="space-y-2">
-                  {links.slice(0, 5).map((item) => (
+                  {filteredLinks.map((link) => (
                     <a
-                      key={item.id}
-                      href={item.url}
+                      key={link.title}
+                      href={link.href}
                       target="_blank"
                       rel="noreferrer"
                       className="block text-[16px] leading-7 text-[#475467] underline decoration-[#D0D5DD] underline-offset-4 hover:text-[#0284C7]"
                     >
-                      {item.title}
+                      {link.title}
                     </a>
                   ))}
                 </div>
               ) : (
-                "No project links found in ticket data."
+                "No project links saved."
               )
             }
           />
 
           <Section
-            title="Project Notes"
-            body="Project notes are not stored in the current project record."
+            title="Internal Notes"
+            body={
+              typeof formData.internalNotes === "string" &&
+              formData.internalNotes.trim().length
+                ? formData.internalNotes
+                : "No internal notes saved."
+            }
           />
 
           <section className="overflow-hidden rounded-[12px] border border-[#EAECF0] bg-white">
             <div className="border-b border-[#EAECF0] px-6 py-4">
               <h2 className="project-detail-subtitle">Latest Updates</h2>
             </div>
+
             <table className="w-full table-fixed">
               <thead className="bg-[#F9FAFB] text-left text-[12px] font-semibold text-[#475467]">
                 <tr>
@@ -268,23 +321,23 @@ export default function ProjectDetailsView({
                 </tr>
               </thead>
               <tbody>
-                {filteredUpdates.slice(0, 5).map((row, index) => (
+                {latestUpdates.map((row, index) => (
                   <tr
                     key={row.id}
                     className={index % 2 ? "bg-[#F9FAFB]" : "bg-white"}
                   >
                     <td className="px-6 py-5 font-normal text-[#344054]">
-                      {formatDate(row.date)}
+                      {formatDate(row.created)}
                     </td>
                     <td className="px-6 py-5 text-center text-[#475467]">
                       {row.title}
                     </td>
                     <td className="px-6 py-5 text-center text-[#475467]">
-                      {row.user}
+                      {row.assignedTo || row.reporter || "-"}
                     </td>
                   </tr>
                 ))}
-                {!filteredUpdates.length && (
+                {!latestUpdates.length && (
                   <tr>
                     <td
                       colSpan={3}
@@ -296,30 +349,6 @@ export default function ProjectDetailsView({
                 )}
               </tbody>
             </table>
-            <div className="flex items-center justify-end gap-3 border-t border-[#EAECF0] px-6 py-4 text-sm text-[#475467]">
-              <span>
-                {filteredUpdates.length
-                  ? `1 - ${Math.min(10, filteredUpdates.length)} of ${filteredUpdates.length}`
-                  : "0 results"}
-              </span>
-              <button type="button" className="project-page-size-button">
-                10 per page
-              </button>
-              <div className="flex overflow-hidden rounded-lg border border-[#D0D5DD] bg-white">
-                <button
-                  type="button"
-                  className="grid size-9 place-items-center border-r border-[#D0D5DD] text-[#344054]"
-                >
-                  <ChevronLeft size={16} />
-                </button>
-                <button
-                  type="button"
-                  className="grid size-9 place-items-center text-[#344054]"
-                >
-                  <ChevronRight size={16} />
-                </button>
-              </div>
-            </div>
           </section>
         </div>
       )}
@@ -340,12 +369,12 @@ export default function ProjectDetailsView({
       {activeTab === "Modules" && (
         <RecordsPanel
           title="Modules"
-          description="Module records are derived from live ticket data."
-          items={modules.map((value, index) => ({
-            id: `${index}`,
-            title: value,
-            href: `/modules/new?project=${encodeURIComponent(project.id)}&projectName=${encodeURIComponent(project.name)}`,
-            meta: "Derived from ticket data",
+          description="Module records are loaded from the project form data."
+          items={filteredModules.map((module, index) => ({
+            id: `${index}-${module}`,
+            title: module,
+            href: `/projects/${project.id}/edit`,
+            meta: "Saved on this project",
           }))}
         />
       )}
@@ -353,7 +382,7 @@ export default function ProjectDetailsView({
       {activeTab === "Team" && (
         <RecordsPanel
           title="Team"
-          description="Project team members loaded from the project data."
+          description="Project team members are stored in the project data."
           items={filteredTeam.map((member) => ({
             id: member.id,
             title: member.name,
@@ -367,14 +396,34 @@ export default function ProjectDetailsView({
       {activeTab === "Files" && (
         <RecordsPanel
           title="Files"
-          description="Files and links stored in ticket attachments and ticket form URLs."
-          items={links.map((item) => ({
-            id: item.id,
-            title: item.title,
-            href: item.url,
-            meta: formatDate(item.date),
+          description="Files and links are stored in the project form data."
+          items={filteredAttachments.map((attachment) => ({
+            id: attachment.id,
+            title: attachment.name,
+            href: attachment.url,
+            meta: formatDate(attachment.uploadedAt),
           }))}
           external
+          footer={
+            filteredLinks.length ? (
+              <div className="mt-5 border-t border-[#EAECF0] pt-5">
+                <h3 className="project-detail-field-label">Saved Links</h3>
+                <div className="mt-3 space-y-2">
+                  {filteredLinks.map((link) => (
+                    <a
+                      key={link.title}
+                      href={link.href}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="block text-[16px] leading-7 text-[#475467] underline decoration-[#D0D5DD] underline-offset-4 hover:text-[#0284C7]"
+                    >
+                      {link.title}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            ) : null
+          }
         />
       )}
 
@@ -382,11 +431,11 @@ export default function ProjectDetailsView({
         <RecordsPanel
           title="Timeline"
           description="Timeline is derived from real tickets for this project."
-          items={updates.map((item) => ({
-            id: item.id,
-            title: item.title,
-            href: `/tickets/${item.id}`,
-            meta: `${formatDate(item.date)} - ${item.user}`,
+          items={projectTickets.map((ticket) => ({
+            id: ticket.id,
+            title: ticket.title,
+            href: `/tickets/${ticket.id}`,
+            meta: `${formatDate(ticket.created)} - ${ticket.assignedTo || ticket.reporter || "-"}`,
           }))}
         />
       )}
@@ -420,7 +469,7 @@ function MetricCard({ label, value }: { label: string; value: string }) {
   return (
     <article className="project-metric-card">
       <p className="project-metric-label font-semibold">{label}</p>
-      <p className="project-metric-value text-3xl font-bold" title={value}>
+      <p className="project-metric-value font-semibold text-2xl" title={value}>
         {value}
       </p>
     </article>
@@ -435,26 +484,40 @@ function MetricGroup({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-w-0">
+    <div className="min-w-0 overflow-hidden">
       <p className="project-metric-label font-semibold">{label}</p>
-      <div className="mt-[10px]">{children}</div>
+
+      <div className="mt-2 flex min-w-0 items-center">{children}</div>
     </div>
   );
 }
 
-function PriorityBadge({ priority }: { priority: Project["priority"] }) {
+function PriorityBadge({
+  priority,
+  compact = false,
+}: {
+  priority: Project["priority"];
+  compact?: boolean;
+}) {
   const styles: Record<Project["priority"], string> = {
     Critical: "border-[#FECDCA] bg-[#FEF3F2] text-[#B42318]",
+
     High: "border-[#FEDF89] bg-[#FFFAEB] text-[#B54708]",
+
     Medium: "border-[#B2DDFF] bg-[#EFF8FF] text-[#175CD3]",
+
     Low: "border-[#ABEFC6] bg-[#ECFDF3] text-[#067647]",
+
     "Not Assigned": "border-[#D0D5DD] bg-[#F9FAFB] text-[#475467]",
   };
 
   return (
     <span
       className={cn(
-        "inline-flex h-[28px] items-center rounded-2xl border px-3 text-[14px] font-medium leading-5",
+        "inline-flex items-center justify-center whitespace-nowrap rounded-2xl border font-medium",
+        compact
+          ? "h-[24px] max-w-[112px] px-2.5 text-[12px] leading-[18px]"
+          : "h-[28px] px-3 text-[14px] leading-5",
         styles[priority],
       )}
     >
@@ -499,12 +562,14 @@ function RecordsPanel({
   items,
   avatar = false,
   external = false,
+  footer,
 }: {
   title: string;
   description: string;
   items: Array<{ id: string; title: string; href: string; meta?: string }>;
   avatar?: boolean;
   external?: boolean;
+  footer?: React.ReactNode;
 }) {
   return (
     <section className="rounded-2xl border border-[#EAECF0] bg-white p-5">
@@ -565,6 +630,8 @@ function RecordsPanel({
           </p>
         )}
       </div>
+
+      {footer ? <div>{footer}</div> : null}
     </section>
   );
 }
@@ -593,8 +660,4 @@ function formatProjectDate(value: string) {
     hour: "numeric",
     minute: "2-digit",
   }).format(date);
-}
-
-function stripHtml(value: string) {
-  return value.replace(/<[^>]*>/g, "").trim();
 }

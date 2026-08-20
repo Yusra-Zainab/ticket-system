@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+
 import {
   Bell,
   BriefcaseBusiness,
@@ -10,16 +11,20 @@ import {
   LayoutDashboard,
   List,
   LogOut,
+  Mail,
   Plus,
   Search,
   Settings,
+  ShieldCheck,
   SlidersHorizontal,
   Undo2,
   UserRound,
   UsersRound,
 } from "lucide-react";
+
 import { useState } from "react";
 
+import NotificationPopover from "@/components/ui/NotificationPopover";
 import { cn } from "@/lib/utils";
 
 export interface FloatingActionBarProps {
@@ -77,7 +82,6 @@ const featureConfig: Record<FeatureKey, FeatureConfig> = {
   administration: {
     label: "Administration",
     href: "/admin/users",
-    listHref: "/admin/users",
     icon: SlidersHorizontal,
   },
 };
@@ -110,22 +114,23 @@ export default function FloatingActionBar({
   notificationsCount,
 }: FloatingActionBarProps) {
   const pathname = usePathname();
+
   const router = useRouter();
 
   const [activeFeature, setActiveFeature] = useState<FeatureKey | null>(null);
 
   const [accountOpen, setAccountOpen] = useState(false);
 
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+
   const [searching, setSearching] = useState(false);
 
   const [searchValue, setSearchValue] = useState("");
 
+  const dashboardActive = pathname === "/dashboard";
+
   /*
    * SEARCH MODE
-   *
-   * Search is local to the currently open page.
-   * This value should later be connected to your
-   * local page search/filter state.
    */
   if (searching) {
     return (
@@ -155,6 +160,7 @@ export default function FloatingActionBar({
           title="Back"
           onClick={() => {
             setSearching(false);
+
             setSearchValue("");
           }}
           className="dock-action"
@@ -167,8 +173,6 @@ export default function FloatingActionBar({
 
   /*
    * ACCOUNT MINI BAR
-   *
-   * Search | Account | Settings | Logout | Back
    */
   if (accountOpen) {
     return (
@@ -180,7 +184,11 @@ export default function FloatingActionBar({
           type="button"
           aria-label="Search current page"
           title="Search"
-          onClick={() => setSearching(true)}
+          onClick={() => {
+            setNotificationsOpen(false);
+
+            setSearching(true);
+          }}
           className="dock-action"
         >
           <Search size={22} />
@@ -188,26 +196,19 @@ export default function FloatingActionBar({
 
         <span className="dock-divider" />
 
-        <Link
-          href="/profile"
-          aria-label="Account"
-          title="Account"
-          className={cn(
-            "dock-action dock-action-active",
-            pathname.startsWith("/profile") && "dock-action-active",
-          )}
+        <span
+          aria-label="Profile"
+          title="Profile"
+          className="dock-action dock-action-active"
         >
           <UserRound size={22} />
-        </Link>
+        </span>
 
         <Link
-          href="/settings"
-          aria-label="Settings"
-          title="Settings"
-          className={cn(
-            "dock-action",
-            pathname.startsWith("/settings") && "dock-action-active",
-          )}
+          href="/profile"
+          aria-label="Profile settings"
+          title="Profile settings"
+          className="dock-action"
         >
           <Settings size={22} />
         </Link>
@@ -217,17 +218,7 @@ export default function FloatingActionBar({
           aria-label="Logout"
           title="Logout"
           onClick={() => {
-            /*
-             * Replace this with your real auth
-             * logout action if your app uses one.
-             *
-             * Example:
-             * await signOut();
-             *
-             * For now this sends the user to
-             * the logout route.
-             */
-            router.push("/logout");
+            router.push("/login");
           }}
           className="dock-action"
         >
@@ -250,14 +241,108 @@ export default function FloatingActionBar({
   }
 
   /*
-   * FEATURE MINI BAR
+   * ADMINISTRATION MINI BAR
    *
-   * Search | active feature | + | list | Back
-   *
-   * Administration does not currently have a
-   * create action, so it only shows:
-   *
-   * Search | Administration | List | Back
+   * Search
+   * |
+   * Administration active
+   * Users
+   * Roles
+   * Email configuration
+   * |
+   * Back
+   */
+  if (activeFeature === "administration") {
+    return (
+      <nav
+        aria-label="Administration actions"
+        className="floating-dock floating-feature-mode"
+      >
+        <button
+          type="button"
+          aria-label="Search current page"
+          title="Search"
+          onClick={() => {
+            setNotificationsOpen(false);
+
+            setSearching(true);
+          }}
+          className="dock-action"
+        >
+          <Search size={22} />
+        </button>
+
+        <span className="dock-divider" />
+
+        {/* Selected Administration module */}
+        <span
+          aria-label="Administration"
+          title="Administration"
+          className="dock-action dock-action-active"
+        >
+          <SlidersHorizontal size={22} />
+        </span>
+
+        {/* Users */}
+        <Link
+          href="/admin/users"
+          aria-label="Users"
+          title="Users"
+          className={cn(
+            "dock-action",
+
+            pathname.startsWith("/admin/users") && "dock-action-active",
+          )}
+        >
+          <UsersRound size={22} />
+        </Link>
+
+        {/* Roles */}
+        <Link
+          href="/admin/roles"
+          aria-label="Roles and permissions"
+          title="Roles and permissions"
+          className={cn(
+            "dock-action",
+
+            pathname.startsWith("/admin/roles") && "dock-action-active",
+          )}
+        >
+          <ShieldCheck size={22} />
+        </Link>
+
+        {/* Email configuration */}
+        <Link
+          href="/admin/settings/email"
+          aria-label="Email account settings"
+          title="Email account settings"
+          className={cn(
+            "dock-action",
+
+            pathname.startsWith("/admin/settings/email") &&
+              "dock-action-active",
+          )}
+        >
+          <Mail size={22} />
+        </Link>
+
+        <span className="dock-divider" />
+
+        <button
+          type="button"
+          aria-label="Back to full navigation"
+          title="Back"
+          onClick={() => setActiveFeature(null)}
+          className="dock-action"
+        >
+          <Undo2 size={22} />
+        </button>
+      </nav>
+    );
+  }
+
+  /*
+   * NORMAL FEATURE MINI BAR
    */
   if (activeFeature) {
     const config = featureConfig[activeFeature];
@@ -273,7 +358,11 @@ export default function FloatingActionBar({
           type="button"
           aria-label="Search current page"
           title="Search"
-          onClick={() => setSearching(true)}
+          onClick={() => {
+            setNotificationsOpen(false);
+
+            setSearching(true);
+          }}
           className="dock-action"
         >
           <Search size={22} />
@@ -281,7 +370,6 @@ export default function FloatingActionBar({
 
         <span className="dock-divider" />
 
-        {/* Selected feature: visual only, no navigation */}
         <span
           aria-label={config.label}
           title={config.label}
@@ -290,7 +378,6 @@ export default function FloatingActionBar({
           <FeatureIcon size={22} />
         </span>
 
-        {/* Create */}
         {config.createHref && (
           <Link
             href={config.createHref}
@@ -302,7 +389,6 @@ export default function FloatingActionBar({
           </Link>
         )}
 
-        {/* List */}
         {config.listHref && (
           <Link
             href={config.listHref}
@@ -316,7 +402,6 @@ export default function FloatingActionBar({
 
         <span className="dock-divider" />
 
-        {/* Back to full dock */}
         <button
           type="button"
           aria-label="Back to full navigation"
@@ -331,115 +416,180 @@ export default function FloatingActionBar({
   }
 
   /*
-   * FULL / DEFAULT BAR
-   *
-   * Search
-   * |
-   * Dashboard
-   * Tickets
-   * Projects
-   * Resources
-   * Clients
-   * Administration
-   * |
-   * Notifications
-   * Account
+   * FULL BAR
    */
   return (
-    <nav
-      aria-label="Quick navigation"
-      className="floating-dock floating-full-mode"
-    >
-      <button
-        type="button"
-        aria-label="Search current page"
-        title="Search"
-        onClick={() => setSearching(true)}
-        className="dock-action"
+    <>
+      {notificationsOpen && (
+        <>
+          <button
+            type="button"
+            aria-label="Close notifications"
+            className="notification-popover-dismiss"
+            onClick={() => setNotificationsOpen(false)}
+          />
+
+          <NotificationPopover onClose={() => setNotificationsOpen(false)} />
+        </>
+      )}
+
+      <nav
+        aria-label="Quick navigation"
+        className="floating-dock floating-full-mode"
       >
-        <Search size={22} />
-      </button>
+        <button
+          type="button"
+          aria-label="Search current page"
+          title="Search"
+          onClick={() => {
+            setNotificationsOpen(false);
 
-      <span className="dock-divider" />
+            setAccountOpen(false);
 
-      <Link
-        href="/"
-        aria-label="Dashboard"
-        title="Dashboard"
-        className={cn("dock-action", pathname === "/" && "dock-action-active")}
-      >
-        <LayoutDashboard size={22} />
-      </Link>
+            setSearching(true);
+          }}
+          className="dock-action"
+        >
+          <Search size={22} />
+        </button>
 
-      <FeatureNavButton
-        feature="tickets"
-        pathname={pathname}
-        onSelect={setActiveFeature}
-      />
+        <span className="dock-divider" />
 
-      <FeatureNavButton
-        feature="projects"
-        pathname={pathname}
-        onSelect={setActiveFeature}
-      />
+        <Link
+          href="/"
+          aria-label="Dashboard"
+          title="Dashboard"
+          aria-current={dashboardActive ? "page" : undefined}
+          onClick={() => {
+            setNotificationsOpen(false);
+            setAccountOpen(false);
+            setActiveFeature(null);
+          }}
+          className={cn(
+            "dock-action",
+            dashboardActive && "dock-action-active !bg-[#0284C7] !text-white",
+          )}
+        >
+          <LayoutDashboard
+            size={22}
+            className={cn(dashboardActive && "!text-white")}
+          />
+        </Link>
 
-      <FeatureNavButton
-        feature="resources"
-        pathname={pathname}
-        onSelect={setActiveFeature}
-      />
+        <FeatureNavButton
+          feature="tickets"
+          pathname={pathname}
+          onSelect={(feature) => {
+            setNotificationsOpen(false);
 
-      <FeatureNavButton
-        feature="clients"
-        pathname={pathname}
-        onSelect={setActiveFeature}
-      />
+            setAccountOpen(false);
 
-      <FeatureNavButton
-        feature="administration"
-        pathname={pathname}
-        onSelect={setActiveFeature}
-      />
+            setActiveFeature(feature);
+          }}
+        />
 
-      <span className="dock-divider" />
+        <FeatureNavButton
+          feature="projects"
+          pathname={pathname}
+          onSelect={(feature) => {
+            setNotificationsOpen(false);
 
-      <Link
-        href="/dashboard/notifications"
-        aria-label="Notifications"
-        title="Notifications"
-        className={cn(
-          "dock-action relative",
-          pathname.startsWith("/dashboard/notifications") &&
-            "dock-action-active",
-        )}
-      >
-        <Bell size={22} />
+            setAccountOpen(false);
 
-        {notificationsCount > 0 && (
-          <span className="notification-count">
-            {notificationsCount > 99 ? "99+" : notificationsCount}
-          </span>
-        )}
-      </Link>
+            setActiveFeature(feature);
+          }}
+        />
 
-      <button
-        type="button"
-        aria-label="Account"
-        title="Account"
-        onClick={() => {
-          setActiveFeature(null);
-          setAccountOpen(true);
-        }}
-        className={cn(
-          "dock-action",
-          (pathname.startsWith("/profile") ||
-            pathname.startsWith("/settings")) &&
-            "dock-action-active",
-        )}
-      >
-        <UserRound size={22} />
-      </button>
-    </nav>
+        <FeatureNavButton
+          feature="resources"
+          pathname={pathname}
+          onSelect={(feature) => {
+            setNotificationsOpen(false);
+
+            setAccountOpen(false);
+
+            setActiveFeature(feature);
+          }}
+        />
+
+        <FeatureNavButton
+          feature="clients"
+          pathname={pathname}
+          onSelect={(feature) => {
+            setNotificationsOpen(false);
+
+            setAccountOpen(false);
+
+            setActiveFeature(feature);
+          }}
+        />
+
+        <FeatureNavButton
+          feature="administration"
+          pathname={pathname}
+          onSelect={(feature) => {
+            setNotificationsOpen(false);
+
+            setAccountOpen(false);
+
+            setActiveFeature(feature);
+          }}
+        />
+
+        <span className="dock-divider" />
+
+        <button
+          type="button"
+          aria-label="Notifications"
+          title="Notifications"
+          aria-expanded={notificationsOpen}
+          aria-controls="notification-popover"
+          onClick={() => {
+            setAccountOpen(false);
+
+            setActiveFeature(null);
+
+            setNotificationsOpen((current) => !current);
+          }}
+          className={cn(
+            "dock-action relative",
+
+            (notificationsOpen || pathname.startsWith("/notifications")) &&
+              "dock-action-active",
+          )}
+        >
+          <Bell size={22} />
+
+          {notificationsCount > 0 && (
+            <span className="notification-count">
+              {notificationsCount > 99 ? "99+" : notificationsCount}
+            </span>
+          )}
+        </button>
+
+        <button
+          type="button"
+          aria-label="Account"
+          title="Account"
+          onClick={() => {
+            setNotificationsOpen(false);
+
+            setActiveFeature(null);
+
+            setAccountOpen(true);
+          }}
+          className={cn(
+            "dock-action",
+
+            (pathname.startsWith("/profile") ||
+              pathname.startsWith("/settings")) &&
+              "dock-action-active",
+          )}
+        >
+          <UserRound size={22} />
+        </button>
+      </nav>
+    </>
   );
 }
 
@@ -449,10 +599,13 @@ function FeatureNavButton({
   onSelect,
 }: {
   feature: FeatureKey;
+
   pathname: string;
+
   onSelect: (feature: FeatureKey) => void;
 }) {
   const config = featureConfig[feature];
+
   const Icon = config.icon;
 
   const active = getFeatureFromPath(pathname) === feature;
@@ -462,12 +615,12 @@ function FeatureNavButton({
       type="button"
       aria-label={config.label}
       title={config.label}
-      onClick={() => {
-        // Only open the corresponding mini bar.
-        // Do NOT navigate from the main floating bar.
-        onSelect(feature);
-      }}
-      className={cn("dock-action", active && "dock-action-active")}
+      onClick={() => onSelect(feature)}
+      className={cn(
+        "dock-action",
+
+        active && "dock-action-active",
+      )}
     >
       <Icon size={22} />
     </button>

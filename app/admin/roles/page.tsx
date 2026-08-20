@@ -1,2 +1,23 @@
-import { Plus, ShieldCheck } from 'lucide-react'; import PageHeader from '@/components/ui/PageHeader'; import { mockRoles } from '@/data/mockData';
-export default function RolesPage() { return <div className="space-y-6"><PageHeader title="Roles & permissions" description="Define reusable access policies for workspace users." action="Create role" actionHref="/admin/roles/new" actionIcon={Plus} /><div className="grid gap-4 md:grid-cols-2">{mockRoles.map((role) => <article className="card p-5" key={role.id}><div className="flex items-start justify-between"><span className="grid size-10 place-items-center rounded-xl bg-violet-50 text-violet-600"><ShieldCheck size={20} /></span><span className="text-xs font-semibold text-slate-400">{role.users} users</span></div><h2 className="mt-4 font-bold text-slate-900">{role.name}</h2><p className="mt-1 text-sm leading-6 text-slate-500">{role.description}</p><div className="mt-4 flex flex-wrap gap-2">{role.permissions.slice(0, 3).map((permission) => <span key={permission} className="rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-600">{permission}</span>)}</div></article>)}</div></div>; }
+import { Plus } from "lucide-react";
+
+import RolesTable from "@/components/features/RolesTable";
+import PageHeader from "@/components/ui/PageHeader";
+
+import { listRoles } from "@/lib/db";
+
+export default async function RolesPage() {
+  const roles = await listRoles();
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Roles"
+        action="New Role"
+        actionHref="/admin/roles/new"
+        actionIcon={Plus}
+      />
+
+      <RolesTable initialRoles={roles} />
+    </div>
+  );
+}

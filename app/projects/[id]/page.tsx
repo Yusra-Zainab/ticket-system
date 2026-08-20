@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import ProjectDetailsView from "@/components/features/ProjectDetailsView";
 import { findProject, listTickets, listUsers } from "@/lib/db";
 
-export default async function ProjectDetailPage({
+export default async function ProjectDetailsPage({
   params,
 }: {
   params: Promise<{ id: string }>;
@@ -16,11 +16,13 @@ export default async function ProjectDetailPage({
     listUsers(),
   ]);
 
-  if (!project) {
-    notFound();
-  }
+  if (!project) notFound();
 
   return (
-    <ProjectDetailsView project={project} tickets={tickets} users={users} />
+    <ProjectDetailsView
+      project={project}
+      tickets={tickets}
+      users={users}
+    />
   );
 }
