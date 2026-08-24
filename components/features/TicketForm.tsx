@@ -31,10 +31,24 @@ import { cn } from "@/lib/utils";
 import { useApp } from "@/components/providers/AppProvider";
 import type { Project, Ticket, TicketAttachment, User } from "@/types";
 
+const tagStyles = {
+  red: "bg-red-50 text-red-700 ring-red-200",
+  orange: "bg-orange-50 text-orange-700 ring-orange-200",
+  amber: "bg-amber-50 text-amber-700 ring-amber-200",
+  violet: "bg-violet-50 text-violet-700 ring-violet-200",
+  blue: "bg-blue-50 text-blue-700 ring-blue-200",
+  teal: "bg-teal-50 text-teal-700 ring-teal-200",
+  pink: "bg-pink-50 text-pink-700 ring-pink-200",
+  green: "bg-green-50 text-green-700 ring-green-200",
+} as const;
+
 const plainLength = (value: string) =>
   value.replace(/<[^>]*>/g, "").trim().length;
+const createActivityEntry = (text: string) =>
+  `${new Date().toLocaleString()} · ${text}`;
 const schema = z.object({
   project: z.string().min(1, "Select a project"),
+  projectId: z.string().optional(),
   module: z.string().min(1, "Select a module"),
   subModule: z.string().min(1, "Select a sub module"),
   title: z.string().min(5, "Use at least 5 characters").max(200),
@@ -70,6 +84,7 @@ const sections = [
 ];
 const defaults: Values = {
   project: "",
+  projectId: "",
   module: "",
   subModule: "",
   title: "",
@@ -92,6 +107,7 @@ export default function TicketForm({
 }: {
   initialSelection?: {
     project?: string;
+    projectId?: string;
     module?: string;
     subModule?: string;
     url?: string;
@@ -104,13 +120,21 @@ export default function TicketForm({
   const { saveDraft, submitTicket } = useApp();
   const [active, setActive] = useState("project");
   const savedForm = initialTicket?.formData as
-    | (Partial<Values> & { urls?: string[]; attachments?: TicketAttachment[] })
+    | (Partial<Values> & {
+        urls?: string[];
+        attachments?: TicketAttachment[];
+        projectId?: string;
+      })
     | undefined;
   const [urls, setUrls] = useState(
     savedForm?.urls?.length ? savedForm.urls : [initialSelection.url ?? ""],
   );
   const [attachments, setAttachments] = useState<TicketAttachment[]>(
     savedForm?.attachments?.length ? savedForm.attachments : [],
+  );
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [selectedProjectId, setSelectedProjectId] = useState(
+    savedForm?.projectId ?? initialSelection.projectId ?? "",
   );
   const [uploadMenu, setUploadMenu] = useState(false);
   const [confirmMode, setConfirmMode] = useState<ConfirmMode>();
@@ -126,7 +150,6 @@ export default function TicketForm({
     return `TKT-${crypto.randomUUID().replaceAll("-", "").slice(0, 32)}`;
   }
 
-  const [ticketId] = useState(() => initialTicket?.id ?? createTicketId());
   const {
     register,
     control,
@@ -142,6 +165,7 @@ export default function TicketForm({
       ...defaults,
       ...savedForm,
       project: savedForm?.project ?? initialSelection.project ?? "",
+      projectId: savedForm?.projectId ?? initialSelection.projectId ?? "",
       module: savedForm?.module ?? initialSelection.module ?? "",
       subModule: savedForm?.subModule ?? initialSelection.subModule ?? "",
       createdBy: savedForm?.createdBy ?? users[0]?.name ?? "System",
@@ -161,32 +185,35 @@ export default function TicketForm({
       .getElementById(`ticket-${id}`)
       ?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
-  const uploadAttachments = async (incoming: File[]) => {
+  const uploadAttachments = (incoming: File[]) => {
     if (!incoming.length) return;
+    setPendingFiles((current) => [...current, ...incoming]);
+    setNotice("Files are ready and will be uploaded when the ticket is saved.");
+    setUploadMenu(false);
+  };
+
+  const uploadPendingFiles = async (id: string) => {
+    if (!pendingFiles.length) return;
+
     setUploading(true);
     try {
       const formData = new FormData();
-      incoming.forEach((file) => formData.append("files", file, file.name));
-      const response = await fetch(`/api/tickets/${ticketId}/attachments`, {
+      pendingFiles.forEach((file) => formData.append("files", file, file.name));
+      const response = await fetch(`/api/tickets/${id}/attachments`, {
         method: "POST",
         body: formData,
       });
+      const data = (await response.json().catch(() => ({}))) as {
+        attachments?: TicketAttachment[];
+        error?: string;
+      };
       if (!response.ok) {
-        let message = "Unable to upload attachments.";
-        try {
-          const data = await response.json();
-          if (typeof data?.error === "string") message = data.error;
-        } catch {
-          // fall through
-        }
-        throw new Error(message);
+        throw new Error(data.error ?? "Unable to upload attachments.");
       }
-      const data = (await response.json()) as { attachments?: TicketAttachment[] };
       setAttachments((current) => [...(data.attachments ?? []), ...current]);
-      setNotice("Attachment uploaded successfully.");
+      setPendingFiles([]);
     } finally {
       setUploading(false);
-      setUploadMenu(false);
     }
   };
   const captureScreenshot = async () => {
@@ -225,6 +252,8 @@ export default function TicketForm({
       reset(defaults);
       setUrls([""]);
       setAttachments([]);
+      setPendingFiles([]);
+      setSelectedProjectId("");
       setNotice("Form reset.");
       jump("project");
       return;
@@ -247,22 +276,44 @@ export default function TicketForm({
         assignedTo: values.assignedTo || "",
         reporter: values.createdBy || "",
         created: initialTicket?.created ?? "",
+        updatedAt: new Date().toISOString(),
         dueDate: values.dueDate || "",
         description: values.description || "",
         tags: [values.module, values.subModule].filter(Boolean),
         formData: {
           id: ticketId,
+          projectId: selectedProjectId,
           ...values,
           urls: urls.filter(Boolean),
           attachments,
+          activity: [
+            createActivityEntry(
+              mode === "submit"
+                ? initialTicket
+                  ? "Ticket updated and submitted"
+                  : "Ticket created and submitted"
+                : initialTicket
+                  ? "Ticket draft updated"
+                  : "Ticket draft created",
+            ),
+            ...(
+              Array.isArray(initialTicket?.formData?.activity)
+                ? initialTicket.formData.activity.filter(
+                    (item): item is string => typeof item === "string",
+                  )
+                : []
+            ),
+          ].slice(0, 50),
         },
       };
       if (mode === "submit") {
         await submitTicket(storedTicket);
+        await uploadPendingFiles(ticketId);
         router.push("/tickets");
       } else {
         await saveDraft(storedTicket);
-        setNotice("Ticket draft saved successfully.");
+        await uploadPendingFiles(ticketId);
+        router.push("/tickets/drafts");
       }
     } catch (error) {
       setNotice(
@@ -389,11 +440,15 @@ export default function TicketForm({
                 <Field label="Project Name" required error={errors.project?.message}>
                   <SearchDropdown
                     value={field.value}
-                    onChange={field.onChange}
+                    onChange={(value, _url, id) => {
+                      field.onChange(value);
+                      setSelectedProjectId(id ?? "");
+                    }}
                     placeholder="Select related project."
                     searchPlaceholder="Search Project"
                     options={projects.map((project) => ({
                       label: project.name,
+                      id: project.id,
                     }))}
                     newLabel="New Project"
                     newHref="/projects/new?returnTo=ticket"
@@ -429,7 +484,7 @@ export default function TicketForm({
                         },
                       ]}
                       newLabel="New Module"
-                      newHref="/modules/new?returnTo=ticket"
+                      newHref={`/modules/new?returnTo=ticket${selectedProjectId ? `&projectId=${encodeURIComponent(selectedProjectId)}` : ""}${getValues("project") ? `&projectName=${encodeURIComponent(getValues("project"))}` : ""}`}
                     />
                   </Field>
                 )}
@@ -458,7 +513,7 @@ export default function TicketForm({
                         { label: "Settlements", url: "portal/settlements" },
                       ]}
                       newLabel="New Sub Module"
-                      newHref="/submodules/new?returnTo=ticket"
+                      newHref={`/submodules/new?returnTo=ticket${selectedProjectId ? `&projectId=${encodeURIComponent(selectedProjectId)}` : ""}${getValues("project") ? `&projectName=${encodeURIComponent(getValues("project"))}` : ""}`}
                     />
                   </Field>
                 )}
@@ -553,37 +608,37 @@ export default function TicketForm({
                         {
                           label: "Bug",
                           detail: "Something isn't working",
-                          color: "bg-red-600",
+                          color: tagStyles.red,
                         },
                         {
                           label: "Feedback",
                           detail: "Suggestion or opinion",
-                          color: "bg-orange-500",
+                          color: tagStyles.orange,
                         },
                         {
                           label: "Technical Issue",
                           detail: "Technical problem",
-                          color: "bg-amber-600",
+                          color: tagStyles.amber,
                         },
                         {
                           label: "New Feature",
                           detail: "Request new functionality",
-                          color: "bg-violet-600",
+                          color: tagStyles.violet,
                         },
                         {
                           label: "Task",
                           detail: "General work request",
-                          color: "bg-blue-600",
+                          color: tagStyles.blue,
                         },
                         {
                           label: "Support Request",
                           detail: "Help or assistance needed",
-                          color: "bg-teal-600",
+                          color: tagStyles.teal,
                         },
                         {
                           label: "UI/UX Issue",
                           detail: "Design or usability problem",
-                          color: "bg-pink-600",
+                          color: tagStyles.pink,
                         },
                       ]}
                     />
@@ -658,6 +713,27 @@ export default function TicketForm({
               />
             </div>
             <ul className="grid gap-2 sm:grid-cols-2">
+              {pendingFiles.map((file) => (
+                <li
+                  key={`${file.name}-${file.size}-${file.lastModified}`}
+                  className="flex items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm"
+                >
+                  <File size={16} className="text-sky-600" />
+                  <span className="min-w-0 flex-1 truncate text-slate-700">
+                    {file.name}
+                  </span>
+                  <span className="text-xs font-semibold text-sky-700">Pending</span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setPendingFiles((items) => items.filter((item) => item !== file))
+                    }
+                    aria-label={`Remove ${file.name}`}
+                  >
+                    <X size={15} />
+                  </button>
+                </li>
+              ))}
               {attachments.map((file) => (
                 <li
                   key={file.id}
@@ -713,22 +789,22 @@ export default function TicketForm({
                         {
                           label: "Critical",
                           detail: "Immediate action required",
-                          color: "bg-red-600",
+                          color: tagStyles.red,
                         },
                         {
                           label: "High",
                           detail: "Needs quick attention",
-                          color: "bg-orange-600",
+                          color: tagStyles.orange,
                         },
                         {
                           label: "Medium",
                           detail: "Normal priority",
-                          color: "bg-yellow-600",
+                          color: tagStyles.amber,
                         },
                         {
                           label: "Low",
                           detail: "Can be handled later",
-                          color: "bg-green-600",
+                          color: tagStyles.green,
                         },
                       ]}
                     />
@@ -902,8 +978,8 @@ export default function TicketForm({
               />
             </div>
             <p className="mt-5 rounded-lg bg-slate-50 p-3 text-xs text-slate-500">
-              Files are attached immediately after selection. You can remove
-              them from the attachment list before saving.
+              Files are queued while you fill out the form and uploaded after
+              the ticket has been saved. You can remove them before saving.
             </p>
           </div>
         </div>
@@ -911,7 +987,12 @@ export default function TicketForm({
       {confirmMode && (
         <ConfirmDialog
           mode={confirmMode}
-          dirty={isDirty || attachments.length > 0 || urls.some(Boolean)}
+          dirty={
+            isDirty ||
+            attachments.length > 0 ||
+            pendingFiles.length > 0 ||
+            urls.some(Boolean)
+          }
           onCancel={() => setConfirmMode(undefined)}
           onConfirm={() => perform(confirmMode)}
         />
@@ -1102,7 +1183,7 @@ function SearchDropdown({
   newHref,
 }: {
   value: string;
-  onChange: (value: string, url?: string) => void;
+  onChange: (value: string, url?: string, id?: string) => void;
   placeholder: string;
   searchPlaceholder: string;
   options: Array<{
@@ -1110,12 +1191,14 @@ function SearchDropdown({
     detail?: string;
     color?: string;
     url?: string;
+    id?: string;
   }>;
   newLabel?: string;
   newHref?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const selected = options.find((option) => option.label === value);
   const filtered = options.filter((option) =>
     option.label.toLowerCase().includes(query.toLowerCase()),
   );
@@ -1127,7 +1210,18 @@ function SearchDropdown({
         className="field flex items-center justify-between text-left"
       >
         <span className={value ? "text-slate-800" : "text-slate-400"}>
-          {value || placeholder}
+          {selected?.color ? (
+            <span className="inline-flex min-w-0 items-center gap-3">
+              <TagChip label={selected.label} color={selected.color} />
+              {selected.detail && (
+                <span className="truncate text-sm text-slate-500">
+                  {selected.detail}
+                </span>
+              )}
+            </span>
+          ) : (
+            value || placeholder
+          )}
         </span>
         <ChevronDown
           size={16}
@@ -1159,35 +1253,45 @@ function SearchDropdown({
                 type="button"
                 key={option.label}
                 onClick={() => {
-                  onChange(option.label, option.url);
+                  onChange(option.label, option.url, option.id);
                   setOpen(false);
                   setQuery("");
                 }}
                 className="flex w-full items-center gap-3 border-b border-slate-100 px-2 py-2.5 text-left text-sm last:border-0 hover:bg-slate-50"
               >
-                {option.color && (
-                  <span
-                    className={cn(
-                      "w-20 rounded-full px-2 py-1 text-center text-[10px] font-semibold text-white",
-                      option.color,
-                    )}
-                  >
-                    {option.label}
-                  </span>
-                )}
-                <span
-                  className={
-                    option.color ? "text-xs text-slate-500" : "text-slate-700"
-                  }
-                >
-                  {option.detail ?? (!option.color && option.label)}
-                </span>
+                <div className="flex min-w-0 items-center gap-3">
+                  {option.color ? (
+                    <TagChip label={option.label} color={option.color} />
+                  ) : (
+                    <span className="font-medium text-slate-700">
+                      {option.label}
+                    </span>
+                  )}
+                  {option.detail && (
+                    <span className="truncate text-xs text-slate-500">
+                      {option.detail}
+                    </span>
+                  )}
+                </div>
               </button>
             ))}
           </div>
         </div>
       )}
     </div>
+  );
+}
+
+function TagChip({ label, color }: { label: string; color: string }) {
+  return (
+    <span
+        className={cn(
+          "inline-flex w-28 shrink-0 items-center justify-center rounded-full px-3 py-1 text-center text-xs font-semibold ring-1 ring-inset",
+          color,
+        )}
+      >
+      {label}
+    </span>
   );
 }
 function ConfirmDialog({

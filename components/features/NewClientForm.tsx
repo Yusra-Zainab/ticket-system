@@ -26,9 +26,11 @@ import { useRouter } from "next/navigation";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 
 import RichTextEditor from "@/components/ui/RichTextEditor";
+import StickyToast from "@/components/ui/StickyToast";
 
 import { cn } from "@/lib/utils";
 import ClientStatusBadge from "@/components/features/ClientStatusBadge";
+import { clientStatusDescriptions } from "@/lib/statusOptions";
 import type {
   ClientEditorRecord,
   ClientFormData,
@@ -289,9 +291,11 @@ export default function NewClientForm({
 
   const [saving, setSaving] = useState(false);
 
-  const [error, setError] = useState("");
+  const [, setError] = useState("");
 
-  const [savedMessage, setSavedMessage] = useState("");
+  const [notice, setNotice] = useState("");
+
+  const [noticeKind, setNoticeKind] = useState<"success" | "error">("success");
 
   const [teamDraft, setTeamDraft] = useState<Omit<ClientTeamMemberInput, "id">>(
     {
@@ -315,6 +319,14 @@ export default function NewClientForm({
     (step) => step.id !== "upwork-details" || showUpwork,
   );
 
+  function showNotice(
+    message: string,
+    kind: "success" | "error" = "success",
+  ) {
+    setNoticeKind(kind);
+    setNotice(message);
+  }
+
   function setField<K extends keyof ClientFormData>(
     field: K,
     value: ClientFormData[K],
@@ -323,8 +335,6 @@ export default function NewClientForm({
       ...current,
       [field]: value,
     }));
-
-    setSavedMessage("");
   }
 
   function goToSection(section: SectionId) {
@@ -355,8 +365,7 @@ export default function NewClientForm({
     });
 
     setError("");
-
-    setSavedMessage("");
+    setNotice("");
 
     goToSection(initialSection);
   }
@@ -392,13 +401,17 @@ export default function NewClientForm({
 
     setError("");
 
-    setSavedMessage("");
+    setNotice("");
 
-    if (lifecycle === "OPEN") {
+    const targetLifecycle =
+      lifecycle === "OPEN" ? "OPEN" : (initialRecord?.lifecycle ?? "DRAFT");
+
+    if (targetLifecycle === "OPEN") {
       const validation = validateRegisteredClient();
 
       if (validation) {
         setError(validation);
+        showNotice(validation, "error");
 
         return;
       }
@@ -419,7 +432,7 @@ export default function NewClientForm({
           },
 
           body: JSON.stringify({
-            lifecycle,
+            lifecycle: targetLifecycle,
 
             formData: values,
           }),
@@ -438,14 +451,20 @@ export default function NewClientForm({
 
       const clientId = String(body.id ?? existingId ?? "");
 
-      /*
-       * Saving a draft stays in the
-       * edit form.
-       */
-      if (lifecycle === "DRAFT") {
-        setSavedMessage("Client draft saved successfully.");
+      if (existingId) {
+        showNotice(
+          targetLifecycle === "OPEN"
+            ? "Client changes saved successfully."
+            : "Client draft saved successfully.",
+        );
+        router.refresh();
+        return;
+      }
 
-        if (!existingId && clientId) {
+      if (targetLifecycle === "DRAFT") {
+        showNotice("Client draft saved successfully.");
+
+        if (clientId) {
           router.replace(`/clients/${clientId}/edit?draft=1`);
 
           router.refresh();
@@ -463,9 +482,10 @@ export default function NewClientForm({
 
       router.refresh();
     } catch (reason) {
-      setError(
-        reason instanceof Error ? reason.message : "Unable to save client.",
-      );
+      const message =
+        reason instanceof Error ? reason.message : "Unable to save client.";
+      setError(message);
+      showNotice(message, "error");
     } finally {
       setSaving(false);
     }
@@ -474,6 +494,7 @@ export default function NewClientForm({
   function addTeamMember() {
     if (!teamDraft.name.trim()) {
       setError("Enter a team member name.");
+      showNotice("Enter a team member name.", "error");
 
       return;
     }
@@ -581,17 +602,6 @@ export default function NewClientForm({
           </div>
         </div>
 
-        {error && (
-          <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-700">
-            {error}
-          </div>
-        )}
-
-        {savedMessage && (
-          <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700">
-            {savedMessage}
-          </div>
-        )}
       </div>
 
       <div className="mt-8 grid gap-8 lg:grid-cols-[264px_minmax(0,1fr)]">
@@ -731,10 +741,15 @@ export default function NewClientForm({
                   placeholder="Select status"
                   options={clientStatuses}
                   renderOption={(value) => (
-                    <ClientStatusBadge
-                      status={value as ClientListStatus}
-                      className="!min-w-[110px]"
-                    />
+                    <span className="inline-flex min-w-0 items-center gap-3">
+                      <ClientStatusBadge
+                        status={value as ClientListStatus}
+                        className="!min-w-[110px]"
+                      />
+                      <span className="text-sm text-[#667085]">
+                        {clientStatusDescriptions[value as ClientListStatus]}
+                      </span>
+                    </span>
                   )}
                 />
               </Field>
@@ -1233,6 +1248,17 @@ export default function NewClientForm({
           </FormSection>
         </main>
       </div>
+
+      {notice && (
+        <StickyToast
+          message={notice}
+          kind={noticeKind}
+          onDismiss={() => {
+            setNotice("");
+            setError("");
+          }}
+        />
+      )}
     </div>
   );
 }

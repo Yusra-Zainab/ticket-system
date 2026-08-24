@@ -22,6 +22,10 @@ import {
   X,
 } from "lucide-react";
 import { cn, formatDate } from "@/lib/utils";
+import {
+  ticketPriorityDescriptions,
+  ticketTypeDescriptions,
+} from "@/lib/statusOptions";
 import type { Ticket, TicketAttachment } from "@/types";
 import { useApp } from "@/components/providers/AppProvider";
 
@@ -97,6 +101,20 @@ const statusColors: Record<TicketStatus, string> = {
   Closed: "bg-gray-700 text-white ring-1 ring-gray-800",
   Reopened: "bg-red-600 text-white ring-1 ring-red-700",
   Cancelled: "bg-gray-400 text-white ring-1 ring-gray-500",
+};
+const statusDescriptions: Record<TicketStatus, string> = {
+  Open: "Newly created and ready to be picked up",
+  Reviewed: "Checked and waiting for the next action",
+  Assigned: "Ownership is set and work is about to begin",
+  Active: "Work is actively moving forward",
+  Blocked: "Waiting on a dependency or decision",
+  Awaiting: "Waiting for a reply, input, or approval",
+  QA: "Under testing and quality checks",
+  Validation: "Being verified before completion",
+  Resolved: "A fix or response is in place",
+  Closed: "Finished and no longer active",
+  Reopened: "Opened again after a previous resolution",
+  Cancelled: "Intentionally stopped and no longer pursued",
 };
 const priorityColors = {
   1: "bg-red-600 text-white ring-1 ring-red-700",
@@ -403,7 +421,7 @@ export default function TicketsTable({ variant = "tickets", initialTickets }: { 
       </div>
       {variant === "tickets" && filtersOpen && (
         <div className="space-y-4 rounded-xl border border-slate-200 bg-[#F8FAFC] p-4">
-          <div className="grid gap-3 md:grid-cols-3"><TagDropdown label="Status" value={status} options={statuses.map((item) => ({ value: item, label: item, color: statusColors[item] }))} onChange={(value) => setStatus(value as typeof status)} /><TagDropdown label="Priority Type" value={String(priority)} options={priorities.map((item) => ({ value: String(item.value), label: item.label, color: priorityColors[item.value] }))} onChange={(value) => setPriority(value === "All" ? "All" : Number(value) as Priority)} /><TagDropdown label="Ticket Type" value={type} options={ticketTypes.map((item) => ({ value: item, label: item, color: ticketTypeColors[item] }))} onChange={(value) => setType(value as typeof type)} /></div>
+          <div className="grid gap-3 md:grid-cols-3"><TagDropdown label="Status" value={status} options={statuses.map((item) => ({ value: item, label: item, color: statusColors[item], description: statusDescriptions[item] }))} onChange={(value) => setStatus(value as typeof status)} /><TagDropdown label="Priority Type" value={String(priority)} options={priorities.map((item) => ({ value: String(item.value), label: item.label, color: priorityColors[item.value], description: ticketPriorityDescriptions[item.label] }))} onChange={(value) => setPriority(value === "All" ? "All" : Number(value) as Priority)} /><TagDropdown label="Ticket Type" value={type} options={ticketTypes.map((item) => ({ value: item, label: item, color: ticketTypeColors[item], description: ticketTypeDescriptions[item] }))} onChange={(value) => setType(value as typeof type)} /></div>
           <div className="flex justify-end">
           <button
             disabled={status === "All" && type === "All" && priority === "All"}
@@ -937,7 +955,101 @@ function TicketFileRow({ file }: { file: TicketFile }) {
   return <a href={file.url} target="_blank" rel="noreferrer" className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white px-5 py-4 hover:border-sky-300 hover:bg-sky-50"><span className="grid size-11 shrink-0 place-items-center">{icon}</span><span className="min-w-0 flex-1"><span className="mb-1 inline-flex rounded-full bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-600 ring-1 ring-inset ring-slate-200">{file.category}</span><strong className="block truncate text-base font-medium text-slate-700">{file.name}</strong><span className="block truncate text-sm text-slate-500">{file.detail}</span></span><time className="w-28 shrink-0 text-right text-sm leading-5 text-slate-500">{file.date.replace(" ", "\n")}</time></a>;
 }
 
-function TagDropdown({ label, value, options, onChange }: { label: string; value: string; options: Array<{ value: string; label: string; color: string }>; onChange: (value: string) => void }) { const [open, setOpen] = useState(false); const selected = options.find((option) => option.value === value); return <div className="relative"><span className="label">{label}</span><button type="button" onClick={() => setOpen((current) => !current)} className="field flex items-center justify-between"><span className={cn("rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-inset", selected ? selected.color : "bg-slate-100 text-slate-600 ring-slate-300")}>{selected?.label ?? "All"}</span><ChevronDown size={16} className={open ? "rotate-180" : ""} /></button>{open && <div className="absolute z-30 mt-1 grid max-h-64 w-full gap-1 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2 shadow-xl"><button type="button" onClick={() => { onChange("All"); setOpen(false); }} className="rounded-lg px-3 py-2 text-left text-xs font-semibold text-slate-600 hover:bg-slate-50">All</button>{options.map((option) => <button type="button" key={option.value} onClick={() => { onChange(option.value); setOpen(false); }} className="rounded-lg p-1 text-left hover:bg-slate-50"><span className={cn("inline-flex rounded-full px-3 py-1.5 text-xs font-semibold ring-1 ring-inset", option.color)}>{option.label}</span></button>)}</div>}</div>; }
+function TagDropdown({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: Array<{
+    value: string;
+    label: string;
+    color: string;
+    description: string;
+  }>;
+  onChange: (value: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const selected = options.find((option) => option.value === value);
+
+  return (
+    <div className="relative">
+      <span className="label">{label}</span>
+      <button
+        type="button"
+        onClick={() => setOpen((current) => !current)}
+        className="field flex items-center justify-between gap-3 text-left"
+      >
+        <span className="min-w-0 flex-1">
+          {selected ? (
+            <span className="flex min-w-0 items-center gap-3">
+              <span
+                className={cn(
+                  "inline-flex w-28 shrink-0 items-center justify-center rounded-full px-3 py-1 text-center text-xs font-semibold ring-1 ring-inset",
+                  selected.color,
+                )}
+              >
+                {selected.label}
+              </span>
+              <span className="truncate text-sm text-slate-500">
+                {selected.description}
+              </span>
+            </span>
+          ) : (
+            <span className="text-slate-400">All</span>
+          )}
+        </span>
+        <ChevronDown size={16} className={open ? "rotate-180" : ""} />
+      </button>
+      {open && (
+        <div className="absolute z-30 mt-1 grid max-h-64 w-full gap-1 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2 shadow-xl">
+          <button
+            type="button"
+            onClick={() => {
+              onChange("All");
+              setOpen(false);
+            }}
+            className="rounded-lg px-3 py-2 text-left hover:bg-slate-50"
+          >
+            <span className="block text-xs font-semibold text-slate-600">
+              All
+            </span>
+            <span className="mt-0.5 block text-xs text-slate-400">
+              Show every option
+            </span>
+          </button>
+          {options.map((option) => (
+            <button
+              type="button"
+              key={option.value}
+              onClick={() => {
+                onChange(option.value);
+                setOpen(false);
+              }}
+              className="rounded-lg px-3 py-2 text-left hover:bg-slate-50"
+            >
+              <span className="flex items-center gap-3">
+                <span
+                  className={cn(
+                    "inline-flex w-28 shrink-0 items-center justify-center rounded-full px-3 py-1.5 text-center text-xs font-semibold ring-1 ring-inset",
+                    option.color,
+                  )}
+                >
+                  {option.label}
+                </span>
+                <span className="text-sm text-slate-500">
+                  {option.description}
+                </span>
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function PersonCell({ name }: { name: string }) {
   if (!name.trim()) {

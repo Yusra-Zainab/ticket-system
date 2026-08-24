@@ -19,7 +19,7 @@ interface AppContextValue {
 const AppContext = createContext<AppContextValue | null>(null);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
-  const [notifications, setNotifications] = useState(mockNotifications);
+  const [notifications, setNotifications] = useState<Notification[]>(mockNotifications);
   const readTickets = (key: string) => { if (typeof window === 'undefined') return []; try { return JSON.parse(localStorage.getItem(key) ?? '[]') as Ticket[]; } catch { return []; } };
   const [draftTickets, setDraftTickets] = useState<Ticket[]>(() => readTickets('ticket-drafts'));
   const [submittedTickets, setSubmittedTickets] = useState<Ticket[]>(() => readTickets('submitted-tickets'));

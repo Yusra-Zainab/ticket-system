@@ -4,21 +4,31 @@ import PageHeader from "@/components/ui/PageHeader";
 export default async function NewModulePage({
   searchParams,
 }: {
-  searchParams: Promise<{ project?: string; projectName?: string }>;
+  searchParams: Promise<{
+    project?: string;
+    projectId?: string;
+    projectName?: string;
+    returnTo?: string;
+  }>;
 }) {
-  const { project, projectName } = await searchParams;
+  const { project, projectId, projectName, returnTo } = await searchParams;
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <PageHeader
-        title="Create Module"
+        title="New Module"
         description={
           projectName
             ? `Add a project area to ${projectName}.`
             : "Add a project area and its related URL."
         }
       />
-      <ModuleForm kind="module" projectId={project} projectName={projectName} />
+      <ModuleForm
+        kind="module"
+        projectId={projectId ?? project}
+        projectName={projectName}
+        returnTo={returnTo}
+      />
     </div>
   );
 }

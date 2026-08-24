@@ -10,7 +10,11 @@ export default function ForgotPasswordForm() {
 
   const [isSent, setIsSent] = useState(false);
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const [submitError, setSubmitError] = useState("");
+
+  const [saving, setSaving] = useState(false);
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     if (!email.trim()) {
@@ -26,13 +30,39 @@ export default function ForgotPasswordForm() {
     }
 
     setEmailError("");
+    setSubmitError("");
 
-    /*
-     * Replace with your real password-reset API.
-     */
-    console.log("Password reset requested for:", email);
+    try {
+      setSaving(true);
 
-    setIsSent(true);
+      const response = await fetch("/api/auth/forgot-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email }),
+      });
+
+      const body = (await response.json().catch(() => ({}))) as {
+        error?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(
+          body.error ?? "Unable to send reset link.",
+        );
+      }
+
+      setIsSent(true);
+    } catch (reason) {
+      setSubmitError(
+        reason instanceof Error
+          ? reason.message
+          : "Unable to send reset link.",
+      );
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -70,8 +100,16 @@ export default function ForgotPasswordForm() {
               {emailError && <span className="auth-error">{emailError}</span>}
             </div>
 
-            <button type="submit" className="auth-primary-button">
-              Send Link
+            {submitError && (
+              <span className="auth-error">{submitError}</span>
+            )}
+
+            <button
+              type="submit"
+              disabled={saving}
+              className="auth-primary-button"
+            >
+              {saving ? "Sending..." : "Send Link"}
             </button>
           </form>
         ) : (

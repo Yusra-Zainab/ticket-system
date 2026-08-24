@@ -9,14 +9,19 @@ import {
   listUsers,
 } from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+
 export default async function ClientDetailsPage({
   params,
+  searchParams,
 }: {
   params: Promise<{
     id: string;
   }>;
+  searchParams: Promise<{ tab?: string }>;
 }) {
   const { id } = await params;
+  const { tab } = await searchParams;
 
   const [client, projects, tickets, users] = await Promise.all([
     findClientRecord(id),
@@ -35,6 +40,7 @@ export default async function ClientDetailsPage({
       projects={projects}
       tickets={tickets}
       users={users}
+      initialTab={tab}
     />
   );
 }

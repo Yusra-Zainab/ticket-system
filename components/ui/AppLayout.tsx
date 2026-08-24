@@ -21,7 +21,13 @@ export interface AppLayoutProps {
   breadcrumbs?: Array<{ label: string; href?: string }>;
 }
 
-const bareRoutes = ["/login", "/forgotPassword", "/errors"];
+const bareRoutes = [
+  "/login",
+  "/forgotPassword",
+  "/resetPassword",
+  "/reset-password",
+  "/errors",
+];
 
 function buildCrumbs(
   pathname: string,
@@ -309,7 +315,7 @@ function Shell({ children, breadcrumbs }: AppLayoutProps) {
             </button>
           </nav>
 
-          <main>{children}</main>
+          <main data-page-search-content>{children}</main>
         </div>
 
         <FloatingActionBar notificationsCount={unreadCount} />

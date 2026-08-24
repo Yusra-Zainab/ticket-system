@@ -227,6 +227,8 @@ export interface Ticket {
 
   created: string;
 
+  updatedAt: string;
+
   dueDate: string;
 
   description: string;
@@ -479,8 +481,11 @@ export type AdminFormData = {
   jobTitle: string;
 
   email: string;
+  workEmail?: string;
   phone: string;
   communicationChannel: string;
+  timeZone?: string;
+  twoFactorEnabled?: boolean;
 
   skills: string[];
   experienceLevel: string;

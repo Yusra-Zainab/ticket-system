@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import {
   ArrowDown,
@@ -18,6 +18,8 @@ import {
 import { type ReactNode, useMemo, useState } from "react";
 
 import { Avatar } from "@/components/ui/Avatar";
+import ProjectStatus from "@/components/features/ProjectStatus";
+import StatusBadge from "@/components/ui/StatusBadge";
 
 import { cn } from "@/lib/utils";
 
@@ -128,22 +130,31 @@ export default function ResourceDetailsView({
   resource,
   projects,
   tickets,
+  initialTab,
 }: {
   resource: ResourceRecord;
 
   projects: Project[];
 
   tickets: Ticket[];
+
+  initialTab?: string;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
   const form = resource.formData ?? {};
+  const normalizeTab = (value?: string): ResourceTab =>
+    tabs.find((tab) => tab.toLowerCase() === String(value ?? "").trim().toLowerCase()) ?? "Overview";
 
   /*
    * Reference page defaults to
    * Overview when opening a resource.
    */
-  const [activeTab, setActiveTab] = useState<ResourceTab>("Overview");
+  const [activeTab, setActiveTab] = useState<ResourceTab>(() =>
+    normalizeTab(initialTab),
+  );
 
   const [moreOpen, setMoreOpen] = useState(false);
 
@@ -530,7 +541,19 @@ export default function ResourceDetailsView({
 
                 activeTab === tab && "resource-detail-tab-active",
               )}
-              onClick={() => setActiveTab(tab)}
+              onClick={() => {
+                setActiveTab(tab);
+                const params = new URLSearchParams(searchParams.toString());
+                if (tab === "Overview") {
+                  params.delete("tab");
+                } else {
+                  params.set("tab", tab.toLowerCase());
+                }
+                router.replace(
+                  params.size ? `${pathname}?${params.toString()}` : pathname,
+                  { scroll: false },
+                );
+              }}
             >
               {tab}
             </button>
@@ -771,9 +794,7 @@ function ProjectsTab({
                   <td>—</td>
 
                   <td>
-                    <span className="resource-project-status">
-                      {project.status}
-                    </span>
+                    <ProjectStatus status={project.status} size="sm" />
                   </td>
                 </tr>
               ))}
@@ -1244,27 +1265,8 @@ function ResourceStatusBadge({ status }: { status: ResourceStatus }) {
 }
 
 function TicketStatusBadge({ status }: { status: string }) {
-  const normalized = status.trim().toLowerCase();
-
-  const green = [
-    "active",
-    "in progress",
-    "ready for review",
-    "assigned",
-    "open",
-    "resolved",
-  ].includes(normalized);
-
   return (
-    <span
-      className={cn(
-        "resource-ticket-status",
-
-        green ? "resource-ticket-status-green" : "resource-ticket-status-gray",
-      )}
-    >
-      {status}
-    </span>
+    <StatusBadge status={normalizeTicketStatus(status)} size="sm" />
   );
 }
 
@@ -1367,6 +1369,25 @@ function normalizeResourceStatus(value: unknown): ResourceStatus {
     .toLowerCase() === "inactive"
     ? "Inactive"
     : "Active";
+}
+
+function normalizeTicketStatus(value: string): import("@/types").Status {
+  switch (String(value ?? "").trim()) {
+    case "Assigned":
+      return "Assigned";
+    case "In Progress":
+      return "In Progress";
+    case "Blocked":
+      return "Blocked";
+    case "Ready for Review":
+      return "Ready for Review";
+    case "Closed":
+    case "Resolved":
+    case "Cancelled":
+      return "Closed";
+    default:
+      return "Open";
+  }
 }
 
 function formatRole(value: string) {

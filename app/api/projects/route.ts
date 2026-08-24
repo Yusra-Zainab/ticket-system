@@ -1,5 +1,9 @@
 import { z } from "zod";
-import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
+import type {
+  PoolConnection,
+  ResultSetHeader,
+  RowDataPacket,
+} from "mysql2/promise";
 
 import { db, hasProjectPriorityColumn, listProjects } from "@/lib/db";
 
@@ -86,9 +90,11 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const connection = await db.getConnection();
+  let connection: PoolConnection | undefined;
+  let transactionStarted = false;
 
   try {
+    connection = await db.getConnection();
     const { project, state } = bodySchema.parse(await request.json());
     const lifecycle = state === "draft" ? "DRAFT" : "OPEN";
 
@@ -128,6 +134,7 @@ export async function POST(request: Request) {
     };
 
     await connection.beginTransaction();
+    transactionStarted = true;
 
     const hasPriorityColumn = await hasProjectPriorityColumn();
     const columns = [
@@ -176,7 +183,9 @@ export async function POST(request: Request) {
       { status: 201 },
     );
   } catch (error) {
-    await connection.rollback();
+    if (transactionStarted && connection) {
+      await connection.rollback();
+    }
 
     if (error instanceof z.ZodError) {
       return Response.json(
@@ -188,6 +197,6 @@ export async function POST(request: Request) {
     console.error(error);
     return Response.json({ error: "Unable to save project" }, { status: 500 });
   } finally {
-    connection.release();
+    connection?.release();
   }
 }

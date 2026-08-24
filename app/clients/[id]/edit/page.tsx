@@ -6,6 +6,8 @@ import NewClientForm, {
 
 import { findClientRecord, listProjects, listUsers } from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+
 const validSections = new Set<SectionId>([
   "client-information",
   "primary-contact",

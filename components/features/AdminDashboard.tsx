@@ -8,6 +8,7 @@ import { useMemo, useState } from "react";
 
 import ProjectStatus from "@/components/features/ProjectStatus";
 
+import { profileLabelToTimeZone } from "@/lib/profileUtils";
 import { cn } from "@/lib/utils";
 
 import PageHeader from "@/components/ui/PageHeader";
@@ -20,6 +21,7 @@ type Props = {
   resources: ResourceListRow[];
   clients: ClientListRow[];
   now: number;
+  timeZone: string;
 };
 
 type PriorityLabel = "Critical" | "High" | "Medium" | "Low" | "Not Assigned";
@@ -38,6 +40,7 @@ export default function AdminDashboard({
   resources,
   clients,
   now,
+  timeZone,
 }: Props) {
   const [selectedProjectId, setSelectedProjectId] = useState(
     projects[0]?.id ?? "",
@@ -144,8 +147,7 @@ export default function AdminDashboard({
           assigned,
           active,
         };
-      })
-      .slice(0, 4);
+      });
   }, [
     selectedProject,
     projectTeam,
@@ -155,10 +157,7 @@ export default function AdminDashboard({
   ]);
 
   const priorityTickets = useMemo(
-    () =>
-      [...projectOpenTickets]
-        .sort((left, right) => left.priority - right.priority)
-        .slice(0, 4),
+    () => [...projectOpenTickets].sort((left, right) => left.priority - right.priority),
     [projectOpenTickets],
   );
 
@@ -169,10 +168,9 @@ export default function AdminDashboard({
       [...tickets]
         .sort(
           (left, right) =>
-            new Date(right.created).getTime() -
-            new Date(left.created).getTime(),
-        )
-        .slice(0, 4),
+            new Date(right.updatedAt || right.created).getTime() -
+            new Date(left.updatedAt || left.created).getTime(),
+        ),
     [tickets],
   );
 
@@ -339,6 +337,7 @@ export default function AdminDashboard({
           <DashboardTableCard
             title="Resource Workload"
             badge={`${projectTeam.length} Resources`}
+            scrollable
           >
             <table className="admin-dashboard-mini-table">
               <thead>
@@ -385,7 +384,10 @@ export default function AdminDashboard({
               TICKETS BY PRIORITY
              ============================================= */}
 
-          <DashboardTableCard title="Tickets List ( on the basis of priority )">
+          <DashboardTableCard
+            title="Tickets List ( on the basis of priority )"
+            scrollable
+          >
             <table className="admin-dashboard-mini-table admin-dashboard-priority-table">
               <thead>
                 <tr>
@@ -434,7 +436,7 @@ export default function AdminDashboard({
             RECENT ACTIVITY
            =============================================== */}
 
-        <DashboardTableCard title="Recent Activity" wide>
+        <DashboardTableCard title="Recent Activity" wide scrollable>
           <table className="admin-dashboard-activity-table">
             <thead>
               <tr>
@@ -453,7 +455,7 @@ export default function AdminDashboard({
             <tbody>
               {recentActivity.map((ticket) => (
                 <tr key={ticket.id}>
-                  <td>{formatActivityTime(ticket.created)}</td>
+                  <td>{formatActivityTime(ticket.updatedAt || ticket.created, timeZone)}</td>
 
                   <td>{activityText(ticket)}</td>
 
@@ -514,11 +516,13 @@ function DashboardTableCard({
   title,
   badge,
   wide = false,
+  scrollable = false,
   children,
 }: {
   title: string;
   badge?: string;
   wide?: boolean;
+  scrollable?: boolean;
   children: React.ReactNode;
 }) {
   return (
@@ -534,7 +538,14 @@ function DashboardTableCard({
         {badge && <span>{badge}</span>}
       </header>
 
-      <div className="admin-dashboard-card-content">{children}</div>
+      <div
+        className={cn(
+          "admin-dashboard-card-content",
+          scrollable && "admin-dashboard-card-content-scrollable",
+        )}
+      >
+        {children}
+      </div>
     </section>
   );
 }
@@ -620,7 +631,7 @@ function getNextDueDate(tickets: Ticket[], now: number) {
   }).format(date);
 }
 
-function formatActivityTime(value: string) {
+function formatActivityTime(value: string, timeZoneLabel: string) {
   if (!value) {
     return "—";
   }
@@ -635,6 +646,7 @@ function formatActivityTime(value: string) {
     hour: "2-digit",
     minute: "2-digit",
     hour12: true,
+    timeZone: profileLabelToTimeZone(timeZoneLabel),
   }).format(date);
 }
 

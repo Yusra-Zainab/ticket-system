@@ -20,7 +20,7 @@ const bodySchema = z.object({
   ticket: ticketSchema,
   state: z.enum(["draft", "open"]),
 });
-const priorityName = ["Critical", "Critical", "High", "Medium", "Low"];
+const priorityName = ["Not Assigned", "Critical", "High", "Medium", "Low"];
 type IdRow = RowDataPacket & { id: number };
 async function foreignId(
   table: "projects" | "users",
@@ -51,7 +51,12 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const { ticket, state } = bodySchema.parse(await request.json());
-    const projectId = await foreignId("projects", "name", ticket.project);
+    const formData = ticket.formData ?? {};
+    const projectId = await foreignId(
+      "projects",
+      "name",
+      String(formData.projectId || ticket.project),
+    );
     const assignedTo = await foreignId("users", "name", ticket.assignedTo);
     const createdBy = await foreignId("users", "name", ticket.reporter);
     const lifecycle = state === "draft" ? "DRAFT" : "OPEN";
@@ -77,6 +82,13 @@ export async function POST(request: Request) {
     const createdDate = ticket.created ? ticket.created.slice(0, 10) : null;
     const deadline = ticket.dueDate ? ticket.dueDate.slice(0, 10) : null;
     const ticketType = String(ticket.formData?.type ?? "Task") || "Task";
+    const storedFormData = {
+      id: ticket.id,
+      ...formData,
+      activity: Array.isArray(ticket.formData?.activity)
+        ? ticket.formData.activity
+        : [`Ticket loaded from database: ${ticket.id}`],
+    };
     await db.execute(
       `INSERT INTO tickets (ticket_id,lifecycle,title,description,form_data,priority_type,priority_number,type,project_id,created_by,assigned_to,status,created_date,deadline) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE lifecycle=VALUES(lifecycle),title=VALUES(title),description=VALUES(description),form_data=VALUES(form_data),priority_type=VALUES(priority_type),priority_number=VALUES(priority_number),type=VALUES(type),project_id=VALUES(project_id),created_by=VALUES(created_by),assigned_to=VALUES(assigned_to),status=VALUES(status),deadline=VALUES(deadline)`,
       [
@@ -84,13 +96,13 @@ export async function POST(request: Request) {
         lifecycle,
         ticket.title,
         ticket.description,
-        JSON.stringify({ id: ticket.id, ...ticket.formData }),
-        priorityName[ticket.priority],
+        JSON.stringify(storedFormData),
+        priorityName[ticket.priority] ?? "Not Assigned",
         ticket.priority,
         ticketType,
-        lifecycle === "OPEN" ? projectId : projectId ?? null,
-        lifecycle === "OPEN" ? createdBy : createdBy ?? null,
-        lifecycle === "OPEN" ? assignedTo : assignedTo ?? null,
+        lifecycle === "OPEN" ? projectId : (projectId ?? null),
+        lifecycle === "OPEN" ? createdBy : (createdBy ?? null),
+        lifecycle === "OPEN" ? assignedTo : (assignedTo ?? null),
         status,
         createdDate,
         deadline,

@@ -25,6 +25,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import ClientsTable from "@/components/features/ClientsTable";
 import ResourcesTable from "@/components/features/ResourcesTable";
 
+import { adminStatusDescriptions } from "@/lib/statusOptions";
 import { cn } from "@/lib/utils";
 
 import type { AdminUserListRow, ClientListRow, ResourceListRow } from "@/types";
@@ -405,7 +406,12 @@ export default function AdminUsers({
                     value === "All" ? (
                       <span>All statuses</span>
                     ) : (
-                      <AdminStatusBadge status={value as AdminStatus} />
+                      <span className="inline-flex min-w-0 items-center gap-3">
+                        <AdminStatusBadge status={value as AdminStatus} />
+                        <span className="truncate text-sm text-[#667085]">
+                          {adminStatusDescriptions[value as AdminStatus]}
+                        </span>
+                      </span>
                     )
                   }
                 />

@@ -25,6 +25,7 @@ import {
 import { useState } from "react";
 
 import NotificationPopover from "@/components/ui/NotificationPopover";
+import { usePageSearch } from "@/components/providers/PageSearchProvider";
 import { cn } from "@/lib/utils";
 
 export interface FloatingActionBarProps {
@@ -124,8 +125,12 @@ export default function FloatingActionBar({
   const [notificationsOpen, setNotificationsOpen] = useState(false);
 
   const [searching, setSearching] = useState(false);
-
-  const [searchValue, setSearchValue] = useState("");
+  const { query: searchValue, setQuery, clearQuery, matchState } =
+    usePageSearch();
+  const notificationsLabel =
+    notificationsCount > 0
+      ? `Notifications (${notificationsCount > 99 ? "99+" : notificationsCount} new)`
+      : "No new notifications";
 
   const dashboardActive = pathname === "/dashboard";
 
@@ -146,10 +151,14 @@ export default function FloatingActionBar({
           autoFocus
           type="search"
           value={searchValue}
-          onChange={(event) => setSearchValue(event.target.value)}
+          onChange={(event) => setQuery(event.target.value)}
           placeholder="Search"
           aria-label="Search current page"
-          className="dock-search-input"
+          aria-invalid={matchState === "not-found"}
+          className={cn(
+            "dock-search-input",
+            matchState === "not-found" && "dock-search-input-not-found",
+          )}
         />
 
         <span className="dock-divider" />
@@ -160,8 +169,7 @@ export default function FloatingActionBar({
           title="Back"
           onClick={() => {
             setSearching(false);
-
-            setSearchValue("");
+            clearQuery();
           }}
           className="dock-action"
         >
@@ -217,8 +225,12 @@ export default function FloatingActionBar({
           type="button"
           aria-label="Logout"
           title="Logout"
-          onClick={() => {
+          onClick={async () => {
+            await fetch("/api/auth/logout", {
+              method: "POST",
+            });
             router.push("/login");
+            router.refresh();
           }}
           className="dock-action"
         >
@@ -540,8 +552,8 @@ export default function FloatingActionBar({
 
         <button
           type="button"
-          aria-label="Notifications"
-          title="Notifications"
+          aria-label={notificationsLabel}
+          title={notificationsLabel}
           aria-expanded={notificationsOpen}
           aria-controls="notification-popover"
           onClick={() => {

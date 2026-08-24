@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import NewProjectForm from "@/components/features/NewProjectForm";
 import { findProject, listClients, listUsers } from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+
 export default async function EditProjectPage({
   params,
 }: {
@@ -18,5 +20,7 @@ export default async function EditProjectPage({
 
   if (!project) notFound();
 
-  return <NewProjectForm users={users} clients={clients} initialProject={project} />;
+  return (
+    <NewProjectForm users={users} clients={clients} initialProject={project} />
+  );
 }

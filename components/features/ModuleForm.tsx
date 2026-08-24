@@ -7,10 +7,12 @@ export default function ModuleForm({
   kind,
   projectId,
   projectName,
+  returnTo,
 }: {
   kind: "module" | "subModule";
   projectId?: string;
   projectName?: string;
+  returnTo?: string;
 }) {
   const router = useRouter();
   const [name, setName] = useState("");
@@ -20,7 +22,7 @@ export default function ModuleForm({
   const valid = name.trim().length >= 2 && url.trim().length >= 3;
 
   const create = () => {
-    if (projectId) {
+    if (projectId && returnTo !== "ticket") {
       router.push(`/projects/${projectId}`);
       return;
     }
@@ -32,6 +34,10 @@ export default function ModuleForm({
 
     if (projectName) {
       params.set("project", projectName);
+    }
+
+    if (projectId) {
+      params.set("projectId", projectId);
     }
 
     router.push(`/tickets/new?${params}`);
@@ -77,7 +83,7 @@ export default function ModuleForm({
           onClick={() => setConfirming(true)}
           className="button-primary disabled:opacity-50"
         >
-          Create {kind === "module" ? "Module" : "Sub Module"}
+          Save {kind === "module" ? "Module" : "Sub Module"}
         </button>
       </div>
 
@@ -86,7 +92,7 @@ export default function ModuleForm({
           <div role="alertdialog" aria-modal="true" className="ticket-modal !w-[410px]">
             <h2 className="text-2xl font-bold text-slate-700">Confirmation</h2>
             <p className="mt-5 font-semibold text-slate-700">
-              Create {name}
+              Save {name}
               {projectName ? ` for ${projectName}` : ""}?
             </p>
             <div className="mt-6 flex justify-between">

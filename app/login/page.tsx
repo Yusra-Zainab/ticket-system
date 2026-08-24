@@ -1,6 +1,10 @@
+import { requireAnonymousPage } from "@/lib/auth";
+
 import LoginForm from "./LoginForm";
 
-export default function LoginPage() {
+export default async function LoginPage() {
+  await requireAnonymousPage();
+
   return (
     <main className="auth-page">
       <div className="auth-background-pattern" aria-hidden="true" />

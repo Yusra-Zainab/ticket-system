@@ -3,14 +3,14 @@ import ResourcesTable from "@/components/features/ResourcesTable";
 
 import { listResourceRows } from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+
 export default async function ResourceDraftsPage() {
   const drafts = await listResourceRows("DRAFT");
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Resource Drafts"
-      />
+      <PageHeader title="Resource Drafts" />
 
       <ResourcesTable initialResources={drafts} variant="drafts" />
     </div>

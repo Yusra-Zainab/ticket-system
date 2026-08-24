@@ -4,6 +4,7 @@ import { Check, ChevronDown, Loader2, Send } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import StickyToast from "@/components/ui/StickyToast";
 import { allPermissions, permissionGroups } from "@/lib/rolePermissions";
 import { cn } from "@/lib/utils";
 
@@ -32,7 +33,8 @@ export default function RoleForm({
   const [activeGroup, setActiveGroup] = useState(permissionGroups[0].name);
 
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
+  const [, setError] = useState("");
+  const [notice, setNotice] = useState("");
 
   const activePermissionGroup = useMemo(
     () =>
@@ -84,31 +86,37 @@ export default function RoleForm({
     setSelectedPermissions(initialRole?.permissions ?? []);
     setActiveGroup(permissionGroups[0].name);
     setError("");
+    setNotice("");
   }
 
   async function submit() {
     if (name.trim().length < 3) {
       setError("Enter a role name.");
+      setNotice("Enter a role name.");
       return;
     }
 
     if (!description.trim()) {
       setError("Enter a role description.");
+      setNotice("Enter a role description.");
       return;
     }
 
     if (!roleType.trim()) {
       setError("Enter the role type or position.");
+      setNotice("Enter the role type or position.");
       return;
     }
 
     if (!selectedPermissions.length) {
       setError("Select at least one permission.");
+      setNotice("Select at least one permission.");
       return;
     }
 
     setSaving(true);
     setError("");
+    setNotice("");
 
     try {
       const response = await fetch("/api/roles", {
@@ -138,9 +146,10 @@ export default function RoleForm({
       router.push("/admin/roles");
       router.refresh();
     } catch (reason) {
-      setError(
-        reason instanceof Error ? reason.message : "Unable to save role.",
-      );
+      const message =
+        reason instanceof Error ? reason.message : "Unable to save role.";
+      setError(message);
+      setNotice(message);
     } finally {
       setSaving(false);
     }
@@ -301,7 +310,16 @@ export default function RoleForm({
         )}
       </section>
 
-      {error && <div className="role-form-error">{error}</div>}
+      {notice && (
+        <StickyToast
+          message={notice}
+          kind="error"
+          onDismiss={() => {
+            setNotice("");
+            setError("");
+          }}
+        />
+      )}
     </div>
   );
 }

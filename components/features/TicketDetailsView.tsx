@@ -23,13 +23,18 @@ const roleActions: Record<UserRole, Action[]> = {
   Client: ["Upload File", "Add Comment"],
 };
 const statuses: Status[] = ["Open", "In Progress", "Blocked", "Ready for Review", "Closed"];
-const resources = ["Ahmed Khan", "Olivia Rhy", "Phoenix Baker", "Lana Steiner"];
 const priorities = ["Critical", "High", "Medium", "Low"] as const;
 const priorityNumber = { Critical: 1, High: 2, Medium: 3, Low: 4 };
-const statusColors: Partial<Record<Status, string>> = {
-  Open: "bg-blue-50 text-blue-700 ring-blue-600/20", "In Progress": "bg-teal-50 text-teal-700 ring-teal-600/20", Blocked: "bg-orange-50 text-orange-700 ring-orange-600/20", "Ready for Review": "bg-violet-50 text-violet-700 ring-violet-600/20", Closed: "bg-gray-700 text-white ring-gray-800",
-};
 const priorityColors: Record<Priority, string> = { Critical: "bg-red-600 text-white ring-red-700", High: "bg-orange-600 text-white ring-orange-700", Medium: "bg-yellow-600 text-white ring-yellow-700", Low: "bg-green-600 text-white ring-green-700" };
+const ticketTypeColors: Record<string, string> = {
+  Bug: "bg-red-50 text-red-700 ring-red-200",
+  Feedback: "bg-orange-50 text-orange-700 ring-orange-200",
+  "Technical Issue": "bg-amber-50 text-amber-700 ring-amber-200",
+  "New Feature": "bg-violet-50 text-violet-700 ring-violet-200",
+  Task: "bg-blue-50 text-blue-700 ring-blue-200",
+  "Support Request": "bg-teal-50 text-teal-700 ring-teal-200",
+  "UI/UX Issue": "bg-pink-50 text-pink-700 ring-pink-200",
+};
 const asString = (value: unknown, fallback = "") => (typeof value === "string" ? value : fallback);
 const asStringArray = (value: unknown) =>
   Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
@@ -67,8 +72,53 @@ const buildTicketMedia = (ticket: Ticket): MediaItem[] => {
     })),
   ];
 };
+const readTicketActivities = (ticket: Ticket) => {
+  const data = (ticket.formData ?? {}) as Record<string, unknown>;
+  const stored = Array.isArray(data.activity)
+    ? data.activity.filter((item): item is string => typeof item === "string")
+    : [];
 
-export default function TicketDetailsView({ ticket, currentRole = "Admin" }: { ticket: Ticket; currentRole?: UserRole }) {
+  return stored.length
+    ? stored
+    : [`Ticket loaded from database: ${ticket.id}`];
+};
+const readTicketComments = (ticket: Ticket): Comment[] => {
+  const data = (ticket.formData ?? {}) as Record<string, unknown>;
+  const stored = Array.isArray(data.comments) ? data.comments : [];
+
+  return stored
+    .filter(
+      (item): item is Comment =>
+        typeof item === "object" &&
+        item !== null &&
+        typeof (item as Comment).id === "number" &&
+        typeof (item as Comment).user === "string" &&
+        typeof (item as Comment).time === "string" &&
+        typeof (item as Comment).text === "string" &&
+        ((item as Comment).attachments === undefined ||
+          Array.isArray((item as Comment).attachments)),
+    )
+    .map((item) => ({
+      ...item,
+      attachments: Array.isArray(item.attachments)
+        ? item.attachments.filter(
+            (attachment): attachment is string => typeof attachment === "string",
+          )
+        : undefined,
+    }));
+};
+const createActivityEntry = (text: string) =>
+  `${new Date().toLocaleString()} · ${text}`;
+
+export default function TicketDetailsView({
+  ticket,
+  currentRole = "Admin",
+  resourceOptions = [],
+}: {
+  ticket: Ticket;
+  currentRole?: UserRole;
+  resourceOptions?: string[];
+}) {
   const data = (ticket.formData ?? {}) as Record<string, unknown>;
   const persistedTitle = asString(data.title, ticket.title);
   const persistedDescription = asString(data.description, ticket.description);
@@ -85,6 +135,7 @@ export default function TicketDetailsView({ ticket, currentRole = "Admin" }: { t
   const persistedProject = asString(data.project, ticket.project);
   const persistedModule = asString(data.module, "Not selected");
   const persistedSubModule = asString(data.subModule, "Not selected");
+  const persistedType = asString(data.type, "Not set");
   const persistedCreatedBy = asString(data.createdBy, ticket.reporter || "System");
   const persistedDueDate = asString(data.dueDate, ticket.dueDate);
   const persistedEstimatedTime = asString(data.estimatedTime, "Not set");
@@ -99,22 +150,25 @@ export default function TicketDetailsView({ ticket, currentRole = "Admin" }: { t
   const [status, setStatus] = useState<Status>(persistedStatus);
   const [priority, setPriority] = useState<(typeof priorities)[number]>(persistedPriority);
   const [assignee, setAssignee] = useState(persistedAssignee);
-  const [comments, setComments] = useState<Comment[]>([]);
+  const [comments, setComments] = useState<Comment[]>(() => readTicketComments(ticket));
   const [message, setMessage] = useState("");
   const [pendingFiles, setPendingFiles] = useState<string[]>([]);
   const [media, setMedia] = useState<MediaItem[]>(() => buildTicketMedia(ticket));
+  const [storedFormData, setStoredFormData] = useState<Record<string, unknown>>(data);
   const [mediaModal, setMediaModal] = useState<MediaType>();
   const [pendingChange, setPendingChange] = useState<PendingChange>();
   const [notice, setNotice] = useState("");
-  const [activities, setActivities] = useState<string[]>([
-    `Ticket loaded from database: ${ticket.id}`,
-  ]);
+  const [activities, setActivities] = useState<string[]>(() => readTicketActivities(ticket));
   const fileInput = useRef<HTMLInputElement>(null);
   const commentInput = useRef<HTMLTextAreaElement>(null);
   const actions = roleActions[currentRole];
+  const availableResources = resourceOptions.length
+    ? resourceOptions
+    : persistedAssignee
+      ? [persistedAssignee]
+      : [];
   const visibleActions = actions.slice(0, 6);
   const overflowActions = useMemo(() => actions.slice(6), [actions]);
-  const log = (text: string) => setActivities((items) => [text, ...items]);
   const patchTicket = async (payload: Record<string, unknown>) => {
     const response = await fetch(`/api/tickets/${ticket.id}`, {
       method: "PATCH",
@@ -132,6 +186,29 @@ export default function TicketDetailsView({ ticket, currentRole = "Admin" }: { t
       throw new Error(message);
     }
     return response.json() as Promise<Ticket>;
+  };
+  const persistActivity = async (
+    text: string,
+    payload: Record<string, unknown> = {},
+  ) => {
+    const nextActivities = [createActivityEntry(text), ...activities].slice(0, 50);
+    const formDataPatch =
+      payload.formData && typeof payload.formData === "object"
+        ? (payload.formData as Record<string, unknown>)
+        : {};
+    const nextFormData = {
+      ...storedFormData,
+      ...formDataPatch,
+      activity: nextActivities,
+    };
+
+    await patchTicket({
+      ...payload,
+      formData: nextFormData,
+    });
+
+    setStoredFormData(nextFormData);
+    setActivities(nextActivities);
   };
 
   const selectAction = (action: Action) => {
@@ -166,7 +243,11 @@ export default function TicketDetailsView({ ticket, currentRole = "Admin" }: { t
         })),
         ...items,
       ]);
-      uploaded.forEach((item) => log(`File uploaded: ${item.name}`));
+      await persistActivity(
+        uploaded.length === 1
+          ? `File uploaded: ${uploaded[0].name}`
+          : `${uploaded.length} files uploaded`,
+      );
       setTab("media");
       setActiveAction(undefined);
     };
@@ -174,10 +255,24 @@ export default function TicketDetailsView({ ticket, currentRole = "Admin" }: { t
       setNotice(error instanceof Error ? error.message : "Unable to upload files.");
     });
   };
-  const addComment = () => {
+  const addComment = async () => {
     if (!message.trim() && !pendingFiles.length) return;
-    setComments((items) => [...items, { id: Date.now(), user: assignee, time: "Just now", text: message.trim() || "Shared attachments", attachments: pendingFiles }]);
-    setMessage(""); setPendingFiles([]); setTab("chat"); setActiveAction(undefined); log(`Comment added by ${assignee}`);
+    const nextComment = {
+      id: Date.now(),
+      user: assignee || persistedCreatedBy || "System",
+      time: "Just now",
+      text: message.trim() || "Shared attachments",
+      attachments: pendingFiles,
+    };
+    const nextComments = [...comments, nextComment].slice(-100);
+    setComments(nextComments);
+    const author = assignee || persistedCreatedBy || "System";
+    setMessage(""); setPendingFiles([]); setTab("chat"); setActiveAction(undefined);
+    await persistActivity(`Comment added by ${author}`, {
+      formData: {
+        comments: nextComments,
+      },
+    });
   };
 
   return <div className="ticket-detail-page">
@@ -185,7 +280,7 @@ export default function TicketDetailsView({ ticket, currentRole = "Admin" }: { t
     <div className="mt-8 flex justify-end"><div className="detail-action-row">{visibleActions.map((action, index) => <button key={action} onClick={() => selectAction(action)} className={cn("detail-action-button", index > 2 && "hidden lg:inline-flex")}>{action}</button>)}{(visibleActions.length > 3 || overflowActions.length > 0) && <div className="relative"><button onClick={() => setMoreOpen((value) => !value)} className="detail-action-button" aria-expanded={moreOpen}>More<ChevronDown size={16} /></button>{moreOpen && <div className="detail-more-menu">{[...visibleActions.slice(3), ...overflowActions].map((action) => <button key={action} onClick={() => selectAction(action)}>{action}</button>)}</div>}</div>}</div></div>
 
     <div className={cn("mt-7 grid min-w-0", sidebarOpen ? "lg:grid-cols-[320px_minmax(0,1fr)]" : "lg:grid-cols-[56px_minmax(0,1fr)]")}>
-      <aside className="detail-sidebar"><button onClick={() => setSidebarOpen((value) => !value)} className="detail-sidebar-toggle" aria-label={sidebarOpen ? "Collapse ticket details" : "Expand ticket details"}>{sidebarOpen ? <ChevronLeft /> : <ChevronDown className="-rotate-90" />}</button>{sidebarOpen && <dl className="space-y-4 pr-7"><Meta label="Status"><StatusBadge status={status} /></Meta><Meta label="Priority"><ChoiceTag label={priority} colors={priorityColors[priority]} /></Meta><Meta label="Project" value={persistedProject || "Not set"} /><Meta label="Module" value={persistedModule || "Not set"} /><Meta label="Sub Module" value={persistedSubModule || "Not set"} /><Meta label="Priority Number" value={`#${priorityNumber[priority]}`} /><Meta label="Assignee" value={assignee ? `${assignee} — Developer` : "Not set"} /><Meta label="Created By" value={persistedCreatedBy || "Not set"} /><Meta label="Due Date" value={formatDate(persistedDueDate)} /><Meta label="Estimated Time" value={persistedEstimatedTime || "Not set"} /><Meta label="Created Date" value={formatDate(ticket.created)} /><Meta label="Last Updated" value={formatDate(ticket.created)} /></dl>}</aside>
+      <aside className="detail-sidebar"><button onClick={() => setSidebarOpen((value) => !value)} className="detail-sidebar-toggle" aria-label={sidebarOpen ? "Collapse ticket details" : "Expand ticket details"}>{sidebarOpen ? <ChevronLeft /> : <ChevronDown className="-rotate-90" />}</button>{sidebarOpen && <dl className="space-y-4 pr-7"><Meta label="Status"><StatusBadge status={status} /></Meta><Meta label="Priority"><ChoiceTag label={priority} colors={priorityColors[priority]} /></Meta><Meta label="Ticket Type"><ChoiceTag label={persistedType} colors={ticketTypeColors[persistedType] ?? "bg-slate-50 text-slate-700 ring-slate-200"} /></Meta><Meta label="Project" value={persistedProject || "Not set"} /><Meta label="Module" value={persistedModule || "Not set"} /><Meta label="Sub Module" value={persistedSubModule || "Not set"} /><Meta label="Priority Number" value={`#${priorityNumber[priority]}`} /><Meta label="Assignee" value={assignee ? `${assignee} — Developer` : "Not set"} /><Meta label="Created By" value={persistedCreatedBy || "Not set"} /><Meta label="Due Date" value={formatDate(persistedDueDate)} /><Meta label="Estimated Time" value={persistedEstimatedTime || "Not set"} /><Meta label="Created Date" value={formatDate(ticket.created)} /><Meta label="Last Updated" value={formatDate(ticket.created)} /></dl>}</aside>
       <main className="min-w-0 px-0 pt-7 lg:px-8 lg:pt-0">
         <section><h2 className="detail-heading">{title}</h2><div className="mt-7 flex items-center gap-2"><h3 className="detail-subheading">Description</h3></div><div className="detail-body prose-ticket mt-2 w-full text-left" dangerouslySetInnerHTML={{ __html: sanitizeRichText(description).replace(/\n/g, "<br />") }} /></section>
         <section className="mt-7"><h3 className="detail-subheading">Attachments</h3><div className="mt-3 flex flex-wrap gap-3">{media.filter((item) => item.type !== "Links").slice(0, 5).map((item) => <AttachmentPreview key={item.id} label={item.title} href={item.url} />)}</div></section>
@@ -195,21 +290,21 @@ export default function TicketDetailsView({ ticket, currentRole = "Admin" }: { t
       </main>
     </div>
     {mediaModal && <MediaModal type={mediaModal} items={media.filter((item) => item.type === mediaModal)} onClose={() => setMediaModal(undefined)} />}
-    {activeAction && <ActionModal action={activeAction} status={status} priority={priority} assignee={assignee} titleDraft={titleDraft} descriptionDraft={descriptionDraft} setTitleDraft={setTitleDraft} setDescriptionDraft={setDescriptionDraft} message={message} setMessage={setMessage} onClose={() => setActiveAction(undefined)} onUpload={() => fileInput.current?.click()} onComment={addComment} requestChange={(change) => { setActiveAction(undefined); setPendingChange(change); }} applyStatus={async (value) => { await patchTicket({ status: value }); setStatus(value); log(`Status changed to ${value}`); }} applyPriority={async (value) => { const priorityNumberValue = value === "Critical" ? 1 : value === "High" ? 2 : value === "Medium" ? 3 : 4; await patchTicket({ priorityType: value, priorityNumber: priorityNumberValue }); setPriority(value); log(`Priority changed to ${value}`); }} applyAssignee={async (value) => { await patchTicket({ assignedTo: value }); setAssignee(value); log(`Ticket assigned to ${value}`); }} applyDetails={async () => { const nextTitle = titleDraft.trim() || title; const nextDescription = descriptionDraft.trim() || description; await patchTicket({ title: nextTitle, description: nextDescription, formData: { ...data, title: nextTitle, description: nextDescription } }); setTitle(nextTitle); setDescription(nextDescription); log("Ticket details updated"); }} />}
+    {activeAction && <ActionModal action={activeAction} status={status} priority={priority} assignee={assignee} availableResources={availableResources} titleDraft={titleDraft} descriptionDraft={descriptionDraft} setTitleDraft={setTitleDraft} setDescriptionDraft={setDescriptionDraft} message={message} setMessage={setMessage} onClose={() => setActiveAction(undefined)} onUpload={() => fileInput.current?.click()} onComment={addComment} requestChange={(change) => { setActiveAction(undefined); setPendingChange(change); }} applyStatus={async (value) => { await persistActivity(`Status changed to ${value}`, { status: value }); setStatus(value); }} applyPriority={async (value) => { const priorityNumberValue = value === "Critical" ? 1 : value === "High" ? 2 : value === "Medium" ? 3 : 4; await persistActivity(`Priority changed to ${value}`, { priorityType: value, priorityNumber: priorityNumberValue }); setPriority(value); }} applyAssignee={async (value) => { await persistActivity(`Ticket assigned to ${value}`, { assignedTo: value }); setAssignee(value); }} applyDetails={async () => { const nextTitle = titleDraft.trim() || title; const nextDescription = descriptionDraft.trim() || description; await persistActivity("Ticket details updated", { title: nextTitle, description: nextDescription, formData: { title: nextTitle, description: nextDescription } }); setTitle(nextTitle); setDescription(nextDescription); }} />}
     {pendingChange && <ConfirmationModal message={pendingChange.message} onCancel={() => setPendingChange(undefined)} onConfirm={() => { pendingChange.apply(); setPendingChange(undefined); }} />}
     {notice && <div role="status" className="ticket-toast ticket-toast-error"><p className="text-sm font-medium">{notice}</p><button type="button" className="ml-auto" onClick={() => setNotice("")} aria-label="Dismiss"><X size={17} /></button></div>}
   </div>;
 }
 
-function ActionModal({ action, status, priority, assignee, titleDraft, descriptionDraft, setTitleDraft, setDescriptionDraft, message, setMessage, onClose, onUpload, onComment, requestChange, applyStatus, applyPriority, applyAssignee, applyDetails }: { action: Action; status: Status; priority: Priority; assignee: string; titleDraft: string; descriptionDraft: string; setTitleDraft: (value: string) => void; setDescriptionDraft: (value: string) => void; message: string; setMessage: (value: string) => void; onClose: () => void; onUpload: () => void; onComment: () => void; requestChange: (change: PendingChange) => void; applyStatus: (value: Status) => void; applyPriority: (value: Priority) => void; applyAssignee: (value: string) => void; applyDetails: () => void }) {
+function ActionModal({ action, status, priority, assignee, availableResources, titleDraft, descriptionDraft, setTitleDraft, setDescriptionDraft, message, setMessage, onClose, onUpload, onComment, requestChange, applyStatus, applyPriority, applyAssignee, applyDetails }: { action: Action; status: Status; priority: Priority; assignee: string; availableResources: string[]; titleDraft: string; descriptionDraft: string; setTitleDraft: (value: string) => void; setDescriptionDraft: (value: string) => void; message: string; setMessage: (value: string) => void; onClose: () => void; onUpload: () => void; onComment: () => void; requestChange: (change: PendingChange) => void; applyStatus: (value: Status) => void; applyPriority: (value: Priority) => void; applyAssignee: (value: string) => void; applyDetails: () => void }) {
   const [statusDraft, setStatusDraft] = useState(status);
   const [priorityDraft, setPriorityDraft] = useState(priority);
   const [assigneeDraft, setAssigneeDraft] = useState(assignee);
   const confirm = (messageText: string, apply: () => void) => requestChange({ message: messageText, apply });
   return <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><div role="dialog" aria-modal="true" aria-labelledby="action-modal-title" className="ticket-modal !w-[620px]"><div className="flex items-center justify-between"><h2 id="action-modal-title" className="text-[1.65rem] font-bold text-slate-700">{action}</h2><button onClick={onClose} className="row-icon" aria-label="Close"><X /></button></div>
-    {action === "Change Status" && <ChoiceGrid>{statuses.map((item) => <button key={item} onClick={() => setStatusDraft(item)} className={cn("rounded-full px-3 py-2 text-xs font-semibold ring-1 ring-inset", statusColors[item], statusDraft === item && "outline-2 outline-offset-2 outline-sky-500")}>{item}</button>)}</ChoiceGrid>}
-    {action === "Change Priority" && <ChoiceGrid>{priorities.map((item) => <button key={item} onClick={() => setPriorityDraft(item)} className={cn("rounded-full px-3 py-2 text-xs font-semibold ring-1 ring-inset", priorityColors[item], priorityDraft === item && "outline-2 outline-offset-2 outline-sky-500")}>{item}</button>)}</ChoiceGrid>}
-    {action === "Assign Resource" && <div className="mt-5 grid grid-cols-2 gap-2">{resources.map((item) => <button key={item} onClick={() => setAssigneeDraft(item)} className={cn("rounded-xl border px-4 py-3 text-left text-sm font-semibold", assigneeDraft === item ? "border-sky-500 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-700 hover:bg-slate-50")}>{item}</button>)}</div>}
+    {action === "Change Status" && <ChoiceGrid>{statuses.map((item) => <button key={item} onClick={() => setStatusDraft(item)} className={cn("flex items-center justify-center rounded-lg border px-3 py-2", statusDraft === item ? "border-sky-500 bg-sky-50" : "border-slate-200 hover:bg-slate-50")}><StatusBadge status={item} /></button>)}</ChoiceGrid>}
+    {action === "Change Priority" && <ChoiceGrid>{priorities.map((item) => <button key={item} onClick={() => setPriorityDraft(item)} className={cn("flex items-center justify-center rounded-lg border px-3 py-2", priorityDraft === item ? "border-sky-500 bg-sky-50" : "border-slate-200 hover:bg-slate-50")}><ChoiceTag label={item} colors={priorityColors[item]} /></button>)}</ChoiceGrid>}
+    {action === "Assign Resource" && <div className="mt-5 grid grid-cols-2 gap-2">{availableResources.map((item) => <button key={item} onClick={() => setAssigneeDraft(item)} className={cn("rounded-xl border px-4 py-3 text-left text-sm font-semibold", assigneeDraft === item ? "border-sky-500 bg-sky-50 text-sky-700" : "border-slate-200 text-slate-700 hover:bg-slate-50")}>{item}</button>)}</div>}
     {action === "Upload File" && <button onClick={onUpload} className="mt-5 grid w-full place-items-center gap-2 rounded-xl border-2 border-dashed border-sky-200 bg-sky-50 p-10 text-sm font-semibold text-sky-700"><Upload /><span>Choose files to upload</span></button>}
     {action === "Add Comment" && <textarea autoFocus rows={5} className="field mt-5 resize-none" value={message} onChange={(event) => setMessage(event.target.value)} placeholder="Write a comment..." />}
     {action === "Mark Resolved" && <p className="mt-5 text-base text-slate-600">This will mark the ticket as closed and update its activity history.</p>}

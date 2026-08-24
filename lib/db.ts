@@ -34,9 +34,9 @@ const globalDb = globalThis as typeof globalThis & {
 export const db =
   globalDb.ticketPool ??
   mysql.createPool({
-    host: process.env.MYSQL_HOST,
+    host: process.env.MYSQL_HOST ?? "127.0.0.1",
 
-    port: Number(process.env.MYSQL_PORT),
+    port: Number.parseInt(process.env.MYSQL_PORT ?? "3306", 10) || 3306,
 
     database: process.env.MYSQL_DATABASE,
 
@@ -54,7 +54,11 @@ export const db =
 
     queueLimit: 0,
 
+    connectTimeout: 10_000,
+
     enableKeepAlive: true,
+
+    charset: "utf8mb4",
 
     timezone: "Z",
 
@@ -111,6 +115,8 @@ type TicketRow = RowDataPacket & {
   status: string;
 
   created_date: string | null;
+
+  updated_at: string | null;
 
   deadline: string | null;
 
@@ -248,6 +254,8 @@ function mapTicket(
     reporter: row.creator_name ?? "",
 
     created: row.created_date ?? "",
+
+    updatedAt: row.updated_at ?? row.created_date ?? "",
 
     dueDate: row.deadline ?? "",
 
@@ -678,7 +686,8 @@ export async function hasProjectPriorityColumn() {
 
     projectPriorityColumnCache = Number(rows[0]?.count ?? 0) > 0;
   } catch {
-    projectPriorityColumnCache = false;
+    // Do not permanently cache a transient database outage as a schema fact.
+    projectPriorityColumnCache = null;
   }
 
   return projectPriorityColumnCache;
@@ -1213,6 +1222,16 @@ export async function listResourceRows(
         WHERE
           u.lifecycle = ?
 
+          AND LOWER(
+            COALESCE(
+              u.role,
+              ''
+            )
+          ) NOT IN (
+            'admin',
+            'super_admin'
+          )
+
         ORDER BY
           u.updated_at DESC,
           u.id DESC
@@ -1632,17 +1651,17 @@ type EmailSettingsRow = RowDataPacket & {
 };
 
 export const defaultEmailSettings: EmailSettings = {
-  driver: "",
+  driver: "SMTP",
 
-  host: "",
+  host: process.env.MAILHOG_HOST ?? "127.0.0.1",
 
-  port: "",
+  port: process.env.MAILHOG_SMTP_PORT ?? "1025",
 
   username: "",
 
-  encryption: "",
+  encryption: "None",
 
-  fromAddress: "",
+  fromAddress: process.env.MAIL_FROM ?? "yzainan@datapulsetechnologies.org",
 
   mailgunDomain: "",
 
@@ -1971,12 +1990,21 @@ function parseAdminFormData(
 
     email: typeof form.email === "string" ? form.email : "",
 
+    workEmail: typeof form.workEmail === "string" ? form.workEmail : "",
+
     phone: typeof form.phone === "string" ? form.phone : "",
 
     communicationChannel:
       typeof form.communicationChannel === "string"
         ? form.communicationChannel
         : "",
+
+    timeZone: typeof form.timeZone === "string" ? form.timeZone : "",
+
+    twoFactorEnabled:
+      typeof form.twoFactorEnabled === "boolean"
+        ? form.twoFactorEnabled
+        : true,
 
     skills: Array.isArray(form.skills)
       ? form.skills.filter(
@@ -2052,4 +2080,18 @@ export async function findAdminUser(
       email: formData.email || row.email,
     },
   };
+}
+
+export async function countActiveSessionsForUser(userId: number | string) {
+  const [rows] = await db.query<Array<RowDataPacket & { count: number }>>(
+    `
+      SELECT COUNT(*) AS count
+      FROM auth_sessions
+      WHERE user_id = ?
+        AND expires_at > CURRENT_TIMESTAMP(3)
+    `,
+    [userId],
+  );
+
+  return Number(rows[0]?.count ?? 0);
 }

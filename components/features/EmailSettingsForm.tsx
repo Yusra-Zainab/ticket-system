@@ -4,6 +4,7 @@ import { Check, ChevronDown, Loader2 } from "lucide-react";
 
 import { type ReactNode, useMemo, useState } from "react";
 
+import StickyToast from "@/components/ui/StickyToast";
 import { cn } from "@/lib/utils";
 
 import type {
@@ -82,11 +83,23 @@ export default function EmailSettingsForm({
 
   const [saving, setSaving] = useState(false);
 
-  const [error, setError] = useState("");
+  const [, setError] = useState("");
 
-  const [success, setSuccess] = useState("");
+  const [, setSuccess] = useState("");
+
+  const [notice, setNotice] = useState("");
+
+  const [noticeKind, setNoticeKind] = useState<"success" | "error">("success");
 
   const dirty = JSON.stringify(values) !== JSON.stringify(savedValues);
+
+  function showNotice(
+    message: string,
+    kind: "success" | "error" = "success",
+  ) {
+    setNoticeKind(kind);
+    setNotice(message);
+  }
 
   function setField<K extends keyof FormValues>(
     field: K,
@@ -102,6 +115,7 @@ export default function EmailSettingsForm({
     setError("");
 
     setSuccess("");
+    setNotice("");
   }
 
   function cancelChanges() {
@@ -114,6 +128,7 @@ export default function EmailSettingsForm({
     setError("");
 
     setSuccess("");
+    setNotice("");
   }
 
   function validate() {
@@ -152,6 +167,7 @@ export default function EmailSettingsForm({
 
     if (validation) {
       setError(validation);
+      showNotice(validation, "error");
 
       return;
     }
@@ -161,6 +177,7 @@ export default function EmailSettingsForm({
     setError("");
 
     setSuccess("");
+    setNotice("");
 
     try {
       const response = await fetch("/api/settings/email", {
@@ -202,12 +219,14 @@ export default function EmailSettingsForm({
       setSavedValues(nextSaved);
 
       setSuccess("Email account settings updated successfully.");
+      showNotice("Email account settings updated successfully.");
     } catch (reason) {
-      setError(
+      const message =
         reason instanceof Error
           ? reason.message
-          : "Unable to update email settings.",
-      );
+          : "Unable to update email settings.";
+      setError(message);
+      showNotice(message, "error");
     } finally {
       setSaving(false);
     }
@@ -380,22 +399,16 @@ export default function EmailSettingsForm({
         </EmailField>
       </div>
 
-      {error && (
-        <div
-          role="alert"
-          className="mt-6 rounded-lg border border-[#FECDCA] bg-[#FEF3F2] px-4 py-3 text-sm font-medium text-[#B42318]"
-        >
-          {error}
-        </div>
-      )}
-
-      {success && (
-        <div
-          role="status"
-          className="mt-6 rounded-lg border border-[#ABEFC6] bg-[#ECFDF3] px-4 py-3 text-sm font-medium text-[#067647]"
-        >
-          {success}
-        </div>
+      {notice && (
+        <StickyToast
+          message={notice}
+          kind={noticeKind}
+          onDismiss={() => {
+            setNotice("");
+            setError("");
+            setSuccess("");
+          }}
+        />
       )}
     </div>
   );

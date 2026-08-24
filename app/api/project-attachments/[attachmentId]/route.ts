@@ -29,7 +29,7 @@ export async function GET(
       return Response.json({ error: "Attachment not found" }, { status: 404 });
     }
 
-    return new Response(attachment.file_data, {
+    return new Response(new Uint8Array(attachment.file_data), {
       headers: {
         "Content-Type": attachment.mime_type || "application/octet-stream",
         "Content-Disposition": `inline; filename="${attachment.file_name.replaceAll('"', "")}"`,

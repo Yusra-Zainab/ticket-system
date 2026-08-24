@@ -13,6 +13,7 @@ import {
 import { type ReactNode, useMemo, useState } from "react";
 
 import { Avatar } from "@/components/ui/Avatar";
+import { resourceStatusDescriptions } from "@/lib/statusOptions";
 import { cn } from "@/lib/utils";
 import type { ResourceListRow } from "@/types";
 
@@ -324,7 +325,16 @@ export default function ResourcesTable({
                       value === "All" ? (
                         <span className="text-[#344054]">All statuses</span>
                       ) : (
-                        <ResourceStatus status={value as ResourceStatusType} />
+                        <span className="inline-flex min-w-0 items-center gap-3">
+                          <ResourceStatus status={value as ResourceStatusType} />
+                          <span className="truncate text-sm text-[#667085]">
+                            {
+                              resourceStatusDescriptions[
+                                value as ResourceStatusType
+                              ]
+                            }
+                          </span>
+                        </span>
                       )
                     }
                   />

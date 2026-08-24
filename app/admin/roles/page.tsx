@@ -5,6 +5,8 @@ import PageHeader from "@/components/ui/PageHeader";
 
 import { listRoles } from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+
 export default async function RolesPage() {
   const roles = await listRoles();
 

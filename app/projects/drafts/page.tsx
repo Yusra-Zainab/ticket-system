@@ -5,6 +5,8 @@ import PageHeader from "@/components/ui/PageHeader";
 import { listProjects } from "@/lib/db";
 import type { Project } from "@/types";
 
+export const dynamic = "force-dynamic";
+
 export default async function ProjectDraftsPage() {
   await connection();
 

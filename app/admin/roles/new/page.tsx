@@ -4,6 +4,8 @@ import RoleForm from "@/components/features/RoleForm";
 
 import { findRole } from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+
 export default async function NewRolePage({
   searchParams,
 }: {

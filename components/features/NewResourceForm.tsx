@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 
+import StickyToast from "@/components/ui/StickyToast";
 import { cn } from "@/lib/utils";
 
 export type SectionId =
@@ -413,7 +414,11 @@ export default function NewResourceForm({
 
   const [saving, setSaving] = useState(false);
 
-  const [error, setError] = useState("");
+  const [, setError] = useState("");
+
+  const [notice, setNotice] = useState("");
+
+  const [noticeKind, setNoticeKind] = useState<"success" | "error">("success");
 
   const [projects, setProjects] = useState<Option[]>([]);
 
@@ -422,6 +427,14 @@ export default function NewResourceForm({
   const [resourceId] = useState(
     () => initialResource?.id ?? createResourceId(),
   );
+
+  const showNotice = (
+    message: string,
+    kind: "success" | "error" = "success",
+  ) => {
+    setNoticeKind(kind);
+    setNotice(message);
+  };
 
   /*
    * Load Projects + Users
@@ -528,6 +541,7 @@ export default function NewResourceForm({
     setPhotoPreview(initialResource?.avatar ?? "");
 
     setError("");
+    setNotice("");
 
     setActiveSection("basic");
 
@@ -549,17 +563,20 @@ export default function NewResourceForm({
 
     if (!file.type.startsWith("image/")) {
       setError("Please select an image file.");
+      showNotice("Please select an image file.", "error");
 
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
       setError("Profile image must be smaller than 5 MB.");
+      showNotice("Profile image must be smaller than 5 MB.", "error");
 
       return;
     }
 
     setError("");
+    setNotice("");
 
     setPhoto(file);
 
@@ -601,11 +618,15 @@ export default function NewResourceForm({
      * Drafts may be incomplete.
      * Registered resources may not.
      */
-    if (lifecycle === "OPEN") {
+    const targetLifecycle =
+      lifecycle === "OPEN" ? "OPEN" : (initialResource?.lifecycle ?? "DRAFT");
+
+    if (targetLifecycle === "OPEN") {
       const validationError = validate();
 
       if (validationError) {
         setError(validationError);
+        showNotice(validationError, "error");
 
         return;
       }
@@ -614,6 +635,7 @@ export default function NewResourceForm({
     setSaving(true);
 
     setError("");
+    setNotice("");
 
     try {
       const fullName =
@@ -629,7 +651,7 @@ export default function NewResourceForm({
         body: JSON.stringify({
           id: resourceId,
 
-          lifecycle,
+          lifecycle: targetLifecycle,
 
           name:
             fullName ||
@@ -663,7 +685,17 @@ export default function NewResourceForm({
         );
       }
 
-      if (lifecycle === "DRAFT") {
+      if (initialResource) {
+        showNotice(
+          targetLifecycle === "OPEN"
+            ? "Resource changes saved successfully."
+            : "Resource draft saved successfully.",
+        );
+        router.refresh();
+        return;
+      }
+
+      if (targetLifecycle === "DRAFT") {
         router.push("/resources/drafts");
 
         router.refresh();
@@ -675,9 +707,10 @@ export default function NewResourceForm({
 
       router.refresh();
     } catch (reason) {
-      setError(
-        reason instanceof Error ? reason.message : "Unable to save resource.",
-      );
+      const message =
+        reason instanceof Error ? reason.message : "Unable to save resource.";
+      setError(message);
+      showNotice(message, "error");
     } finally {
       setSaving(false);
     }
@@ -749,14 +782,6 @@ export default function NewResourceForm({
           </div>
         </div>
 
-        {error && (
-          <div
-            role="alert"
-            className="mt-4 rounded-lg border border-[#FECDCA] bg-[#FEF3F2] px-4 py-3 text-sm font-medium text-[#B42318]"
-          >
-            {error}
-          </div>
-        )}
       </header>
 
       <div className="new-resource-layout">
@@ -1144,6 +1169,16 @@ export default function NewResourceForm({
           </ResourceSection>
         </main>
       </div>
+      {notice && (
+        <StickyToast
+          message={notice}
+          kind={noticeKind}
+          onDismiss={() => {
+            setNotice("");
+            setError("");
+          }}
+        />
+      )}
     </div>
   );
 }

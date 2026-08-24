@@ -4,6 +4,8 @@ import ProjectsTable from "@/components/features/ProjectsTable";
 import PageHeader from "@/components/ui/PageHeader";
 import { listProjects } from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+
 export default async function ProjectsPage() {
   const projects = await listProjects("OPEN");
 

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Check,
   ChevronDown,
@@ -19,6 +20,7 @@ const roles = [
 ] as const;
 
 export default function LoginForm() {
+  const router = useRouter();
   const [email, setEmail] =
     useState("");
 
@@ -37,7 +39,13 @@ export default function LoginForm() {
   const [passwordError, setPasswordError] =
     useState("");
 
-  const handleSubmit = (
+  const [submitError, setSubmitError] =
+    useState("");
+
+  const [saving, setSaving] =
+    useState(false);
+
+  const handleSubmit = async (
     event: React.FormEvent<HTMLFormElement>,
   ) => {
     event.preventDefault();
@@ -83,14 +91,49 @@ export default function LoginForm() {
       return;
     }
 
-    /*
-     * Connect this to your real authentication
-     * endpoint when ready.
-     */
-    console.log("Login attempt", {
-      email,
-      role,
-    });
+    try {
+      setSaving(true);
+      setSubmitError("");
+
+      const response = await fetch(
+        "/api/auth/login",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            email,
+            password,
+            role,
+          }),
+        },
+      );
+
+      const body = (await response.json().catch(
+        () => ({}),
+      )) as {
+        error?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(
+          body.error ??
+            "Unable to sign in.",
+        );
+      }
+
+      router.push("/dashboard");
+      router.refresh();
+    } catch (reason) {
+      setSubmitError(
+        reason instanceof Error
+          ? reason.message
+          : "Unable to sign in.",
+      );
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -223,10 +266,19 @@ export default function LoginForm() {
 
         <button
           type="submit"
+          disabled={saving}
           className="auth-primary-button"
         >
-          Sign in
+          {saving ? "Signing in..." : "Sign in"}
         </button>
+
+        {submitError && (
+          <div className="auth-field">
+            <span className="auth-error">
+              {submitError}
+            </span>
+          </div>
+        )}
 
         <div className="auth-bottom-link">
           <Link href="/forgotPassword">

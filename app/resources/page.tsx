@@ -4,11 +4,10 @@ import ResourcesTable from "@/components/features/ResourcesTable";
 import PageHeader from "@/components/ui/PageHeader";
 import { listResourceRows } from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+
 export default async function ResourcesPage() {
-  const resources =
-    await listResourceRows(
-      "OPEN",
-    );
+  const resources = await listResourceRows("OPEN");
 
   return (
     <div className="space-y-6">
@@ -19,11 +18,7 @@ export default async function ResourcesPage() {
         actionIcon={Plus}
       />
 
-      <ResourcesTable
-        initialResources={
-          resources
-        }
-      />
+      <ResourcesTable initialResources={resources} />
     </div>
   );
 }

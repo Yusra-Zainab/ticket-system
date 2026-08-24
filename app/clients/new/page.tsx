@@ -1,6 +1,8 @@
 import NewClientForm from "@/components/features/NewClientForm";
 import { listProjects, listUsers } from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+
 export default async function NewClientPage() {
   const [users, projects] = await Promise.all([
     listUsers(),

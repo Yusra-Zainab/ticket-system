@@ -1,17 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
-import { ChevronLeft, ChevronRight, FileText, RefreshCcw } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { ChevronRight, FileText, X } from "lucide-react";
 
 import ProjectTabs, {
   type ProjectTab,
+  projectTabs,
 } from "@/components/features/ProjectTabs";
 import ProjectStatus from "@/components/features/ProjectStatus";
 import { usePageSearch } from "@/components/providers/PageSearchProvider";
 import { Avatar } from "@/components/ui/Avatar";
-import { cn, formatDate } from "@/lib/utils";
+import { cn, formatDate, sanitizeRichText } from "@/lib/utils";
 import type { Project, Ticket, TicketAttachment, User } from "@/types";
 
 type ProjectLink = {
@@ -23,19 +24,39 @@ export default function ProjectDetailsView({
   project,
   tickets,
   users,
+  showSavedToast = false,
+  initialTab,
 }: {
   project: Project;
   tickets: Ticket[];
   users: User[];
+  showSavedToast?: boolean;
+  initialTab?: string;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { query } = usePageSearch();
-  const [activeTab, setActiveTab] = useState<ProjectTab>("Overview");
+  const normalizeTab = (value?: string): ProjectTab =>
+    projectTabs.find((tab) => tab.toLowerCase() === String(value ?? "").trim().toLowerCase()) ?? "Overview";
+  const [activeTab, setActiveTab] = useState<ProjectTab>(() => normalizeTab(initialTab));
+  const [toastDismissed, setToastDismissed] = useState(false);
+  const toast = showSavedToast && !toastDismissed
+    ? "Project saved successfully."
+    : "";
 
   const formData = (project.formData ?? {}) as Record<string, unknown>;
   const projectTickets = useMemo(
-    () => tickets.filter((ticket) => ticket.project === project.name),
-    [project.name, tickets],
+    () =>
+      tickets.filter((ticket) => {
+        const ticketProjectId = (ticket.formData as Record<string, unknown> | undefined)
+          ?.projectId;
+        return (
+          ticket.project === project.name ||
+          String(ticketProjectId ?? "") === project.id
+        );
+      }),
+    [project.id, project.name, tickets],
   );
 
   const teamMembers = useMemo(() => {
@@ -153,6 +174,23 @@ export default function ProjectDetailsView({
 
   const latestUpdates = projectTickets.slice(0, 5);
 
+  useEffect(() => {
+    setActiveTab(normalizeTab(initialTab));
+  }, [initialTab]);
+
+  const handleTabChange = (tab: ProjectTab) => {
+    setActiveTab(tab);
+    const params = new URLSearchParams(searchParams.toString());
+    if (tab === "Overview") {
+      params.delete("tab");
+    } else {
+      params.set("tab", tab.toLowerCase());
+    }
+    router.replace(params.size ? `${pathname}?${params.toString()}` : pathname, {
+      scroll: false,
+    });
+  };
+
   return (
     <div className="space-y-6 pb-28">
       <header className="sticky top-0 z-20 -mx-3 bg-white/95 px-3 py-3 backdrop-blur sm:-mx-4 sm:px-4">
@@ -181,10 +219,10 @@ export default function ProjectDetailsView({
               Create New Project
             </Link>
             <Link
-              href={`/tickets/new?project=${encodeURIComponent(project.name)}`}
+              href={`/tickets/new?project=${encodeURIComponent(project.name)}&projectId=${encodeURIComponent(project.id)}`}
               className="project-action-outline"
             >
-              Create Ticket
+              New Ticket
             </Link>
           </div>
         </div>
@@ -220,16 +258,24 @@ export default function ProjectDetailsView({
         />
       </section>
 
-      <ProjectTabs value={activeTab} onValueChange={setActiveTab} />
+      <ProjectTabs value={activeTab} onValueChange={handleTabChange} />
 
       {activeTab === "Overview" && (
         <div className="space-y-6">
           <section>
             <h2 className="project-detail-field-label">Project Brief</h2>
-            <p className="mt-2 text-[16px] leading-7 text-[#475467]">
-              {project.description?.trim() ||
-                "Project brief is not stored in the current database record."}
-            </p>
+            {project.description?.trim() ? (
+              <div
+                className="prose-ticket mt-2 text-[16px] leading-7 text-[#475467]"
+                dangerouslySetInnerHTML={{
+                  __html: sanitizeRichText(project.description),
+                }}
+              />
+            ) : (
+              <p className="mt-2 text-[16px] leading-7 text-[#475467]">
+                Project brief is not stored in the current database record.
+              </p>
+            )}
           </section>
 
           <div className="grid gap-6 lg:grid-cols-2">
@@ -460,6 +506,20 @@ export default function ProjectDetailsView({
             </Link>
           }
         />
+      )}
+
+      {toast && (
+        <div role="status" aria-live="polite" className="ticket-toast ticket-toast-success">
+          <p className="text-sm font-medium">{toast}</p>
+          <button
+            type="button"
+            className="ml-auto"
+            onClick={() => setToastDismissed(true)}
+            aria-label="Dismiss"
+          >
+            <X size={17} />
+          </button>
+        </div>
       )}
     </div>
   );

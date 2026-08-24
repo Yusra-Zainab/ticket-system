@@ -7,6 +7,8 @@ import NewResourceForm, {
 
 import { findResource } from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+
 const validSections = new Set<SectionId>([
   "basic",
   "contact",

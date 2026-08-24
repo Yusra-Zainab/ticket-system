@@ -17,6 +17,7 @@ import { type ReactNode, useMemo, useState } from "react";
 
 import { usePageSearch } from "@/components/providers/PageSearchProvider";
 import { Avatar } from "@/components/ui/Avatar";
+import { clientStatusDescriptions } from "@/lib/statusOptions";
 import { cn } from "@/lib/utils";
 
 import type {
@@ -435,10 +436,19 @@ export default function ClientsTable({
                 value === "All" ? (
                   <span>All statuses</span>
                 ) : (
-                  <ClientStatusBadge
-                    status={value as ClientListStatus}
-                    className="!min-w-[110px]"
-                  />
+                  <span className="inline-flex min-w-0 items-center gap-3">
+                    <ClientStatusBadge
+                      status={value as ClientListStatus}
+                      className="!min-w-[110px]"
+                    />
+                    <span className="truncate text-sm text-[#667085]">
+                      {
+                        clientStatusDescriptions[
+                          value as ClientListStatus
+                        ]
+                      }
+                    </span>
+                  </span>
                 )
               }
             />

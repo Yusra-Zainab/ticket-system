@@ -1,19 +1,150 @@
-import type { RowDataPacket } from 'mysql2/promise';
-import { z } from 'zod';
-import { db, findTicket } from '@/lib/db';
-const updateSchema = z.object({ title: z.string().min(1).max(255).optional(), description: z.string().max(65535).optional(), status: z.enum(['Open', 'Assigned', 'In Progress', 'Blocked', 'Ready for Review', 'Closed']).optional(), priorityType: z.enum(['Not Assigned', 'Low', 'Medium', 'High', 'Critical']).optional(), priorityNumber: z.number().int().min(1).max(999).optional(), deadline: z.string().date().nullable().optional(), assignedTo: z.union([z.number().int().positive(), z.string().min(1)]).nullable().optional(), projectId: z.union([z.number().int().positive(), z.string().min(1)]).nullable().optional(), formData: z.record(z.string(), z.unknown()).optional() }).refine((value) => Object.keys(value).length > 0, 'At least one field is required');
+import type { RowDataPacket } from "mysql2/promise";
+import { z } from "zod";
+import { db, findTicket } from "@/lib/db";
+const updateSchema = z
+  .object({
+    title: z.string().min(1).max(255).optional(),
+    description: z.string().max(65535).optional(),
+    status: z
+      .enum([
+        "Open",
+        "Assigned",
+        "In Progress",
+        "Blocked",
+        "Ready for Review",
+        "Closed",
+      ])
+      .optional(),
+    priorityType: z
+      .enum(["Not Assigned", "Low", "Medium", "High", "Critical"])
+      .optional(),
+    priorityNumber: z.number().int().min(1).max(999).optional(),
+    deadline: z.string().date().nullable().optional(),
+    assignedTo: z
+      .union([z.number().int().positive(), z.string().min(1)])
+      .nullable()
+      .optional(),
+    projectId: z
+      .union([z.number().int().positive(), z.string().min(1)])
+      .nullable()
+      .optional(),
+    formData: z.record(z.string(), z.unknown()).optional(),
+  })
+  .refine(
+    (value) => Object.keys(value).length > 0,
+    "At least one field is required",
+  );
 type IdRow = RowDataPacket & { id: number };
-async function resolveForeignId(table: 'projects' | 'users', value: string | number | null | undefined) {
-  if (value == null || value === '') return null;
-  if (typeof value === 'number') return Number.isInteger(value) && value > 0 ? value : null;
+async function resolveForeignId(
+  table: "projects" | "users",
+  value: string | number | null | undefined,
+) {
+  if (value == null || value === "") return null;
+  if (typeof value === "number")
+    return Number.isInteger(value) && value > 0 ? value : null;
   const trimmed = value.trim();
-  if (!trimmed || trimmed === 'Unassigned' || trimmed === 'Not selected') return null;
+  if (!trimmed || trimmed === "Unassigned" || trimmed === "Not selected")
+    return null;
   const asId = Number(trimmed);
   if (Number.isInteger(asId) && asId > 0) return asId;
-  const [rows] = await db.query<IdRow[]>(`SELECT id FROM ${table} WHERE name=? LIMIT 1`, [trimmed]);
+  const [rows] = await db.query<IdRow[]>(
+    `SELECT id FROM ${table} WHERE name=? LIMIT 1`,
+    [trimmed],
+  );
   return rows[0]?.id ?? null;
 }
-export async function GET(_request: Request, context: RouteContext<'/api/tickets/[id]'>) { try { const { id } = await context.params; const ticket = await findTicket(id); return ticket ? Response.json(ticket) : Response.json({ error: 'Not found' }, { status: 404 }); } catch { return Response.json({ error: 'Database unavailable' }, { status: 503 }); } }
-export async function PATCH(request: Request, context: RouteContext<'/api/tickets/[id]'>) { try { const { id } = await context.params; const body = updateSchema.parse(await request.json()); const columns: Record<string, string> = { title: 'title', description: 'description', status: 'status', priorityType: 'priority_type', priorityNumber: 'priority_number', deadline: 'deadline', assignedTo: 'assigned_to', projectId: 'project_id', formData: 'form_data' }; const entries = await Promise.all(Object.entries(body).map(async ([key, value]) => { if (key === 'formData') return [key, JSON.stringify(value)] as const; if (key === 'assignedTo' || key === 'projectId') return [key, await resolveForeignId(key === 'assignedTo' ? 'users' : 'projects', value as string | number | null | undefined)] as const; return [key, value as string | number | null] as const; })); const values = entries.map(([, value]) => value); const [result] = await db.execute(`UPDATE tickets SET ${entries.map(([key]) => `${columns[key]}=?`).join(', ')} WHERE ticket_id=?`, [...values, id]); if (!('affectedRows' in result) || result.affectedRows === 0) return Response.json({ error: 'Ticket not found' }, { status: 404 }); return Response.json(await findTicket(id)); } catch (error) { if (error instanceof z.ZodError) return Response.json({ error: 'Invalid ticket update', details: error.flatten() }, { status: 400 }); console.error(error); return Response.json({ error: 'Unable to update ticket' }, { status: 500 }); } }
+export async function GET(
+  _request: Request,
+  context: RouteContext<"/api/tickets/[id]">,
+) {
+  try {
+    const { id } = await context.params;
+    const ticket = await findTicket(id);
+    return ticket
+      ? Response.json(ticket)
+      : Response.json({ error: "Not found" }, { status: 404 });
+  } catch {
+    return Response.json({ error: "Database unavailable" }, { status: 503 });
+  }
+}
+export async function PATCH(
+  request: Request,
+  context: RouteContext<"/api/tickets/[id]">,
+) {
+  try {
+    const { id } = await context.params;
+    const body = updateSchema.parse(await request.json());
+    const existing = await findTicket(id);
+
+    if (!existing) {
+      return Response.json({ error: "Ticket not found" }, { status: 404 });
+    }
+
+    const columns: Record<string, string> = {
+      title: "title",
+      description: "description",
+      status: "status",
+      priorityType: "priority_type",
+      priorityNumber: "priority_number",
+      deadline: "deadline",
+      assignedTo: "assigned_to",
+      projectId: "project_id",
+      formData: "form_data",
+    };
+    const entries = await Promise.all(
+      Object.entries(body).map(async ([key, value]) => {
+        if (key === "formData") return [key, JSON.stringify(value)] as const;
+        if (key === "assignedTo" || key === "projectId") {
+          const resolved = await resolveForeignId(
+            key === "assignedTo" ? "users" : "projects",
+            value as string | number | null | undefined,
+          );
+          if (value != null && value !== "" && resolved == null) {
+            throw new Error(
+              `Unknown ${key === "assignedTo" ? "assignee" : "project"}.`,
+            );
+          }
+          return [key, resolved] as const;
+        }
+        return [key, value as string | number | null] as const;
+      }),
+    );
+    const values = entries.map(([, value]) => value);
+    await db.execute(
+      `UPDATE tickets SET ${entries.map(([key]) => `${columns[key]}=?`).join(", ")} WHERE ticket_id=?`,
+      [...values, id],
+    );
+    return Response.json(await findTicket(id));
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return Response.json(
+        { error: "Invalid ticket update", details: error.flatten() },
+        { status: 400 },
+      );
+    }
+    if (error instanceof Error && error.message.startsWith("Unknown ")) {
+      return Response.json({ error: error.message }, { status: 400 });
+    }
+    console.error(error);
+    return Response.json({ error: "Unable to update ticket" }, { status: 500 });
+  }
+}
 export const PUT = PATCH;
-export async function DELETE(_request: Request, context: RouteContext<'/api/tickets/[id]'>) { try { const { id } = await context.params; const [result] = await db.execute('DELETE FROM tickets WHERE ticket_id = ?', [id]); if (!('affectedRows' in result) || result.affectedRows === 0) return Response.json({ error: 'Ticket not found' }, { status: 404 }); return new Response(null, { status: 204 }); } catch (error) { console.error(error); return Response.json({ error: 'Unable to delete ticket' }, { status: 500 }); } }
+export async function DELETE(
+  _request: Request,
+  context: RouteContext<"/api/tickets/[id]">,
+) {
+  try {
+    const { id } = await context.params;
+    const [result] = await db.execute(
+      "DELETE FROM tickets WHERE ticket_id = ?",
+      [id],
+    );
+    if (!("affectedRows" in result) || result.affectedRows === 0)
+      return Response.json({ error: "Ticket not found" }, { status: 404 });
+    return new Response(null, { status: 204 });
+  } catch (error) {
+    console.error(error);
+    return Response.json({ error: "Unable to delete ticket" }, { status: 500 });
+  }
+}

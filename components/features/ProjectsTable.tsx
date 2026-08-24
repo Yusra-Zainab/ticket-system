@@ -15,6 +15,10 @@ import { useMemo, useState } from "react";
 import ProjectStatus from "@/components/features/ProjectStatus";
 import { usePageSearch } from "@/components/providers/PageSearchProvider";
 import { Avatar } from "@/components/ui/Avatar";
+import {
+  projectPriorityDescriptions,
+  projectStatusDescriptions,
+} from "@/lib/statusOptions";
 import { cn } from "@/lib/utils";
 
 import type {
@@ -486,11 +490,20 @@ export default function ProjectsTable({
                     All statuses
                   </span>
                 ) : (
-                  <ProjectStatus
-                    status={value as ProjectStatusType}
-                    size="sm"
-                    className="!min-w-[110px]"
-                  />
+                  <span className="inline-flex min-w-0 items-center gap-3">
+                    <ProjectStatus
+                      status={value as ProjectStatusType}
+                      size="sm"
+                      className="!min-w-[110px]"
+                    />
+                    <span className="truncate text-sm text-[#667085]">
+                      {
+                        projectStatusDescriptions[
+                          value as ProjectStatusType
+                        ]
+                      }
+                    </span>
+                  </span>
                 )
               }
             />
@@ -803,13 +816,18 @@ export default function ProjectsTable({
                   key={priority.value}
                   onClick={() => setPriorityDraft(priority.value)}
                   className={cn(
-                    "rounded-xl border px-4 py-3 text-left text-sm font-semibold transition",
+                    "rounded-xl border px-4 py-3 text-left transition",
                     priority.className,
                     priorityDraft === priority.value &&
                       "outline outline-2 outline-offset-2 outline-[#0284C7]",
                   )}
                 >
-                  {priority.value}
+                  <span className="block text-sm font-semibold">
+                    {priority.value}
+                  </span>
+                  <span className="mt-1 block text-xs font-medium text-current/80">
+                    {projectPriorityDescriptions[priority.value]}
+                  </span>
                 </button>
               ))}
             </div>

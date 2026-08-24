@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { ResultSetHeader } from "mysql2/promise";
+import type { PoolConnection, ResultSetHeader } from "mysql2/promise";
 
 import { db, findProject, hasProjectPriorityColumn } from "@/lib/db";
 
@@ -83,9 +83,11 @@ export async function PATCH(
     return Response.json({ error: "Invalid project id" }, { status: 400 });
   }
 
-  const connection = await db.getConnection();
+  let connection: PoolConnection | undefined;
+  let transactionStarted = false;
 
   try {
+    connection = await db.getConnection();
     const values = patchSchema.parse(await request.json());
     const current = await findProject(id);
 
@@ -113,7 +115,9 @@ export async function PATCH(
       ...(values.moduleName !== undefined
         ? { moduleName: values.moduleName }
         : {}),
-      ...(values.subModule !== undefined ? { subModule: values.subModule } : {}),
+      ...(values.subModule !== undefined
+        ? { subModule: values.subModule }
+        : {}),
       ...(values.moduleOwnerId !== undefined
         ? { moduleOwnerId: values.moduleOwnerId ?? "" }
         : {}),
@@ -124,25 +128,28 @@ export async function PATCH(
     };
 
     await connection.beginTransaction();
+    transactionStarted = true;
 
     const columns: string[] = [];
-    const args: unknown[] = [];
+    const args: Array<string | number | null> = [];
 
     const add = (column: string, value: unknown) => {
       columns.push(`${column}=?`);
-      args.push(value);
+      args.push(value as string | number | null);
     };
 
     if (values.lifecycle !== undefined) add("lifecycle", values.lifecycle);
     if (values.name !== undefined) add("name", values.name);
-    if (values.description !== undefined) add("description", values.description);
+    if (values.description !== undefined)
+      add("description", values.description);
     if (values.clientId !== undefined) add("client_id", values.clientId);
     if (values.status !== undefined) add("status", values.status);
     if (values.priority !== undefined && (await hasProjectPriorityColumn())) {
       add("priority_type", values.priority);
     }
     if (values.progress !== undefined) add("progress", values.progress);
-    if (values.startDate !== undefined) add("start_date", values.startDate || null);
+    if (values.startDate !== undefined)
+      add("start_date", values.startDate || null);
     if (values.dueDate !== undefined) add("due_date", values.dueDate || null);
 
     const touchesFormData = [
@@ -180,7 +187,9 @@ export async function PATCH(
     const updated = await findProject(id);
     return Response.json(updated);
   } catch (error) {
-    await connection.rollback();
+    if (transactionStarted && connection) {
+      await connection.rollback();
+    }
 
     if (error instanceof z.ZodError) {
       return Response.json(
@@ -190,9 +199,12 @@ export async function PATCH(
     }
 
     console.error(error);
-    return Response.json({ error: "Unable to update project" }, { status: 500 });
+    return Response.json(
+      { error: "Unable to update project" },
+      { status: 500 },
+    );
   } finally {
-    connection.release();
+    connection?.release();
   }
 }
 
@@ -220,6 +232,9 @@ export async function DELETE(
     return new Response(null, { status: 204 });
   } catch (error) {
     console.error(error);
-    return Response.json({ error: "Unable to delete project" }, { status: 500 });
+    return Response.json(
+      { error: "Unable to delete project" },
+      { status: 500 },
+    );
   }
 }

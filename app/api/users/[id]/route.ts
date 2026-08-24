@@ -1,135 +1,130 @@
-import { promisify } from "node:util";
-
-import { randomBytes, scrypt } from "node:crypto";
-
 import { z } from "zod";
 
-import type { ResultSetHeader } from "mysql2/promise";
-
-import { db, listUsers } from "@/lib/db";
-
-const hashPassword = async (password: string) => {
-  const salt = randomBytes(16).toString("hex");
-
-  const derived = (await promisify(scrypt)(password, salt, 64)) as Buffer;
-
-  return `${salt}:${derived.toString("hex")}`;
-};
+import { hashPassword } from "@/lib/auth";
+import { db, findAdminUser } from "@/lib/db";
 
 const schema = z.object({
   name: z.string().min(2).max(255),
-
-  email: z.email(),
-
+  email: z.string().email(),
   role: z.string().min(2).max(100),
-
   avatar: z.string().nullable().optional(),
-
   lifecycle: z.enum(["OPEN", "DRAFT"]).default("OPEN"),
-
   formData: z.record(z.string(), z.unknown()).default({}),
-
   password: z.string().min(8).max(200).optional(),
 });
 
-export async function GET() {
+function normalizeRole(role: string) {
+  return role.trim().toLowerCase().replaceAll(" ", "_");
+}
+
+export async function GET(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
   try {
-    return Response.json(await listUsers());
-  } catch {
-    return Response.json(
-      {
-        error: "Unable to load users",
-      },
-      {
-        status: 503,
-      },
-    );
+    const { id } = await params;
+    const user = await findAdminUser(id);
+
+    if (!user) {
+      return Response.json({ error: "User not found." }, { status: 404 });
+    }
+
+    return Response.json(user);
+  } catch (error) {
+    console.error(error);
+    return Response.json({ error: "Unable to load user." }, { status: 500 });
   }
 }
 
-export async function POST(request: Request) {
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
   try {
+    const { id } = await params;
     const value = schema.parse(await request.json());
+    const formData = {
+      ...value.formData,
+      email: value.email,
+      workEmail: value.email,
+    };
 
-    /*
-     * Until password setup is added
-     * to the New Admin design, create
-     * a strong temporary password.
-     */
-    const password = value.password ?? randomBytes(18).toString("base64url");
-
-    const [result] = await db.execute<ResultSetHeader>(
-      `
-          INSERT INTO users (
-            name,
-            email,
-            password,
-            role,
-            avatar,
-            lifecycle,
-            form_data
-          )
-
-          VALUES (
-            ?,
-            ?,
-            ?,
-            ?,
-            ?,
-            ?,
-            ?
-          )
+    if (value.password) {
+      await db.execute(
+        `
+          UPDATE users
+          SET
+            name = ?,
+            email = ?,
+            password = ?,
+            role = ?,
+            avatar = ?,
+            lifecycle = ?,
+            form_data = ?,
+            updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
         `,
-      [
-        value.name,
-        value.email,
-        await hashPassword(password),
-        value.role.trim().toLowerCase().replaceAll(" ", "_"),
-        value.avatar ?? null,
-        value.lifecycle,
-        JSON.stringify(value.formData),
-      ],
-    );
+        [
+          value.name,
+          value.email,
+          await hashPassword(value.password),
+          normalizeRole(value.role),
+          value.avatar ?? null,
+          value.lifecycle,
+          JSON.stringify(formData),
+          id,
+        ],
+      );
+    } else {
+      await db.execute(
+        `
+          UPDATE users
+          SET
+            name = ?,
+            email = ?,
+            role = ?,
+            avatar = ?,
+            lifecycle = ?,
+            form_data = ?,
+            updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `,
+        [
+          value.name,
+          value.email,
+          normalizeRole(value.role),
+          value.avatar ?? null,
+          value.lifecycle,
+          JSON.stringify(formData),
+          id,
+        ],
+      );
+    }
 
-    return Response.json(
-      {
-        id: String(result.insertId),
-
-        name: value.name,
-
-        email: value.email,
-
-        role: value.role,
-
-        avatar: value.avatar ?? null,
-      },
-      {
-        status: 201,
-      },
-    );
+    return Response.json({ ok: true });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return Response.json(
-        {
-          error: "Invalid user",
-
-          details: error.flatten(),
-        },
-        {
-          status: 400,
-        },
+        { error: "Invalid user information.", details: error.flatten() },
+        { status: 400 },
       );
     }
 
     console.error(error);
+    return Response.json({ error: "Unable to update user." }, { status: 500 });
+  }
+}
 
-    return Response.json(
-      {
-        error: "Unable to create user",
-      },
-      {
-        status: 409,
-      },
-    );
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    const { id } = await params;
+    await db.execute("DELETE FROM users WHERE id = ? LIMIT 1", [id]);
+    return Response.json({ ok: true });
+  } catch (error) {
+    console.error(error);
+    return Response.json({ error: "Unable to delete user." }, { status: 500 });
   }
 }

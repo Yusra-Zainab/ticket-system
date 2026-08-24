@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import {
   ChevronDown,
@@ -16,8 +17,10 @@ import {
 
 import { type ReactNode, useMemo, useState } from "react";
 
+import ClientStatusBadge from "@/components/features/ClientStatusBadge";
 import ProjectStatus from "@/components/features/ProjectStatus";
 import { Avatar } from "@/components/ui/Avatar";
+import StatusBadge from "@/components/ui/StatusBadge";
 
 import { cn, formatDate } from "@/lib/utils";
 
@@ -43,19 +46,28 @@ export default function ClientDetailsView({
   projects,
   tickets,
   users,
+  initialTab,
 }: {
   client: ClientEditorRecord;
   projects: Project[];
   tickets: Ticket[];
   users: User[];
+  initialTab?: string;
 }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const form = client.formData;
+  const normalizeTab = (value?: string): ClientTab =>
+    tabs.find((tab) => tab.toLowerCase() === String(value ?? "").trim().toLowerCase()) ?? "Overview";
 
   /*
    * Overview is intentionally the
    * default tab.
    */
-  const [activeTab, setActiveTab] = useState<ClientTab>("Overview");
+  const [activeTab, setActiveTab] = useState<ClientTab>(() =>
+    normalizeTab(initialTab),
+  );
 
   const [query, setQuery] = useState("");
 
@@ -116,6 +128,44 @@ export default function ClientDetailsView({
       new Map(members.map((member) => [member.id, member])).values(),
     );
   }, [clientProjects]);
+
+  const clientFiles = useMemo(() => {
+    const projectFiles = clientProjects.flatMap((project) => {
+      const attachments = Array.isArray(project.formData?.attachments)
+        ? project.formData.attachments
+        : [];
+
+      return attachments.map((attachment) => ({
+        id: `project-${project.id}-${attachment.id}`,
+        name: attachment.name,
+        source: project.name,
+        kind: "Project File",
+        url: attachment.url,
+        uploadedAt: attachment.uploadedAt,
+      }));
+    });
+
+    const ticketFiles = clientTickets.flatMap((ticket) => {
+      const attachments = Array.isArray(ticket.formData?.attachments)
+        ? ticket.formData.attachments
+        : [];
+
+      return attachments.map((attachment) => ({
+        id: `ticket-${ticket.id}-${attachment.id}`,
+        name: attachment.name,
+        source: ticket.title,
+        kind: "Ticket File",
+        url: attachment.url,
+        uploadedAt: attachment.uploadedAt,
+      }));
+    });
+
+    return [...projectFiles, ...ticketFiles].sort(
+      (left, right) =>
+        new Date(right.uploadedAt).getTime() -
+        new Date(left.uploadedAt).getTime(),
+    );
+  }, [clientProjects, clientTickets]);
 
   const search = query.trim().toLowerCase();
 
@@ -269,6 +319,16 @@ export default function ClientDetailsView({
               type="button"
               onClick={() => {
                 setActiveTab(tab);
+                const params = new URLSearchParams(searchParams.toString());
+                if (tab === "Overview") {
+                  params.delete("tab");
+                } else {
+                  params.set("tab", tab.toLowerCase());
+                }
+                router.replace(
+                  params.size ? `${pathname}?${params.toString()}` : pathname,
+                  { scroll: false },
+                );
 
                 setQuery("");
 
@@ -322,6 +382,7 @@ export default function ClientDetailsView({
               title: ticket.title,
               subtitle: ticket.project,
               meta: ticket.status,
+              metaNode: <StatusBadge status={ticket.status} size="sm" />,
               href: `/tickets/${ticket.id}`,
             }))}
           />
@@ -333,13 +394,7 @@ export default function ClientDetailsView({
 
         {activeTab === "Communication" && <CommunicationTab client={client} />}
 
-        {activeTab === "Files" && (
-          <EmptyTab
-            icon={FileText}
-            title="Files"
-            text="No client-specific files are stored in the current client record."
-          />
-        )}
+        {activeTab === "Files" && <FilesTab files={clientFiles} />}
 
         {activeTab === "Activity" && (
           <ActivityTab projects={clientProjects} tickets={clientTickets} />
@@ -382,7 +437,11 @@ function OverviewTab({
 
           <DetailValue label="Website" value={form.website} link />
 
-          <DetailValue label="Client Status" value={form.clientStatus} />
+          <DetailValue label="Client Status">
+            <ClientStatusBadge
+              status={normalizeClientStatus(form.clientStatus)}
+            />
+          </DetailValue>
         </DetailGrid>
       </DetailSection>
 
@@ -425,7 +484,11 @@ function OverviewTab({
 
             <DetailValue label="Budget / Rate" value={form.budgetRate} />
 
-            <DetailValue label="Contract Status" value={form.contractStatus} />
+            <DetailValue label="Contract Status">
+              <ClientStatusBadge
+                status={normalizeClientStatus(form.contractStatus)}
+              />
+            </DetailValue>
           </DetailGrid>
         </DetailSection>
       )}
@@ -816,6 +879,7 @@ function SimpleListTab({
     title: string;
     subtitle: string;
     meta: string;
+    metaNode?: ReactNode;
     href: string;
   }>;
   query: string;
@@ -846,7 +910,9 @@ function SimpleListTab({
               <small>{row.subtitle}</small>
             </span>
 
-            <span className="client-record-meta">{row.meta}</span>
+            <span className="client-record-meta">
+              {row.metaNode ?? row.meta}
+            </span>
           </Link>
         ))}
 
@@ -886,10 +952,12 @@ function DetailValue({
   label,
   value,
   link = false,
+  children,
 }: {
   label: string;
   value?: string;
   link?: boolean;
+  children?: ReactNode;
 }) {
   const visible = value?.trim() || "—";
 
@@ -897,7 +965,9 @@ function DetailValue({
     <div className="client-detail-value">
       <span>{label}</span>
 
-      {link && value ? (
+      {children ? (
+        <div>{children}</div>
+      ) : link && value ? (
         <a href={value} target="_blank" rel="noreferrer">
           {visible}
         </a>
@@ -906,6 +976,67 @@ function DetailValue({
       )}
     </div>
   );
+}
+
+function FilesTab({
+  files,
+}: {
+  files: Array<{
+    id: string;
+    name: string;
+    source: string;
+    kind: string;
+    url: string;
+    uploadedAt: string;
+  }>;
+}) {
+  return (
+    <div className="space-y-5">
+      <h2 className="client-detail-section-heading">Files</h2>
+
+      <div className="client-record-list">
+        {files.map((file) => (
+          <a href={file.url} target="_blank" rel="noreferrer" key={file.id}>
+            <span>
+              <strong>{file.name}</strong>
+
+              <small>
+                {file.kind} • {file.source}
+              </small>
+            </span>
+
+            <span className="client-record-meta">
+              {file.uploadedAt ? formatDate(file.uploadedAt) : "—"}
+            </span>
+          </a>
+        ))}
+
+        {!files.length && (
+          <p className="client-detail-empty-copy">No files found.</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function normalizeClientStatus(value?: string) {
+  switch (String(value ?? "").trim().toLowerCase()) {
+    case "inactive":
+    case "cancelled":
+    case "expired":
+      return "Inactive" as const;
+    case "paused":
+      return "Paused" as const;
+    case "completed":
+    case "closed":
+      return "Completed" as const;
+    case "prospect":
+    case "negotiation":
+    case "onboarding":
+      return "Onboarding" as const;
+    default:
+      return "Active" as const;
+  }
 }
 
 function ClientLogo({ name }: { name: string }) {

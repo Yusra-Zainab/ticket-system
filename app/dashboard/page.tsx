@@ -1,23 +1,25 @@
 import AdminDashboard from "@/components/features/AdminDashboard";
 
 import {
+  findAdminUser,
   listClientRows,
   listProjects,
   listResourceRows,
   listTickets,
 } from "@/lib/db";
+import { requireAdminPageSession } from "@/lib/auth";
+import { defaultProfileTimeZone } from "@/lib/profileUtils";
+
+export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const [
-    projects,
-    tickets,
-    resources,
-    clients,
-  ] = await Promise.all([
+  const sessionUser = await requireAdminPageSession();
+  const [projects, tickets, resources, clients, profile] = await Promise.all([
     listProjects("OPEN"),
     listTickets("OPEN"),
     listResourceRows("OPEN"),
     listClientRows(),
+    findAdminUser(String(sessionUser.id)),
   ]);
 
   /*
@@ -34,6 +36,7 @@ export default async function DashboardPage() {
       resources={resources}
       clients={clients}
       now={now}
+      timeZone={profile?.formData.timeZone || defaultProfileTimeZone}
     />
   );
 }

@@ -4,9 +4,16 @@ import PageHeader from "@/components/ui/PageHeader";
 import { connection } from "next/server";
 import { listTickets } from "@/lib/db";
 import type { Ticket } from "@/types";
+
+export const dynamic = "force-dynamic";
 export default async function TicketsPage() {
   await connection();
-  let stored: Ticket[] = []; try { stored = await listTickets("OPEN"); } catch { stored = []; }
+  let stored: Ticket[] = [];
+  try {
+    stored = await listTickets("OPEN");
+  } catch {
+    stored = [];
+  }
   return (
     <div className="space-y-7">
       <PageHeader

@@ -1,45 +1,59 @@
 "use client";
 
 import { ChevronDown, Eye } from "lucide-react";
-import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useMemo, useState } from "react";
 
-const initialProfile = {
-  firstName: "Ahmed",
-  lastName: "Khan",
-  email: "amasood@datapulsetechnologies.org",
-  phone: "+353-5222-5669",
-  jobTitle: "Project Coordinator",
-  timeZone: "GMT+1 IST (Ireland)",
-  role: "Admin",
+import StickyToast from "@/components/ui/StickyToast";
+
+type ProfileData = {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  jobTitle: string;
+  timeZone: string;
+  role: string;
+  twoFactorEnabled?: boolean;
 };
 
-const timeZones = [
-  "GMT+1 IST (Ireland)",
-  "GMT London",
-  "GMT+1 Central European Time",
-  "GMT+4 Gulf Standard Time",
-  "GMT+5 Pakistan Standard Time",
-];
-
-export default function EditProfileForm() {
+export default function EditProfileForm({
+  initialProfile,
+}: {
+  initialProfile: ProfileData;
+}) {
   const router = useRouter();
 
   const [values, setValues] = useState(initialProfile);
-
   const [original, setOriginal] = useState(initialProfile);
-
   const [newPassword, setNewPassword] = useState("");
-
   const [confirmPassword, setConfirmPassword] = useState("");
-
   const [showPassword, setShowPassword] = useState(false);
-
   const [timeZoneOpen, setTimeZoneOpen] = useState(false);
-
   const [saving, setSaving] = useState(false);
+  const [, setError] = useState("");
+  const [notice, setNotice] = useState("");
 
-  const [error, setError] = useState("");
+  const timeZones = useMemo(
+    () =>
+      typeof Intl.supportedValuesOf === "function"
+        ? Intl.supportedValuesOf("timeZone")
+        : [
+            "Africa/Cairo",
+            "America/Chicago",
+            "America/Los_Angeles",
+            "America/New_York",
+            "Asia/Dubai",
+            "Asia/Karachi",
+            "Asia/Tokyo",
+            "Australia/Sydney",
+            "Europe/Berlin",
+            "Europe/Dublin",
+            "Europe/London",
+            "UTC",
+          ],
+    [],
+  );
 
   const changed = useMemo(
     () =>
@@ -48,8 +62,30 @@ export default function EditProfileForm() {
       confirmPassword !== "",
     [values, original, newPassword, confirmPassword],
   );
+  const passwordError =
+    newPassword.length > 0 && newPassword.length < 8
+      ? "Password must be at least 8 characters."
+      : !/\S/.test(newPassword) && newPassword.length > 0
+        ? "Password must include at least one non-space character."
+        : "";
+  const confirmPasswordError =
+    confirmPassword.length > 0 && newPassword !== confirmPassword
+      ? "Passwords do not match."
+      : "";
+  const newPasswordStateClass =
+    newPassword.length === 0
+      ? ""
+      : passwordError
+        ? "profile-input-invalid"
+        : "profile-input-valid";
+  const confirmPasswordStateClass =
+    confirmPassword.length === 0
+      ? ""
+      : confirmPasswordError || passwordError
+        ? "profile-input-invalid"
+        : "profile-input-valid";
 
-  function setField(field: keyof typeof values, value: string) {
+  function setField(field: keyof ProfileData, value: string) {
     setValues((current) => ({
       ...current,
       [field]: value,
@@ -61,6 +97,7 @@ export default function EditProfileForm() {
     setNewPassword("");
     setConfirmPassword("");
     setError("");
+    setNotice("");
   }
 
   async function saveChanges() {
@@ -70,36 +107,51 @@ export default function EditProfileForm() {
 
     if (!values.email.trim()) {
       setError("Email address is required.");
+      setNotice("Email address is required.");
+      return;
+    }
 
+    if (passwordError) {
+      setError(passwordError);
+      setNotice(passwordError);
+      return;
+    }
+
+    if (confirmPasswordError) {
+      setError(confirmPasswordError);
+      setNotice(confirmPasswordError);
       return;
     }
 
     if (newPassword && newPassword !== confirmPassword) {
       setError("New password and confirmation do not match.");
-
+      setNotice("New password and confirmation do not match.");
       return;
     }
 
     setSaving(true);
     setError("");
+    setNotice("");
 
     try {
-      /*
-       * Replace this with your profile API once
-       * your authentication/current-user endpoint
-       * is available.
-       */
-      const payload = {
-        ...values,
+      const response = await fetch("/api/profile", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          ...values,
+          ...(newPassword ? { newPassword } : {}),
+        }),
+      });
 
-        ...(newPassword
-          ? {
-              password: newPassword,
-            }
-          : {}),
+      const body = (await response.json().catch(() => ({}))) as {
+        error?: string;
       };
 
-      console.log("Save profile:", payload);
+      if (!response.ok) {
+        throw new Error(body.error ?? "Unable to save profile changes.");
+      }
 
       setOriginal(values);
       setNewPassword("");
@@ -107,8 +159,13 @@ export default function EditProfileForm() {
 
       router.push("/profile");
       router.refresh();
-    } catch {
-      setError("Unable to save profile changes.");
+    } catch (saveError) {
+      const message =
+        saveError instanceof Error
+          ? saveError.message
+          : "Unable to save profile changes.";
+      setError(message);
+      setNotice(message);
     } finally {
       setSaving(false);
     }
@@ -118,9 +175,6 @@ export default function EditProfileForm() {
 
   return (
     <div className="profile-page">
-      {/* =====================================================
-          STICKY HEADER
-         ===================================================== */}
       <header className="profile-page-header">
         <h1 className="profile-page-title">Profile Details</h1>
 
@@ -146,24 +200,18 @@ export default function EditProfileForm() {
       </header>
 
       <main className="profile-content">
-        {/* =================================================
-            IDENTITY
-           ================================================= */}
         <div className="profile-identity">
-          <div className="profile-avatar" aria-label={fullName}>
-            AK
+          <div className="profile-avatar" aria-label={fullName || "Profile User"}>
+            {(values.firstName[0] ?? "A").toUpperCase()}
+            {(values.lastName[0] ?? "D").toUpperCase()}
           </div>
 
           <div className="profile-identity-copy">
             <h2>{fullName || "Profile User"}</h2>
-
             <p>{values.role}</p>
           </div>
         </div>
 
-        {/* =================================================
-            PERSONAL INFORMATION
-           ================================================= */}
         <section className="profile-section">
           <h3 className="profile-section-title">Personal Information</h3>
 
@@ -201,7 +249,6 @@ export default function EditProfileForm() {
                   onClick={() => setTimeZoneOpen((current) => !current)}
                 >
                   <span>{values.timeZone}</span>
-
                   <ChevronDown size={20} />
                 </button>
 
@@ -222,7 +269,6 @@ export default function EditProfileForm() {
                           className="profile-select-option"
                           onClick={() => {
                             setField("timeZone", zone);
-
                             setTimeZoneOpen(false);
                           }}
                         >
@@ -237,9 +283,6 @@ export default function EditProfileForm() {
           </div>
         </section>
 
-        {/* =================================================
-            ACCOUNT SECURITY
-           ================================================= */}
         <section className="profile-section">
           <h3 className="profile-section-title">Account Security</h3>
 
@@ -248,7 +291,7 @@ export default function EditProfileForm() {
               <div className="profile-password-input">
                 <input
                   type="password"
-                  value="••••••••••••"
+                  value="************"
                   readOnly
                   className="profile-input"
                 />
@@ -264,7 +307,7 @@ export default function EditProfileForm() {
                   value={newPassword}
                   onChange={(event) => setNewPassword(event.target.value)}
                   placeholder="Enter new password"
-                  className="profile-input"
+                  className={`profile-input ${newPasswordStateClass}`.trim()}
                 />
 
                 <button
@@ -275,26 +318,44 @@ export default function EditProfileForm() {
                   <Eye size={20} />
                 </button>
               </div>
+
+              {passwordError && (
+                <span className="profile-field-error">{passwordError}</span>
+              )}
             </ProfileField>
 
             <ProfileField label="Confirm Password">
-              <input
-                type={showPassword ? "text" : "password"}
-                value={confirmPassword}
-                onChange={(event) => setConfirmPassword(event.target.value)}
-                placeholder="Confirm new password"
-                className="profile-input"
-              />
+              <>
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={confirmPassword}
+                  onChange={(event) => setConfirmPassword(event.target.value)}
+                  placeholder="Confirm new password"
+                  className={`profile-input ${confirmPasswordStateClass}`.trim()}
+                />
+
+                {confirmPasswordError && (
+                  <span className="profile-field-error">
+                    {confirmPasswordError}
+                  </span>
+                )}
+              </>
             </ProfileField>
           </div>
         </section>
 
-        {error && (
-          <div role="alert" className="profile-error">
-            {error}
-          </div>
-        )}
       </main>
+
+      {notice && (
+        <StickyToast
+          message={notice}
+          kind="error"
+          onDismiss={() => {
+            setNotice("");
+            setError("");
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -309,7 +370,6 @@ function ProfileField({
   return (
     <label className="profile-field">
       <span>{label}</span>
-
       {children}
     </label>
   );

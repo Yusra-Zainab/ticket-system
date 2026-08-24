@@ -56,9 +56,13 @@ export default function NotificationPopover({
         .slice(0, 4),
     [notifications, tab],
   );
+  const unreadCount = notifications.filter((item) => item.unread).length;
 
   return (
     <section
+      id="notification-popover"
+      role="dialog"
+      aria-modal="true"
       aria-label="Notifications"
       className="notification-popover"
     >
@@ -108,8 +112,9 @@ export default function NotificationPopover({
 
         {visible.length === 0 && (
           <p className="notification-empty">
-            No notifications in this
-            category.
+            {tab === "All" && unreadCount === 0
+              ? "No new notifications."
+              : "No notifications in this category."}
           </p>
         )}
       </div>

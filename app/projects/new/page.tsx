@@ -1,6 +1,8 @@
 import NewProjectForm from "@/components/features/NewProjectForm";
 import { listClients, listUsers } from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+
 export default async function NewProjectPage({
   searchParams,
 }: {

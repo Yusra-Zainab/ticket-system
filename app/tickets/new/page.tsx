@@ -1,10 +1,13 @@
 import TicketForm from "@/components/features/TicketForm";
 import { findTicket, listProjects, listUsers } from "@/lib/db";
+
+export const dynamic = "force-dynamic";
 export default async function NewTicketPage({
   searchParams,
 }: {
   searchParams: Promise<{
     project?: string;
+    projectId?: string;
     module?: string;
     subModule?: string;
     url?: string;

@@ -6,6 +6,8 @@ import PageHeader from "@/components/ui/PageHeader";
 
 import { listClientRows } from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+
 export default async function ClientsPage() {
   const clients = await listClientRows();
 

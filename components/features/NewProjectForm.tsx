@@ -24,10 +24,17 @@ import {
 import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import ProjectStatus from "@/components/features/ProjectStatus";
 import RichTextEditor from "@/components/ui/RichTextEditor";
+import StickyToast from "@/components/ui/StickyToast";
 import { cn } from "@/lib/utils";
+import {
+  projectPriorityDescriptions,
+  projectStatusDescriptions,
+} from "@/lib/statusOptions";
 
+import ProjectStatus, {
+  normalizeProjectStatus,
+} from "@/components/features/ProjectStatus";
 import type {
   Client,
   Project,
@@ -100,6 +107,17 @@ const priorities: ProjectPriority[] = [
   "Not Assigned",
 ];
 
+const priorityStyles: Record<ProjectPriority, string> = {
+  Critical:
+    "bg-red-50 text-red-700 ring-1 ring-inset ring-red-200 border border-red-200",
+  High: "bg-orange-50 text-orange-700 ring-1 ring-inset ring-orange-200 border border-orange-200",
+  Medium:
+    "bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200 border border-amber-200",
+  Low: "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200 border border-emerald-200",
+  "Not Assigned":
+    "bg-slate-50 text-slate-700 ring-1 ring-inset ring-slate-200 border border-slate-200",
+};
+
 const projectTypes = [
   "Full Stack Development",
   "Payment Solutions",
@@ -167,7 +185,7 @@ function valuesFromProject(project?: Project): ProjectFormValues {
 
     startDate: project.startDate ?? "",
     endDate: project.dueDate ?? "",
-    status: project.status ?? "",
+    status: normalizeProjectStatus(project.status),
     priority: project.priority ?? "Not Assigned",
 
     coordinatorId:
@@ -259,8 +277,17 @@ export default function NewProjectForm({
     useState<SectionId>("project-details");
 
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
+  const [, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [noticeKind, setNoticeKind] = useState<"success" | "error">("success");
+
+  const showNotice = (
+    message: string,
+    kind: "success" | "error" = "success",
+  ) => {
+    setNoticeKind(kind);
+    setNotice(message);
+  };
 
   const [teamOpen, setTeamOpen] = useState(false);
 
@@ -312,7 +339,7 @@ export default function NewProjectForm({
     setTeamOpen(false);
     setUploadMenu(false);
     setError("");
-    setNotice("");
+    showNotice("Project form reset.");
     setActiveSection("project-details");
     jump("project-details");
   };
@@ -321,7 +348,7 @@ export default function NewProjectForm({
     const accepted = incoming.filter((file) => file.size <= 10 * 1024 * 1024);
 
     if (accepted.length !== incoming.length) {
-      setNotice("Files larger than 10 MB were skipped.");
+      showNotice("Files larger than 10 MB were skipped.", "error");
     }
 
     setPendingFiles((current) => {
@@ -417,8 +444,9 @@ export default function NewProjectForm({
         "image/png",
       );
     } catch {
-      setNotice(
+      showNotice(
         "Screenshot capture was cancelled or is not supported by this browser.",
+        "error",
       );
       setUploadMenu(false);
     }
@@ -441,10 +469,11 @@ export default function NewProjectForm({
         items.filter((item) => item.id !== attachment.id),
       );
     } catch (cause) {
-      setNotice(
+      showNotice(
         cause instanceof Error
           ? cause.message
           : "Unable to delete attachment.",
+        "error",
       );
     }
   };
@@ -529,11 +558,15 @@ export default function NewProjectForm({
   };
 
   const saveProject = async (state: "draft" | "open") => {
-    if (state === "open") {
+    const targetLifecycle =
+      state === "open" ? "OPEN" : (initialProject?.lifecycle ?? "DRAFT");
+
+    if (targetLifecycle === "OPEN") {
       const validationError = validate();
 
       if (validationError) {
         setError(validationError);
+        showNotice(validationError, "error");
         return;
       }
     }
@@ -552,7 +585,7 @@ export default function NewProjectForm({
             },
             body: JSON.stringify({
               ...payload,
-              lifecycle: state === "draft" ? "DRAFT" : "OPEN",
+              lifecycle: targetLifecycle,
             }),
           })
         : await fetch("/api/projects", {
@@ -586,16 +619,32 @@ export default function NewProjectForm({
 
       router.refresh();
 
-      if (state === "draft") {
-        router.push("/projects/drafts");
+      if (initialProject && returnTo !== "ticket") {
+        showNotice(
+          targetLifecycle === "OPEN"
+            ? "Project changes saved successfully."
+            : "Project draft saved successfully.",
+        );
         return;
       }
 
-      router.push(returnTo || `/projects/${projectId}`);
+      if (targetLifecycle === "DRAFT") {
+        router.push("/projects/drafts?saved=1");
+        return;
+      }
+
+      if (returnTo === "ticket") {
+        router.push(
+          `/tickets/new?project=${encodeURIComponent(result.name ?? values.name)}&projectId=${encodeURIComponent(projectId)}`,
+        );
+      } else {
+        router.push(returnTo || `/projects/${projectId}?saved=1`);
+      }
     } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : "Unable to save project.",
-      );
+      const message =
+        cause instanceof Error ? cause.message : "Unable to save project.";
+      setError(message);
+      showNotice(message, "error");
     } finally {
       setSaving(false);
     }
@@ -629,7 +678,7 @@ export default function NewProjectForm({
               className="new-project-secondary-button"
             >
               <RotateCcw size={16} />
-              Reset
+                Reset
             </button>
 
             <button
@@ -639,7 +688,7 @@ export default function NewProjectForm({
               className="new-project-secondary-button"
             >
               <Save size={16} />
-              Save Info
+                Save Info
             </button>
 
             <button
@@ -659,14 +708,6 @@ export default function NewProjectForm({
           </div>
         </div>
 
-        {error && (
-          <div
-            role="alert"
-            className="mt-4 rounded-lg border border-[#FECDCA] bg-[#FEF3F2] px-4 py-3 text-sm font-medium text-[#B42318]"
-          >
-            {error}
-          </div>
-        )}
       </header>
 
       <div className="mx-auto mt-4 grid max-w-[1376px] gap-8 px-5 md:px-8 lg:grid-cols-[264px_minmax(0,1080px)]">
@@ -1271,27 +1312,11 @@ export default function NewProjectForm({
       )}
 
       {notice && (
-        <div
-          role="status"
-          className={cn(
-            "ticket-toast",
-            notice.toLowerCase().includes("unable") ||
-              notice.toLowerCase().includes("cancelled")
-              ? "ticket-toast-error"
-              : "ticket-toast-success",
-          )}
-        >
-          <p className="text-sm font-medium">{notice}</p>
-
-          <button
-            type="button"
-            className="ml-auto"
-            onClick={() => setNotice("")}
-            aria-label="Dismiss"
-          >
-            <X size={17} />
-          </button>
-        </div>
+        <StickyToast
+          message={notice}
+          kind={noticeKind}
+          onDismiss={() => setNotice("")}
+        />
       )}
     </div>
   );
@@ -1558,15 +1583,20 @@ function StatusDropdown({
                     setQuery("");
                   }}
                   className={cn(
-                    "flex min-h-[51px] w-full items-center border-b border-[#EAECF0] px-4 text-left transition last:border-b-0 hover:bg-[#F9FAFB]",
+                    "flex min-h-[60px] w-full items-center justify-between gap-3 border-b border-[#EAECF0] px-4 py-2 text-left transition last:border-b-0 hover:bg-[#F9FAFB]",
                     value === status && "bg-[#F9FAFB]",
                   )}
                 >
-                  <ProjectStatus
-                    status={status}
-                    size="sm"
-                    className="!min-w-[122px]"
-                  />
+                  <span className="inline-flex min-w-0 items-center gap-3">
+                    <ProjectStatus
+                      status={status}
+                      size="sm"
+                      className="!min-w-[122px]"
+                    />
+                    <span className="truncate text-[13px] leading-5 text-[#667085]">
+                      {projectStatusDescriptions[status]}
+                    </span>
+                  </span>
                 </button>
               ))}
             </div>
@@ -1577,31 +1607,6 @@ function StatusDropdown({
   );
 }
 
-
-const priorityStyles: Record<ProjectPriority, string> = {
-  Critical: "border-[#DC2626] bg-[#DC2626] text-white",
-  High: "border-[#EA580C] bg-[#EA580C] text-white",
-  Medium: "border-[#D97706] bg-[#D97706] text-white",
-  Low: "border-[#16A34A] bg-[#16A34A] text-white",
-  "Not Assigned": "border-[#6B7280] bg-[#6B7280] text-white",
-};
-
-function ProjectPriorityTag({
-  priority,
-}: {
-  priority: ProjectPriority;
-}) {
-  return (
-    <span
-      className={cn(
-        "inline-flex h-[22px] min-w-[122px] items-center justify-center rounded-[16px] border px-2 text-[12px] font-medium leading-[18px]",
-        priorityStyles[priority],
-      )}
-    >
-      {priority}
-    </span>
-  );
-}
 
 function PriorityDropdown({
   value,
@@ -1629,7 +1634,14 @@ function PriorityDropdown({
           open && "!border-[#98A2B3]",
         )}
       >
-        <ProjectPriorityTag priority={value} />
+        <span
+          className={cn(
+            "inline-flex min-w-[122px] items-center justify-center rounded-full px-3 py-1 text-xs font-semibold",
+            priorityStyles[value],
+          )}
+        >
+          {value}
+        </span>
 
         <ChevronDown
           size={18}
@@ -1674,11 +1686,23 @@ function PriorityDropdown({
                     setQuery("");
                   }}
                   className={cn(
-                    "flex min-h-[51px] w-full items-center border-b border-[#EAECF0] px-4 text-left transition last:border-b-0 hover:bg-[#F9FAFB]",
+                    "flex min-h-[60px] w-full items-center border-b border-[#EAECF0] px-4 py-2 text-left transition last:border-b-0 hover:bg-[#F9FAFB]",
                     value === priority && "bg-[#F9FAFB]",
                   )}
                 >
-                  <ProjectPriorityTag priority={priority} />
+                  <span className="inline-flex min-w-0 items-center gap-3">
+                    <span
+                      className={cn(
+                        "inline-flex min-w-[122px] items-center justify-center rounded-full px-3 py-1 text-xs font-semibold",
+                        priorityStyles[priority],
+                      )}
+                    >
+                      {priority}
+                    </span>
+                    <span className="truncate text-[13px] leading-5 text-[#667085]">
+                      {projectPriorityDescriptions[priority]}
+                    </span>
+                  </span>
                 </button>
               ))}
             </div>
