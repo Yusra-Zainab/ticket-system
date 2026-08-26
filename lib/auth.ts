@@ -1,3 +1,4 @@
+
 import "server-only";
 
 import { promisify } from "node:util";
@@ -7,6 +8,7 @@ import net from "node:net";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { type NextRequest, NextResponse } from "next/server";
+import type { RowDataPacket } from "mysql2/promise";
 
 import { db } from "@/lib/db";
 
@@ -17,16 +19,45 @@ const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const RESET_TTL_MS = 60 * 60 * 1000;
 const ADMIN_ACCOUNTS = [
   {
-    email: "yzainan@datapulsetechnologies.org",
-    name: "YZainan",
-  },
-  {
     email: "yzainab@datapulsetechnologies.org",
     name: "YZainab",
   },
 ] as const;
+const SEEDED_PORTAL_ACCOUNTS = [
+  {
+    email: "yzainab@datapulsetechnologies.org",
+    name: "YZainab",
+    role: "admin",
+    password: "Password123!",
+    formData: {},
+  },
+  {
+    email: "kingdomwise11@gmail.com",
+    name: "Kingdom Wise",
+    role: "resource",
+    password: "Password123!",
+    formData: {
+      firstName: "Kingdom",
+      lastName: "Wise",
+      email: "kingdomwise11@gmail.com",
+      jobTitle: "Developer",
+    },
+  },
+  {
+    email: "testclient@gmail.com",
+    name: "TEST CLIENT",
+    role: "client_user",
+    password: "Password123!",
+    formData: {
+      firstName: "TEST",
+      lastName: "CLIENT",
+      email: "testclient@gmail.com",
+      company: "TEST CLIENT",
+    },
+  },
+] as const;
 
-type AuthUser = {
+export type AuthUser = {
   id: number;
   email: string;
   role: string;
@@ -34,8 +65,16 @@ type AuthUser = {
   lifecycle: string | null;
 };
 
-type QueryUserRow = AuthUser & {
+type QueryUserRow = RowDataPacket & AuthUser & {
   password: string | null;
+};
+type SessionRow = RowDataPacket & {
+  user_id: number;
+  expires_at: string;
+};
+type PasswordResetRow = RowDataPacket & {
+  id: number;
+  user_id: number;
 };
 
 declare global {
@@ -44,6 +83,24 @@ declare global {
 }
 
 const deriveKey = promisify(scrypt);
+
+function persistedRoleForUserTable(role: string) {
+  const normalized = normalizedRole(role);
+
+  if (normalized === "client_user" || normalized === "client_team") {
+    return "client";
+  }
+
+  if (normalized === "support_agent") {
+    return "developer";
+  }
+
+  if (normalized === "super_admin") {
+    return "admin";
+  }
+
+  return normalized;
+}
 
 function sha256(value: string) {
   return createHash("sha256").update(value).digest("hex");
@@ -102,18 +159,23 @@ async function ensureAuthTables() {
 }
 
 async function ensureAdminUsers() {
-  const password = await hashPassword(ADMIN_PASSWORD);
-
-  for (const account of ADMIN_ACCOUNTS) {
-    await syncAdminAccount(account, password);
+  for (const account of SEEDED_PORTAL_ACCOUNTS) {
+    await syncPortalAccount(account);
   }
 }
 
-async function syncAdminAccount(
-  account: (typeof ADMIN_ACCOUNTS)[number],
-  password?: string,
+function findSeededPortalAccountByEmail(email: string) {
+  const normalizedEmail = email.trim().toLowerCase();
+  return SEEDED_PORTAL_ACCOUNTS.find(
+    (account) => account.email.toLowerCase() === normalizedEmail,
+  );
+}
+
+async function syncPortalAccount(
+  account: (typeof SEEDED_PORTAL_ACCOUNTS)[number],
 ) {
-  const passwordHash = password ?? (await hashPassword(ADMIN_PASSWORD));
+  const passwordHash = await hashPassword(account.password);
+  const persistedRole = persistedRoleForUserTable(account.role);
 
   const [rows] = await db.query<QueryUserRow[]>(
     `
@@ -140,10 +202,17 @@ async function syncAdminAccount(
           password = ?,
           role = ?,
           lifecycle = 'OPEN',
+          form_data = ?,
           updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
       `,
-      [account.name, passwordHash, ADMIN_ROLE, rows[0].id],
+      [
+        account.name,
+        passwordHash,
+        persistedRole,
+        JSON.stringify(account.formData),
+        rows[0].id,
+      ],
     );
     return;
   }
@@ -158,9 +227,15 @@ async function syncAdminAccount(
         lifecycle,
         form_data
       )
-      VALUES (?, ?, ?, ?, 'OPEN', JSON_OBJECT())
+      VALUES (?, ?, ?, ?, 'OPEN', ?)
     `,
-    [account.name, account.email, passwordHash, ADMIN_ROLE],
+    [
+      account.name,
+      account.email,
+      passwordHash,
+      persistedRole,
+      JSON.stringify(account.formData),
+    ],
   );
 }
 
@@ -199,7 +274,7 @@ async function findUserByEmail(email: string) {
 }
 
 async function findUserById(id: number) {
-  const [rows] = await db.query<AuthUser[]>(
+  const [rows] = await db.query<(RowDataPacket & AuthUser)[]>(
     `
       SELECT
         id,
@@ -217,8 +292,36 @@ async function findUserById(id: number) {
   return rows[0];
 }
 
-function isAdminRole(role: string | null | undefined) {
-  return ["admin", "super_admin"].includes(String(role ?? "").toLowerCase());
+export type PortalKind = "admin" | "client" | "resource";
+
+export function normalizedRole(role: string | null | undefined) {
+  return String(role ?? "").trim().toLowerCase().replaceAll("-", "_").replaceAll(" ", "_");
+}
+
+export function isAdminRole(role: string | null | undefined) {
+  return ["admin", "super_admin", "project_manager"].includes(normalizedRole(role));
+}
+
+export function isClientRole(role: string | null | undefined) {
+  return ["client", "client_user", "client_team"].includes(normalizedRole(role));
+}
+
+export function isResourceRole(role: string | null | undefined) {
+  return ["resource", "developer", "support_agent"].includes(normalizedRole(role));
+}
+
+export function portalForRole(role: string | null | undefined): PortalKind | null {
+  if (isClientRole(role)) return "client";
+  if (isResourceRole(role)) return "resource";
+  if (isAdminRole(role)) return "admin";
+  return null;
+}
+
+export function portalHomeForRole(role: string | null | undefined) {
+  const portal = portalForRole(role);
+  if (portal === "client") return "/client/dashboard";
+  if (portal === "resource") return "/resource/dashboard";
+  return "/dashboard";
 }
 
 export async function createSession(userId: number) {
@@ -226,6 +329,7 @@ export async function createSession(userId: number) {
 
   const token = randomBytes(32).toString("hex");
   const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
+  const ttlSeconds = Math.floor(SESSION_TTL_MS / 1000);
 
   await db.execute(
     `
@@ -234,9 +338,9 @@ export async function createSession(userId: number) {
         user_id,
         expires_at
       )
-      VALUES (?, ?, ?)
+      VALUES (?, ?, DATE_ADD(CURRENT_TIMESTAMP(3), INTERVAL ? SECOND))
     `,
-    [sha256(token), userId, expiresAt],
+    [sha256(token), userId, ttlSeconds],
   );
 
   return {
@@ -306,12 +410,7 @@ export async function getSessionUserFromToken(token: string | undefined) {
 
   await ensureAuthInfrastructure();
 
-  const [rows] = await db.query<
-    Array<{
-      user_id: number;
-      expires_at: string;
-    }>
-  >(
+  const [rows] = await db.query<SessionRow[]>(
     `
       SELECT
         user_id,
@@ -338,7 +437,7 @@ export async function getSessionUserFromToken(token: string | undefined) {
 
   const user = await findUserById(session.user_id);
 
-  if (!user || !isAdminRole(user.role) || user.lifecycle !== "OPEN") {
+  if (!user || user.lifecycle !== "OPEN" || !portalForRole(user.role)) {
     return null;
   }
 
@@ -350,13 +449,37 @@ export async function getSessionUser() {
   return getSessionUserFromToken(store.get(SESSION_COOKIE)?.value);
 }
 
-export async function requireAdminPageSession() {
+export async function requirePageSession() {
   const user = await getSessionUser();
 
   if (!user) {
     redirect("/login");
   }
 
+  return user;
+}
+
+export async function requireAdminPageSession() {
+  const user = await requirePageSession();
+  if (!isAdminRole(user.role)) {
+    redirect(portalHomeForRole(user.role));
+  }
+  return user;
+}
+
+export async function requireClientPageSession() {
+  const user = await requirePageSession();
+  if (!isClientRole(user.role)) {
+    redirect(portalHomeForRole(user.role));
+  }
+  return user;
+}
+
+export async function requireResourcePageSession() {
+  const user = await requirePageSession();
+  if (!isResourceRole(user.role)) {
+    redirect(portalHomeForRole(user.role));
+  }
   return user;
 }
 
@@ -368,15 +491,28 @@ export async function requireAnonymousPage() {
   }
 }
 
+export async function authenticateUser(email: string, password: string) {
+  await ensureAuthInfrastructure();
+
+  const seededAccount = findSeededPortalAccountByEmail(email);
+  if (seededAccount) {
+    await syncPortalAccount(seededAccount);
+  }
+
+  const user = await findUserByEmail(email);
+  if (!user || user.lifecycle !== "OPEN" || !portalForRole(user.role)) {
+    return null;
+  }
+
+  return (await verifyPassword(password, user.password)) ? user : null;
+}
+
 export async function authenticateAdmin(email: string, password: string) {
   await ensureAuthInfrastructure();
 
-  const seededAccount = ADMIN_ACCOUNTS.find(
-    (account) => account.email.toLowerCase() === email.trim().toLowerCase(),
-  );
-
+  const seededAccount = findSeededPortalAccountByEmail(email);
   if (seededAccount) {
-    await syncAdminAccount(seededAccount);
+    await syncPortalAccount(seededAccount);
   }
 
   const user = await findUserByEmail(email);
@@ -392,17 +528,14 @@ export async function authenticateAdmin(email: string, password: string) {
 export async function createPasswordResetToken(email: string) {
   await ensureAuthInfrastructure();
 
-  const seededAccount = ADMIN_ACCOUNTS.find(
-    (account) => account.email.toLowerCase() === email.trim().toLowerCase(),
-  );
-
+  const seededAccount = findSeededPortalAccountByEmail(email);
   if (seededAccount) {
-    await syncAdminAccount(seededAccount);
+    await syncPortalAccount(seededAccount);
   }
 
   const user = await findUserByEmail(email);
 
-  if (!user || user.lifecycle !== "OPEN" || !isAdminRole(user.role)) {
+  if (!user || user.lifecycle !== "OPEN" || !portalForRole(user.role)) {
     return null;
   }
 
@@ -444,12 +577,7 @@ export async function resetPasswordFromToken(
 ) {
   await ensureAuthInfrastructure();
 
-  const [rows] = await db.query<
-    Array<{
-      id: number;
-      user_id: number;
-    }>
-  >(
+  const [rows] = await db.query<PasswordResetRow[]>(
     `
       SELECT
         id,
@@ -583,7 +711,7 @@ export async function sendMail({
 
 export function buildResetUrl(request: Request | NextRequest, token: string) {
   const url = new URL(request.url);
-  url.pathname = "/resetPassword";
+  url.pathname = "/reset-password";
   url.search = "";
   url.searchParams.set("token", token);
   return url.toString();
@@ -591,7 +719,12 @@ export function buildResetUrl(request: Request | NextRequest, token: string) {
 
 export async function issueSessionResponse(userId: number) {
   const { token, expiresAt } = await createSession(userId);
-  const response = NextResponse.json({ ok: true });
+  const user = await findUserById(userId);
+  const response = NextResponse.json({
+    ok: true,
+    portal: user ? portalForRole(user.role) : null,
+    redirectTo: user ? portalHomeForRole(user.role) : "/dashboard",
+  });
   response.cookies.set(SESSION_COOKIE, token, {
     httpOnly: true,
     sameSite: "lax",

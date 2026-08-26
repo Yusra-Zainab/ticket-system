@@ -68,6 +68,12 @@ export async function hasDatabaseColumn(table: string, column: string) {
   return Number(rows[0]?.count ?? 0) > 0;
 }
 
+async function projectFormDataSelect(alias = "p") {
+  return (await hasDatabaseColumn("projects", "form_data"))
+    ? `${alias}.form_data`
+    : "NULL";
+}
+
 type ProjectRow = RowDataPacket & {
   id: number;
   name: string;
@@ -197,11 +203,12 @@ function safeProjectData(data: Record<string, unknown>) {
 }
 
 export async function listResourceProjects(user: ResourcePortalSessionUser) {
+  const formDataSelect = await projectFormDataSelect();
   const [rows] = await db.query<ProjectRow[]>(
     `
       SELECT
         p.id, p.name, p.description, p.status, p.priority_type, p.progress,
-        p.due_date, p.updated_at, p.form_data,
+        p.due_date, p.updated_at, ${formDataSelect} AS form_data,
         c.name AS client_name, c.company,
         SUM(CASE WHEN t.lifecycle = 'OPEN' AND t.status NOT IN ('Closed','Cancelled') THEN 1 ELSE 0 END) AS open_tickets
       FROM project_resources pr
@@ -363,6 +370,7 @@ export async function listResourceTickets(
     lifecycle === "DRAFT"
       ? "LEFT JOIN project_resources pr ON pr.project_id = t.project_id AND pr.user_id = ?"
       : "JOIN project_resources pr ON pr.project_id = t.project_id";
+  const projectFormData = await projectFormDataSelect();
 
 
   const [rows] = await db.query<TicketRow[]>(
@@ -372,7 +380,7 @@ export async function listResourceTickets(
         t.priority_type, t.type, t.project_id, p.name AS project_name,
         t.created_by, t.assigned_to, creator.name AS creator_name,
         assignee.name AS assignee_name, t.status, t.created_at, t.updated_at,
-        t.deadline, t.form_data, p.form_data AS project_form_data
+        t.deadline, t.form_data, ${projectFormData} AS project_form_data
       FROM tickets t
       LEFT JOIN projects p ON p.id = t.project_id
       ${joins}
@@ -393,6 +401,7 @@ export async function getResourceTicketAccess(
   user: ResourcePortalSessionUser,
   ticketId: string,
 ): Promise<ResourceTicketAccess | null> {
+  const projectFormData = await projectFormDataSelect();
   const [rows] = await db.query<
     (RowDataPacket & {
       database_id: number;
@@ -410,7 +419,7 @@ export async function getResourceTicketAccess(
   >(
     `
       SELECT t.id AS database_id, t.ticket_id, t.lifecycle, t.created_by, t.assigned_to,
-             t.project_id, t.status, t.form_data, p.form_data AS project_form_data,
+             t.project_id, t.status, t.form_data, ${projectFormData} AS project_form_data,
              pr.project_id AS assigned_project, p.lifecycle AS project_lifecycle
       FROM tickets t
       LEFT JOIN projects p ON p.id = t.project_id
@@ -502,6 +511,7 @@ async function ticketActivities(databaseTicketId: number): Promise<ResourcePorta
 export async function findResourceTicket(user: ResourcePortalSessionUser, ticketId: string) {
   const access = await getResourceTicketAccess(user, ticketId);
   if (!access) return undefined;
+  const projectFormData = await projectFormDataSelect();
   const [rows] = await db.query<TicketRow[]>(
     `
       SELECT
@@ -509,7 +519,7 @@ export async function findResourceTicket(user: ResourcePortalSessionUser, ticket
         t.priority_type, t.type, t.project_id, p.name AS project_name,
         t.created_by, t.assigned_to, creator.name AS creator_name,
         assignee.name AS assignee_name, t.status, t.created_at, t.updated_at,
-        t.deadline, t.form_data, p.form_data AS project_form_data
+        t.deadline, t.form_data, ${projectFormData} AS project_form_data
       FROM tickets t
       LEFT JOIN projects p ON p.id = t.project_id
       LEFT JOIN users creator ON creator.id = t.created_by
@@ -585,9 +595,11 @@ export async function canResourceAccessTicketAttachment(
   >(
     `
       SELECT ta.attachment_id, ta.file_name, ta.mime_type, ta.size_bytes, ta.content,
-             t.created_by, t.lifecycle, pr.project_id AS assigned_project
+             t.created_by, t.lifecycle, pr.project_id AS assigned_project,
+             p.lifecycle AS project_lifecycle
       FROM ticket_attachments ta
       JOIN tickets t ON t.ticket_id = ta.ticket_id
+      LEFT JOIN projects p ON p.id = t.project_id
       LEFT JOIN project_resources pr ON pr.project_id = t.project_id AND pr.user_id = ?
       WHERE ta.attachment_id = ?
       LIMIT 1

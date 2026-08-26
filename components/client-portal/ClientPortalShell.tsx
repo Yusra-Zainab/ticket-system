@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import ClientFloatingActionBar from "@/components/client-portal/ClientFloatingActionBar";
+import { useApp } from "@/components/providers/AppProvider";
 import {
   Bell,
   FileText,
@@ -32,6 +34,7 @@ export default function ClientPortalShell({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const { unreadCount } = useApp();
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -56,18 +59,7 @@ export default function ClientPortalShell({
 
       <main className="cp-shell-main">{children}</main>
 
-      <nav className="cp-dock" aria-label="Client portal navigation">
-        {nav.map((item) => {
-          const Icon = item.icon;
-          const active = pathname === item.href || (item.href !== "/client/dashboard" && pathname.startsWith(`${item.href}/`));
-          return (
-            <Link key={item.href} href={item.href} className={active ? "cp-dock-link is-active" : "cp-dock-link"} title={item.label}>
-              <Icon size={20} />
-              <span>{item.label}</span>
-            </Link>
-          );
-        })}
-      </nav>
+      <ClientFloatingActionBar notificationsCount={unreadCount} />
     </div>
   );
 }

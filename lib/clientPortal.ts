@@ -84,6 +84,12 @@ export async function hasDatabaseColumn(table: string, column: string) {
   return Number(rows[0]?.count ?? 0) > 0;
 }
 
+async function projectFormDataSelect(alias = "p") {
+  return (await hasDatabaseColumn("projects", "form_data"))
+    ? `${alias}.form_data`
+    : "NULL";
+}
+
 export async function getClientContext(
   user: Pick<ClientPortalSessionUser, "id" | "email">,
 ): Promise<ClientContext | null> {
@@ -298,12 +304,13 @@ function safeProjectData(data: Record<string, unknown>) {
 export async function listClientProjects(user: ClientPortalSessionUser) {
   const context = await getClientContext(user);
   if (!context) return [];
+  const formDataSelect = await projectFormDataSelect();
 
   const [rows] = await db.query<ProjectRow[]>(
     `
       SELECT
         p.id, p.name, p.description, p.status, p.priority_type, p.progress,
-        p.due_date, p.updated_at, p.form_data,
+        p.due_date, p.updated_at, ${formDataSelect} AS form_data,
         c.company, c.name AS client_name,
         SUM(CASE WHEN t.lifecycle = 'OPEN' AND t.status NOT IN ('Closed','Cancelled') THEN 1 ELSE 0 END) AS open_tickets
       FROM projects p

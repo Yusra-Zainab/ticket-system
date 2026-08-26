@@ -1,6 +1,231 @@
 import ResourcePortalShell from "@/components/resource-portal/ResourcePortalShell";
 import { requireResourcePageSession } from "@/lib/auth";
-export const dynamic="force-dynamic";
-export default async function ResourceLayout({children}:{children:React.ReactNode}){const user=await requireResourcePageSession();return <><style>{`
-.rp-shell{min-height:100vh;background:#fff;color:#101828;font-family:var(--font-inter),Inter,Arial,sans-serif}.rp-shell-topbar{height:64px;border-bottom:1px solid #eaecf0;display:flex;align-items:center;justify-content:space-between;padding:0 32px;position:sticky;top:0;background:rgba(255,255,255,.96);backdrop-filter:blur(10px);z-index:40}.rp-brand{display:flex;align-items:center;gap:10px;font-weight:800;color:#101828;text-decoration:none}.rp-brand-mark{display:grid;place-items:center;width:34px;height:34px;border-radius:10px;color:#fff;background:linear-gradient(66.43deg,#0284c7 12.82%,#06b6d4 47.68%,#22d3ee 82.54%)}.rp-shell-user{display:flex;align-items:center;gap:12px;font-size:14px;font-weight:600}.rp-icon-button{width:36px;height:36px;display:grid;place-items:center;border:1px solid #d0d5dd;background:#fff;border-radius:8px;color:#344054;cursor:pointer}.rp-shell-main{max-width:1440px;margin:0 auto;padding-bottom:120px}.rp-dock{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);display:flex;gap:4px;padding:8px;background:#fff;border:1px solid #e4e7ec;border-radius:16px;box-shadow:0 14px 36px rgba(16,24,40,.16);z-index:50}.rp-dock-link{min-width:82px;display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 10px;border-radius:10px;text-decoration:none;color:#667085;font-size:11px;font-weight:700}.rp-dock-link.is-active,.rp-dock-link:hover{background:#e6f8fb;color:#0284c7}@media(max-width:720px){.rp-shell-topbar{padding:0 16px}.rp-shell-user>span{display:none}.rp-dock{width:calc(100% - 24px);overflow:auto;justify-content:flex-start}.rp-dock-link{min-width:70px}.rp-shell-main{padding-bottom:130px}}
-`}</style><ResourcePortalShell userName={user.name}>{children}</ResourcePortalShell></>}
+import { listResourceNotifications } from "@/lib/resourcePortal";
+
+export const dynamic = "force-dynamic";
+
+export default async function ResourceLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const user = await requireResourcePageSession();
+  const notifications = await listResourceNotifications(user);
+
+  return (
+    <>
+      <style>{`
+        .resource-portal-shell {
+          min-height: 100vh;
+          background: #ffffff;
+          color: #101828;
+          font-family: Geist, var(--font-inter), Inter, Arial, sans-serif;
+        }
+
+        .resource-portal-shell *,
+        .resource-portal-shell *::before,
+        .resource-portal-shell *::after {
+          box-sizing: border-box;
+        }
+
+        /*
+         * Same outer layout pattern as the admin AppLayout:
+         * centered content, generous top spacing and room for the
+         * floating action bar at the bottom.
+         */
+        .resource-portal-frame {
+          width: 100%;
+          max-width: 1800px;
+          min-height: 100vh;
+          margin: 0 auto;
+          padding: 28px 0 144px;
+        }
+
+        /*
+         * Global resource breadcrumb row.
+         * This intentionally replaces the breadcrumb/history row that
+         * older ResourcePageHeader instances render inside each page.
+         */
+        .resource-shell-breadcrumbs {
+          display: flex;
+          min-height: 48px;
+          align-items: center;
+          gap: 10px;
+          margin: 0 32px;
+          overflow-x: auto;
+          border-bottom: 1px solid rgba(2, 132, 199, 0.1);
+          border-radius: 8px;
+          padding: 8px 12px;
+          color: #0284c7;
+          font-size: 14px;
+          font-weight: 600;
+          white-space: nowrap;
+          scrollbar-width: none;
+        }
+
+        .resource-shell-breadcrumbs::-webkit-scrollbar {
+          display: none;
+        }
+
+        .resource-shell-home,
+        .resource-shell-history-button,
+        .resource-shell-refresh-button {
+          display: grid;
+          width: 40px;
+          height: 40px;
+          flex: 0 0 40px;
+          place-items: center;
+          border: 0;
+          background: #e6f8fb;
+          color: #0284c7;
+          text-decoration: none;
+          cursor: pointer;
+        }
+
+        .resource-shell-home {
+          border-radius: 8px;
+        }
+
+        .resource-shell-home:hover,
+        .resource-shell-history-button:hover,
+        .resource-shell-refresh-button:hover {
+          background: #d8f3f8;
+        }
+
+        .resource-shell-home:focus-visible,
+        .resource-shell-history-button:focus-visible,
+        .resource-shell-refresh-button:focus-visible,
+        .resource-shell-crumb-link:focus-visible {
+          outline: 2px solid #06b6d4;
+          outline-offset: 2px;
+        }
+
+        .resource-shell-crumb {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .resource-shell-chevron {
+          flex: none;
+          color: #0284c7;
+        }
+
+        .resource-shell-crumb-link,
+        .resource-shell-crumb-current {
+          display: inline-flex;
+          min-height: 32px;
+          align-items: center;
+          border-radius: 8px;
+          padding: 6px 8px;
+          color: #0284c7;
+          text-decoration: none;
+        }
+
+        .resource-shell-crumb-link:hover {
+          background: #f0f9ff;
+        }
+
+        .resource-shell-crumb-current {
+          background: #f0f9ff;
+          padding-inline: 12px;
+        }
+
+        .resource-shell-history {
+          display: flex;
+          flex: none;
+          margin-left: 8px;
+          overflow: hidden;
+          border-radius: 8px;
+          background: #e6f8fb;
+          color: #0284c7;
+        }
+
+        .resource-shell-history-button:first-child {
+          border-radius: 8px 0 0 8px;
+        }
+
+        .resource-shell-history-button:last-child {
+          border-left: 1px solid #ffffff;
+          border-radius: 0 8px 8px 0;
+        }
+
+        .resource-shell-refresh-button {
+          margin-left: 4px;
+          border-radius: 8px;
+        }
+
+        .resource-shell-refresh-button:disabled {
+          cursor: default;
+          opacity: 0.6;
+        }
+
+        .resource-shell-refreshing {
+          animation: resourceShellSpin 0.8s linear infinite;
+        }
+
+        @keyframes resourceShellSpin {
+          to {
+            transform: rotate(360deg);
+          }
+        }
+
+        .resource-portal-main {
+          width: 100%;
+          min-width: 0;
+        }
+
+        /*
+         * Breadcrumbs/history are now owned by ResourcePortalShell,
+         * so hide the older per-page row to prevent duplicate top bars.
+         */
+        .resource-portal-shell .resource-page-tools-row {
+          display: none !important;
+        }
+
+        /* Match the sticky admin PageHeader behaviour. */
+        .resource-portal-shell .resource-page-header {
+          position: sticky;
+          top: 0;
+          z-index: 30;
+          background: rgba(255, 255, 255, 0.95);
+          backdrop-filter: blur(8px);
+          -webkit-backdrop-filter: blur(8px);
+        }
+
+        @media (max-width: 760px) {
+          .resource-portal-frame {
+            padding-top: 20px;
+          }
+
+          .resource-shell-breadcrumbs {
+            margin: 0 16px;
+            gap: 8px;
+            padding: 6px 8px;
+          }
+
+          .resource-shell-home,
+          .resource-shell-history-button,
+          .resource-shell-refresh-button {
+            width: 36px;
+            height: 36px;
+            flex-basis: 36px;
+          }
+
+          .resource-shell-crumb-link,
+          .resource-shell-crumb-current {
+            min-height: 30px;
+            padding: 5px 7px;
+          }
+        }
+      `}</style>
+
+      <ResourcePortalShell
+        notifications={notifications}
+        notificationReadStorageKey={`resource-notification-read-ids-${user.id}`}
+      >
+        {children}
+      </ResourcePortalShell>
+    </>
+  );
+}

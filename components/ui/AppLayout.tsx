@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -27,6 +28,8 @@ const bareRoutes = [
   "/resetPassword",
   "/reset-password",
   "/errors",
+  "/client",
+  "/resource",
 ];
 
 function buildCrumbs(

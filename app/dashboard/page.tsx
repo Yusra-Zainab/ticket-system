@@ -1,5 +1,7 @@
-import AdminDashboard from "@/components/features/AdminDashboard";
+import { redirect } from "next/navigation";
 
+import AdminDashboard from "@/components/features/AdminDashboard";
+import { portalForRole, requirePageSession } from "@/lib/auth";
 import {
   findAdminUser,
   listClientRows,
@@ -7,13 +9,22 @@ import {
   listResourceRows,
   listTickets,
 } from "@/lib/db";
-import { requireAdminPageSession } from "@/lib/auth";
 import { defaultProfileTimeZone } from "@/lib/profileUtils";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const sessionUser = await requireAdminPageSession();
+  const sessionUser = await requirePageSession();
+  const portal = portalForRole(sessionUser.role);
+
+  if (portal === "client") {
+    redirect("/client/dashboard");
+  }
+
+  if (portal === "resource") {
+    redirect("/resource/dashboard");
+  }
+
   const [projects, tickets, resources, clients, profile] = await Promise.all([
     listProjects("OPEN"),
     listTickets("OPEN"),
@@ -21,21 +32,13 @@ export default async function DashboardPage() {
     listClientRows(),
     findAdminUser(String(sessionUser.id)),
   ]);
-
-  /*
-   * Generate time on the server.
-   * The client component receives a stable value,
-   * so React does not flag Date.now() as impure.
-   */
-  const now = new Date().getTime();
-
   return (
     <AdminDashboard
       projects={projects}
       tickets={tickets}
       resources={resources}
       clients={clients}
-      now={now}
+      now={Date.now()}
       timeZone={profile?.formData.timeZone || defaultProfileTimeZone}
     />
   );

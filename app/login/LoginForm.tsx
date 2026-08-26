@@ -12,11 +12,9 @@ import {
 
 const roles = [
   "Admin",
-  "Super Admin",
-  "Project Manager",
-  "Developer",
-  "Support Agent",
-  "Client User",
+  "Resource",
+  "Client",
+  "Client Team",
 ] as const;
 
 export default function LoginForm() {
