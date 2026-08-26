@@ -51,11 +51,11 @@ export default function ResourceFloatingActionBar() {
     matchState,
   } = usePageSearch();
 
-  const dashboardActive = pathname === "/resource/dashboard";
-  const ticketsActive = pathname.startsWith("/resource/tickets");
-  const projectsActive = pathname.startsWith("/resource/projects");
-  const notificationsActive = pathname.startsWith("/resource/notifications");
-  const profileActive = pathname.startsWith("/resource/profile");
+  const dashboardActive = pathname === "/resource-portal/dashboard";
+  const ticketsActive = pathname.startsWith("/resource-portal/tickets");
+  const projectsActive = pathname.startsWith("/resource-portal/projects");
+  const notificationsActive = pathname.startsWith("/resource-portal/notifications");
+  const profileActive = pathname.startsWith("/resource-portal/profile");
 
   const notificationsLabel =
     notificationsCount > 0
@@ -168,12 +168,12 @@ export default function ResourceFloatingActionBar() {
           </span>
 
           <Link
-            href="/resource/tickets/new"
+            href="/resource-portal/tickets/new"
             aria-label="Create ticket"
             title="Create ticket"
             className={cn(
               "resource-dock-action",
-              pathname === "/resource/tickets/new" &&
+              pathname === "/resource-portal/tickets/new" &&
                 "resource-dock-action-active",
             )}
           >
@@ -181,12 +181,12 @@ export default function ResourceFloatingActionBar() {
           </Link>
 
           <Link
-            href="/resource/tickets/drafts"
+            href="/resource-portal/tickets/drafts"
             aria-label="Ticket drafts"
             title="Ticket drafts"
             className={cn(
               "resource-dock-action",
-              pathname.startsWith("/resource/tickets/drafts") &&
+              pathname.startsWith("/resource-portal/tickets/drafts") &&
                 "resource-dock-action-active",
             )}
           >
@@ -194,12 +194,12 @@ export default function ResourceFloatingActionBar() {
           </Link>
 
           <Link
-            href="/resource/tickets"
+            href="/resource-portal/tickets"
             aria-label="Tickets list"
             title="Tickets list"
             className={cn(
               "resource-dock-action",
-              pathname === "/resource/tickets" &&
+              pathname === "/resource-portal/tickets" &&
                 "resource-dock-action-active",
             )}
           >
@@ -261,12 +261,12 @@ export default function ResourceFloatingActionBar() {
           </span>
 
           <Link
-            href="/resource/projects"
+            href="/resource-portal/projects"
             aria-label="Projects list"
             title="Projects list"
             className={cn(
               "resource-dock-action",
-              pathname === "/resource/projects" &&
+              pathname === "/resource-portal/projects" &&
                 "resource-dock-action-active",
             )}
           >
@@ -326,12 +326,12 @@ export default function ResourceFloatingActionBar() {
           </span>
 
           <Link
-            href="/resource/profile"
+            href="/resource-portal/profile"
             aria-label="Edit resource"
             title="Edit resource"
             className={cn(
               "resource-dock-action",
-              pathname.startsWith("/resource/profile") &&
+              pathname.startsWith("/resource-portal/profile") &&
                 "resource-dock-action-active",
             )}
           >
@@ -411,7 +411,7 @@ export default function ResourceFloatingActionBar() {
         <span className="resource-dock-divider" />
 
         <Link
-          href="/resource/dashboard"
+          href="/resource-portal/dashboard"
           aria-label="Dashboard"
           title="Dashboard"
           aria-current={dashboardActive ? "page" : undefined}

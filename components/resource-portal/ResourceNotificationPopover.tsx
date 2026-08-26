@@ -103,7 +103,7 @@ export default function ResourceNotificationPopover({
 
       <footer className="notification-popover-footer">
         <Link
-          href="/resource/notifications"
+          href="/resource-portal/notifications"
           onClick={onClose}
           className="notification-text-button"
         >

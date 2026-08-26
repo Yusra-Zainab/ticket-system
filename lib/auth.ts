@@ -319,8 +319,8 @@ export function portalForRole(role: string | null | undefined): PortalKind | nul
 
 export function portalHomeForRole(role: string | null | undefined) {
   const portal = portalForRole(role);
-  if (portal === "client") return "/client/dashboard";
-  if (portal === "resource") return "/resource/dashboard";
+  if (portal === "client") return "/client-portal/dashboard";
+  if (portal === "resource") return "/resource-portal/dashboard";
   return "/dashboard";
 }
 

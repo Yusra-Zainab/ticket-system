@@ -299,7 +299,7 @@ export default function ResourceProjectList({
                   >
                     <td>
                       <Link
-                        href={`/resource/projects/${project.id}`}
+                        href={`/resource-portal/projects/${project.id}`}
                         className="resource-admin-project-name"
                       >
                         {project.name}

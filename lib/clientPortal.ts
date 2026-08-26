@@ -84,12 +84,6 @@ export async function hasDatabaseColumn(table: string, column: string) {
   return Number(rows[0]?.count ?? 0) > 0;
 }
 
-async function projectFormDataSelect(alias = "p") {
-  return (await hasDatabaseColumn("projects", "form_data"))
-    ? `${alias}.form_data`
-    : "NULL";
-}
-
 export async function getClientContext(
   user: Pick<ClientPortalSessionUser, "id" | "email">,
 ): Promise<ClientContext | null> {
@@ -290,6 +284,8 @@ function safeProjectData(data: Record<string, unknown>) {
       ? (data.links as Record<string, unknown>)
       : {};
   return {
+    projectType: String(data.projectType ?? ""),
+    department: String(data.department ?? ""),
     moduleName: String(data.moduleName ?? ""),
     subModule: String(data.subModule ?? ""),
     links: {
@@ -301,16 +297,54 @@ function safeProjectData(data: Record<string, unknown>) {
   };
 }
 
+
+async function clientProjectCriticalCounts(projectIds: number[]) {
+  const counts = new Map<number, number>();
+
+  if (!projectIds.length) {
+    return counts;
+  }
+
+  const placeholders = projectIds.map(() => "?").join(",");
+
+  const [rows] = await db.query<
+    (RowDataPacket & {
+      project_id: number;
+      form_data: string | Record<string, unknown> | null;
+    })[]
+  >(
+    `
+      SELECT project_id, form_data
+      FROM tickets
+      WHERE lifecycle = 'OPEN' AND project_id IN (${placeholders})
+    `,
+    projectIds,
+  );
+
+  for (const row of rows) {
+    const data = parseJson<Record<string, unknown>>(row.form_data, {});
+
+    const tags = stringArray(data.tags).map((tag) => tag.trim().toLowerCase());
+
+    if (!tags.includes("critical")) {
+      continue;
+    }
+
+    counts.set(row.project_id, (counts.get(row.project_id) ?? 0) + 1);
+  }
+
+  return counts;
+}
+
 export async function listClientProjects(user: ClientPortalSessionUser) {
   const context = await getClientContext(user);
   if (!context) return [];
-  const formDataSelect = await projectFormDataSelect();
 
   const [rows] = await db.query<ProjectRow[]>(
     `
       SELECT
         p.id, p.name, p.description, p.status, p.priority_type, p.progress,
-        p.due_date, p.updated_at, ${formDataSelect} AS form_data,
+        p.due_date, p.updated_at, p.form_data,
         c.company, c.name AS client_name,
         SUM(CASE WHEN t.lifecycle = 'OPEN' AND t.status NOT IN ('Closed','Cancelled') THEN 1 ELSE 0 END) AS open_tickets
       FROM projects p
@@ -323,10 +357,18 @@ export async function listClientProjects(user: ClientPortalSessionUser) {
     [context.clientId],
   );
 
-  const [filesByProject, membersById, assignedMembers] = await Promise.all([
-    projectFiles(rows.map((row) => row.id)),
+  const projectIds = rows.map((row) => row.id);
+
+  const [
+    filesByProject,
+    membersById,
+    assignedMembers,
+    criticalCounts,
+  ] = await Promise.all([
+    projectFiles(projectIds),
     projectMembers(rows),
-    assignedProjectMembers(rows.map((row) => row.id)),
+    assignedProjectMembers(projectIds),
+    clientProjectCriticalCounts(projectIds),
   ]);
 
   return rows.map((row): ClientPortalProject => {
@@ -343,6 +385,7 @@ export async function listClientProjects(user: ClientPortalSessionUser) {
       dueDate: row.due_date || "",
       updatedAt: row.updated_at,
       openTickets: Number(row.open_tickets ?? 0),
+      criticalTickets: criticalCounts.get(row.id) ?? 0,
       team: Array.from(
         new Map(
           [
@@ -712,7 +755,9 @@ export async function addClientActivity(
   );
 }
 
-export async function getClientProfile(user: ClientPortalSessionUser): Promise<ClientPortalProfile> {
+export async function getClientProfile(
+  user: ClientPortalSessionUser,
+): Promise<ClientPortalProfile> {
   const [rows] = await db.query<
     (RowDataPacket & {
       id: number;
@@ -722,30 +767,124 @@ export async function getClientProfile(user: ClientPortalSessionUser): Promise<C
       avatar: string | null;
       form_data: string | Record<string, unknown> | null;
     })[]
-  >("SELECT id, name, email, role, avatar, form_data FROM users WHERE id = ? LIMIT 1", [user.id]);
+  >(
+    `
+      SELECT
+        id,
+        name,
+        email,
+        role,
+        avatar,
+        form_data
+      FROM users
+      WHERE id = ?
+      LIMIT 1
+    `,
+    [user.id],
+  );
+
   const row = rows[0];
-  if (!row) throw new Error("Profile not found");
-  const data = parseJson<Record<string, unknown>>(row.form_data, {});
-  const parts = row.name.trim().split(/\s+/);
-  const context = await getClientContext(user);
+
+  /*
+   * A valid client session should normally always have a users row.
+   * Still return a complete ClientPortalProfile when a legacy/migrated
+   * account temporarily has no matching row so ProfileDetails never
+   * receives undefined.
+   */
+  const sourceName = row?.name?.trim() || user.name.trim();
+  const nameParts = sourceName
+    ? sourceName.split(/\s+/)
+    : [];
+
+  const data = parseJson<Record<string, unknown>>(
+    row?.form_data,
+    {},
+  );
+
+  let context: ClientContext | null = null;
+
+  try {
+    context = await getClientContext(user);
+  } catch {
+    context = null;
+  }
+
   return {
-    id: row.id,
-    firstName: String(data.firstName ?? parts[0] ?? ""),
-    lastName: String(data.lastName ?? parts.slice(1).join(" ")),
-    name: row.name,
-    email: row.email,
+    id: row?.id ?? user.id,
+    firstName: String(
+      data.firstName ??
+        nameParts[0] ??
+        "",
+    ),
+    lastName: String(
+      data.lastName ??
+        nameParts.slice(1).join(" "),
+    ),
+    name: sourceName || "Client User",
+    email: row?.email || user.email,
     phone: String(data.phone ?? ""),
     jobTitle: String(data.jobTitle ?? ""),
-    avatar: String(data.avatarUrl ?? row.avatar ?? ""),
+    avatar: String(
+      data.avatarUrl ??
+        row?.avatar ??
+        "",
+    ),
     company: context?.company ?? "",
-    role: row.role,
-    emailNotifications: data.emailNotifications !== false,
+    role: row?.role || user.role,
+    emailNotifications:
+      data.emailNotifications !== false,
   };
 }
 
-export async function listClientTeam(user: ClientPortalSessionUser): Promise<ClientPortalTeamMember[]> {
+export async function listClientTeam(
+  user: ClientPortalSessionUser,
+): Promise<ClientPortalTeamMember[]> {
   const context = await getClientContext(user);
-  if (!context) return [];
+
+  if (!context) {
+    return [];
+  }
+
+  /*
+   * Legacy Admin Client records may already contain teamMembers in
+   * clients.form_data even when the users row does not yet have clientId.
+   * Include those ids/emails so existing client users stay visible/editable.
+   */
+  const [clientRows] = await db.query<
+    (RowDataPacket & {
+      form_data: string | Record<string, unknown> | null;
+    })[]
+  >(
+    "SELECT form_data FROM clients WHERE id = ? LIMIT 1",
+    [context.clientId],
+  );
+
+  const clientData = parseJson<Record<string, unknown>>(
+    clientRows[0]?.form_data,
+    {},
+  );
+
+  const legacyMembers = Array.isArray(clientData.teamMembers)
+    ? clientData.teamMembers.filter(
+        (item): item is Record<string, unknown> =>
+          Boolean(item && typeof item === "object"),
+      )
+    : [];
+
+  const legacyIds = new Set(
+    legacyMembers
+      .map((member) => String(member.id ?? "").trim())
+      .filter(Boolean),
+  );
+
+  const legacyEmails = new Set(
+    legacyMembers
+      .map((member) =>
+        String(member.email ?? "").trim().toLowerCase(),
+      )
+      .filter(Boolean),
+  );
+
   const [rows] = await db.query<
     (RowDataPacket & {
       id: number;
@@ -757,27 +896,108 @@ export async function listClientTeam(user: ClientPortalSessionUser): Promise<Cli
       form_data: string | Record<string, unknown> | null;
     })[]
   >(
-    `SELECT id, name, email, avatar, lifecycle, created_at, form_data FROM users WHERE role = 'client' ORDER BY created_at DESC`,
+    `
+      SELECT
+        id,
+        name,
+        email,
+        avatar,
+        lifecycle,
+        created_at,
+        form_data
+      FROM users
+      WHERE LOWER(role) IN ('client', 'client_user')
+      ORDER BY created_at DESC
+    `,
   );
+
   const clientEmail = context.clientEmail.toLowerCase();
+
   return rows
     .filter((row) => {
-      const data = parseJson<Record<string, unknown>>(row.form_data, {});
-      return Number(data.clientId ?? 0) === context.clientId || row.email.toLowerCase() === clientEmail;
+      const data = parseJson<Record<string, unknown>>(
+        row.form_data,
+        {},
+      );
+
+      return (
+        Number(data.clientId ?? data.client_id ?? 0) ===
+          context.clientId ||
+        row.email.toLowerCase() === clientEmail ||
+        legacyIds.has(String(row.id)) ||
+        legacyEmails.has(row.email.toLowerCase())
+      );
     })
     .map((row) => {
-      const data = parseJson<Record<string, unknown>>(row.form_data, {});
+      const data = parseJson<Record<string, unknown>>(
+        row.form_data,
+        {},
+      );
+
+      const [fallbackFirst = "", ...fallbackRest] = row.name
+        .trim()
+        .split(/\s+/);
+
+      const legacyMember = legacyMembers.find(
+        (member) =>
+          String(member.id ?? "") === String(row.id) ||
+          String(member.email ?? "")
+            .trim()
+            .toLowerCase() === row.email.toLowerCase(),
+      );
+
       return {
         id: String(row.id),
+        firstName: String(
+          data.firstName ?? fallbackFirst,
+        ),
+        lastName: String(
+          data.lastName ?? fallbackRest.join(" "),
+        ),
         name: row.name,
         email: row.email,
-        phone: String(data.phone ?? ""),
-        jobTitle: String(data.jobTitle ?? ""),
-        avatar: String(data.avatarUrl ?? row.avatar ?? "") || null,
-        status: row.lifecycle === "OPEN" ? "Active" : "Inactive",
+        phone: String(
+          data.phone ?? legacyMember?.phone ?? "",
+        ),
+        jobTitle: String(
+          data.jobTitle ??
+            legacyMember?.role ??
+            "",
+        ),
+        communicationChannel: String(
+          data.communicationChannel ??
+            legacyMember?.contactChannel ??
+            "Email",
+        ),
+        avatar:
+          String(
+            data.avatarUrl ??
+              row.avatar ??
+              legacyMember?.avatar ??
+              "",
+          ) || null,
+        status:
+          row.lifecycle === "OPEN"
+            ? "Active"
+            : "Inactive",
         addedAt: row.created_at,
       };
     });
+}
+
+export async function findClientTeamMember(
+  user: ClientPortalSessionUser,
+  id: string,
+): Promise<ClientPortalTeamMember | undefined> {
+  const numericId = Number(id);
+
+  if (!Number.isInteger(numericId) || numericId <= 0) {
+    return undefined;
+  }
+
+  return (await listClientTeam(user)).find(
+    (member) => member.id === String(numericId),
+  );
 }
 
 export async function getClientDashboardStats(
@@ -828,6 +1048,6 @@ export async function listClientNotifications(
     title: row.title,
     body: row.status ? `${row.action} · ${row.status}` : row.action,
     time: row.created_at,
-    href: `/client/tickets/${row.ticket_id}`,
+    href: `/client-portal/tickets/${row.ticket_id}`,
   }));
 }

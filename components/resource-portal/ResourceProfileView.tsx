@@ -215,7 +215,7 @@ export default function ResourceProfileView({
 
           <div className="resource-detail-actions">
             <Link
-              href="/resource/profile/edit"
+              href="/resource-portal/profile/edit"
               className="resource-detail-action"
             >
               Edit Resource
@@ -396,7 +396,7 @@ function ProjectsTab({
                 >
                   <td>
                     <Link
-                      href={`/resource/projects/${project.id}`}
+                      href={`/resource-portal/projects/${project.id}`}
                       className="resource-detail-record-link"
                     >
                       <FolderKanban size={18} />
@@ -464,7 +464,7 @@ function TicketsTab({
                 >
                   <td>
                     <Link
-                      href={`/resource/tickets/${ticket.id}`}
+                      href={`/resource-portal/tickets/${ticket.id}`}
                       className="resource-detail-record-link"
                     >
                       {ticket.title}
@@ -525,7 +525,7 @@ function ModulesTab({
                 <td>{module.subModule}</td>
                 <td>
                   <Link
-                    href={`/resource/projects/${module.project.id}`}
+                    href={`/resource-portal/projects/${module.project.id}`}
                     className="resource-detail-record-link"
                   >
                     {module.project.name}
@@ -628,7 +628,7 @@ function ActivityTab({
                   <td>
                     {row.projectId ? (
                       <Link
-                        href={`/resource/projects/${row.projectId}`}
+                        href={`/resource-portal/projects/${row.projectId}`}
                         className="resource-activity-project"
                       >
                         <span className="resource-activity-project-icon">P</span>
@@ -640,7 +640,7 @@ function ActivityTab({
                   </td>
                   <td>
                     <Link
-                      href={`/resource/tickets/${row.ticketId}`}
+                      href={`/resource-portal/tickets/${row.ticketId}`}
                       className="resource-detail-record-link"
                     >
                       {row.ticket}

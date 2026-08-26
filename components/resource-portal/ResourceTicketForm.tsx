@@ -399,8 +399,8 @@ export default function ResourceTicketForm({
 
       router.push(
         lifecycle === "DRAFT"
-          ? "/resource/tickets/drafts"
-          : `/resource/tickets/${encodeURIComponent(ticketId)}`,
+          ? "/resource-portal/tickets/drafts"
+          : `/resource-portal/tickets/${encodeURIComponent(ticketId)}`,
       );
       router.refresh();
     } catch (reason) {
@@ -439,7 +439,7 @@ export default function ResourceTicketForm({
         </h1>
 
         <div className="flex flex-wrap gap-2">
-          <Link href="/resource/tickets/drafts" className="button-secondary">
+          <Link href="/resource-portal/tickets/drafts" className="button-secondary">
             Drafts
           </Link>
 

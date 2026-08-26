@@ -133,7 +133,7 @@ export default function ResourceProfileForm({
         throw new Error(result.error || "Unable to save resource details.");
       }
 
-      router.push("/resource/profile");
+      router.push("/resource-portal/profile");
       router.refresh();
     } catch (reason) {
       setError(
@@ -154,7 +154,7 @@ export default function ResourceProfileForm({
 
           <div className="resource-edit-details-actions">
             <Link
-              href="/resource/profile"
+              href="/resource-portal/profile"
               className="resource-edit-details-cancel"
             >
               Cancel

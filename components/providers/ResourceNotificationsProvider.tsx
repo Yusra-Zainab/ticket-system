@@ -39,7 +39,7 @@ function inferCategory(
 ): ResourceNotificationCategory {
   const text = `${item.title} ${item.body}`.toLowerCase();
 
-  if (item.href.startsWith("/resource/tickets")) {
+  if (item.href.startsWith("/resource-portal/tickets")) {
     return "Tickets";
   }
 

@@ -702,6 +702,6 @@ export async function listResourceNotifications(
     title: row.title,
     body: row.status ? `${row.action} · ${row.status}` : row.action,
     time: row.created_at,
-    href: `/resource/tickets/${row.ticket_id}`,
+    href: `/resource-portal/tickets/${row.ticket_id}`,
   }));
 }

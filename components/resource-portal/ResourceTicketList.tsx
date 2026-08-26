@@ -377,8 +377,8 @@ export default function ResourceTicketList({
               <tbody>
                 {visible.map((ticket, index) => {
                   const href = drafts
-                    ? `/resource/tickets/new?draft=${encodeURIComponent(ticket.id)}`
-                    : `/resource/tickets/${encodeURIComponent(ticket.id)}`;
+                    ? `/resource-portal/tickets/new?draft=${encodeURIComponent(ticket.id)}`
+                    : `/resource-portal/tickets/${encodeURIComponent(ticket.id)}`;
 
                   return (
                     <tr key={ticket.id} className={index % 2 ? "is-striped" : ""}>

@@ -43,7 +43,7 @@ export default function ResourcePageHeader({
             <div className="resource-page-tools-row">
               <nav className="resource-page-breadcrumbs" aria-label="Breadcrumbs">
                 <Link
-                  href="/resource/dashboard"
+                  href="/resource-portal/dashboard"
                   className="resource-page-home"
                   aria-label="Resource dashboard"
                 >

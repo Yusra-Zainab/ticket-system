@@ -145,7 +145,7 @@ export default function ResourceDashboardView({
           </div>
 
           <Link
-            href="/resource/projects"
+            href="/resource-portal/projects"
             className="resource-dashboard-see-more"
           >
             See More <ArrowRight size={20} />
@@ -185,7 +185,7 @@ export default function ResourceDashboardView({
                 {priorityTickets.slice(0, 5).map((ticket) => (
                   <tr key={ticket.id}>
                     <td>
-                      <Link href={`/resource/tickets/${ticket.id}`}>
+                      <Link href={`/resource-portal/tickets/${ticket.id}`}>
                         {ticket.title}
                       </Link>
                     </td>
@@ -230,7 +230,7 @@ export default function ResourceDashboardView({
 
                   {/* Ticket */}
                   <td>
-                    <Link href={`/resource/tickets/${ticket.id}`}>
+                    <Link href={`/resource-portal/tickets/${ticket.id}`}>
                       {ticket.title}
                     </Link>
                   </td>

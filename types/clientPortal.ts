@@ -70,6 +70,9 @@ export interface ClientPortalProject {
   dueDate: string;
   updatedAt: string;
   openTickets: number;
+  criticalTickets: number;
+  projectType: string;
+  department: string;
   team: ClientPortalProjectMember[];
   files: ClientPortalProjectFile[];
   moduleName: string;
@@ -157,10 +160,13 @@ export interface ClientPortalProfile {
 
 export interface ClientPortalTeamMember {
   id: string;
+  firstName?: string;
+  lastName?: string;
   name: string;
   email: string;
   phone: string;
   jobTitle: string;
+  communicationChannel?: string;
   avatar?: string | null;
   status: "Active" | "Inactive";
   addedAt: string;

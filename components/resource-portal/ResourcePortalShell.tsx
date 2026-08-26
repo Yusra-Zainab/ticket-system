@@ -27,71 +27,71 @@ function buildResourceCrumbs(pathname: string): ResourceCrumb[] {
    * Match the admin dashboard behaviour: the dashboard itself only
    * shows the home button plus browser history / refresh controls.
    */
-  if (pathname === "/resource" || pathname === "/resource/dashboard") {
+  if (pathname === "/resource" || pathname === "/resource-portal/dashboard") {
     return [];
   }
 
   /* Projects */
-  if (pathname === "/resource/projects") {
+  if (pathname === "/resource-portal/projects") {
     return [{ label: "Projects" }];
   }
 
   if (
-    pathname.startsWith("/resource/projects/") &&
+    pathname.startsWith("/resource-portal/projects/") &&
     pathname.split("/").filter(Boolean).length === 3
   ) {
     return [
-      { label: "Projects", href: "/resource/projects" },
+      { label: "Projects", href: "/resource-portal/projects" },
       { label: "..." },
       { label: "Project Details" },
     ];
   }
 
   /* Tickets */
-  if (pathname === "/resource/tickets") {
+  if (pathname === "/resource-portal/tickets") {
     return [{ label: "Tickets" }];
   }
 
-  if (pathname === "/resource/tickets/drafts") {
+  if (pathname === "/resource-portal/tickets/drafts") {
     return [
-      { label: "Tickets", href: "/resource/tickets" },
+      { label: "Tickets", href: "/resource-portal/tickets" },
       { label: "..." },
       { label: "Ticket Drafts" },
     ];
   }
 
-  if (pathname === "/resource/tickets/new") {
+  if (pathname === "/resource-portal/tickets/new") {
     return [
-      { label: "Tickets", href: "/resource/tickets" },
+      { label: "Tickets", href: "/resource-portal/tickets" },
       { label: "..." },
       { label: "Create Ticket" },
     ];
   }
 
   if (
-    pathname.startsWith("/resource/tickets/") &&
+    pathname.startsWith("/resource-portal/tickets/") &&
     pathname.split("/").filter(Boolean).length === 3
   ) {
     return [
-      { label: "Tickets", href: "/resource/tickets" },
+      { label: "Tickets", href: "/resource-portal/tickets" },
       { label: "..." },
       { label: "Ticket Details" },
     ];
   }
 
   /* Notifications */
-  if (pathname === "/resource/notifications") {
+  if (pathname === "/resource-portal/notifications") {
     return [{ label: "Notifications" }];
   }
 
   /* Profile */
-  if (pathname === "/resource/profile") {
+  if (pathname === "/resource-portal/profile") {
     return [{ label: "Resource Details" }];
   }
 
-  if (pathname === "/resource/profile/edit") {
+  if (pathname === "/resource-portal/profile/edit") {
     return [
-      { label: "Resource Details", href: "/resource/profile" },
+      { label: "Resource Details", href: "/resource-portal/profile" },
       { label: "..." },
       { label: "Edit Resource" },
     ];
@@ -116,7 +116,7 @@ function buildResourceCrumbs(pathname: string): ResourceCrumb[] {
       label,
       href: isLast
         ? undefined
-        : `/resource/${parts.slice(0, index + 1).join("/")}`,
+        : `/resource-portal/${parts.slice(0, index + 1).join("/")}`,
     };
   });
 }
@@ -150,7 +150,7 @@ export default function ResourcePortalShell({
             className="resource-shell-breadcrumbs"
           >
             <Link
-              href="/resource/dashboard"
+              href="/resource-portal/dashboard"
               aria-label="Resource dashboard"
               title="Dashboard"
               className="resource-shell-home"

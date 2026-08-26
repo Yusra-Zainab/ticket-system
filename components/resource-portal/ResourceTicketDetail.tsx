@@ -245,7 +245,7 @@ export default function ResourceTicketDetail({
         <header className="resource-admin-ticket-detail-header">
           <h1>Ticket Details</h1>
           <Link
-            href="/resource/tickets/new"
+            href="/resource-portal/tickets/new"
             className="resource-admin-ticket-detail-primary-button"
           >
             <Plus size={18} />

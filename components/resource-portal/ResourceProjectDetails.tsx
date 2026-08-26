@@ -302,7 +302,7 @@ export default function ResourceProjectDetails({
                         >
                           <td>{formatDate(ticket.updatedAt || ticket.createdAt)}</td>
                           <td className="resource-admin-center">
-                            <Link href={`/resource/tickets/${ticket.id}`}>
+                            <Link href={`/resource-portal/tickets/${ticket.id}`}>
                               {ticket.title}
                             </Link>
                           </td>
@@ -337,7 +337,7 @@ export default function ResourceProjectDetails({
               items={filteredTickets.map((ticket) => ({
                 id: ticket.id,
                 title: ticket.title,
-                href: `/resource/tickets/${ticket.id}`,
+                href: `/resource-portal/tickets/${ticket.id}`,
                 meta: `${ticket.status} · ${ticket.priority} · ${
                   ticket.assignee || "Unassigned"
                 }`,
@@ -416,7 +416,7 @@ export default function ResourceProjectDetails({
               items={filteredTickets.map((ticket) => ({
                 id: ticket.id,
                 title: ticket.title,
-                href: `/resource/tickets/${ticket.id}`,
+                href: `/resource-portal/tickets/${ticket.id}`,
                 meta: `${formatDate(ticket.updatedAt || ticket.createdAt)} · ${
                   ticket.status
                 } · ${ticket.assignee || ticket.reporter || "—"}`,

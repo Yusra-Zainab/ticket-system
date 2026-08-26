@@ -18,11 +18,11 @@ export default async function DashboardPage() {
   const portal = portalForRole(sessionUser.role);
 
   if (portal === "client") {
-    redirect("/client/dashboard");
+    redirect("/client-portal/dashboard");
   }
 
   if (portal === "resource") {
-    redirect("/resource/dashboard");
+    redirect("/resource-portal/dashboard");
   }
 
   const [projects, tickets, resources, clients, profile] = await Promise.all([

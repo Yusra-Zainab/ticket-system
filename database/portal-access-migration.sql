@@ -1,4 +1,4 @@
--- Run once before enabling the client/resource portals.
+-- Run once before enabling the client-portal/resource portals.
 -- These columns are referenced by the current admin project code in code-export.txt
 -- but were not present in the supplied live schema snapshot.
 
