@@ -54,14 +54,20 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
+  const isClientPortalRoute =
+    pathname.startsWith("/client-portal") ||
+    pathname.startsWith("/api/client-portal");
+
+  const isResourcePortalRoute =
+    pathname.startsWith("/resource-portal") ||
+    pathname.startsWith("/api/resource-portal");
+
   // /dashboard is intentionally shared. The server page routes a valid session
   // to the correct portal after login and password reset.
   const needsSession =
     pathname === "/dashboard" ||
-    pathname.startsWith("/client") ||
-    pathname.startsWith("/resource") ||
-    pathname.startsWith("/api/client-portal") ||
-    pathname.startsWith("/api/resource-portal") ||
+    isClientPortalRoute ||
+    isResourcePortalRoute ||
     adminPagePrefixes.some((prefix) => pathname.startsWith(prefix)) ||
     adminApiPrefixes.some((prefix) => pathname.startsWith(prefix));
 
@@ -81,7 +87,7 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(login);
   }
 
-  if (pathname.startsWith("/client") || pathname.startsWith("/api/client-portal")) {
+  if (isClientPortalRoute) {
     if (!isClientRole(user.role)) {
       if (pathname.startsWith("/api/")) {
         return jsonUnauthorized(403, "Client portal access required.");
@@ -91,7 +97,7 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  if (pathname.startsWith("/resource") || pathname.startsWith("/api/resource-portal")) {
+  if (isResourcePortalRoute) {
     if (!isResourceRole(user.role)) {
       if (pathname.startsWith("/api/")) {
         return jsonUnauthorized(403, "Resource portal access required.");

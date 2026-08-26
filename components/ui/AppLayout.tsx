@@ -28,8 +28,8 @@ const bareRoutes = [
   "/resetPassword",
   "/reset-password",
   "/errors",
-  "/client",
-  "/resource",
+  "/client-portal",
+  "/resource-portal",
 ];
 
 function buildCrumbs(
