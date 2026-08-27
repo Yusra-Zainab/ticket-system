@@ -197,17 +197,44 @@ export function NotificationRow({
   );
 }
 
-function formatTime(
-  value: string,
-) {
-  if (
-    value
-      .trim()
-      .toLowerCase()
-      .endsWith("ago")
-  ) {
-    return value;
+function formatTime(value: string) {
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    return "";
   }
 
-  return `${value} ago`;
+  if (trimmed.toLowerCase().endsWith("ago")) {
+    return trimmed;
+  }
+
+  const date = new Date(trimmed);
+
+  if (Number.isNaN(date.getTime())) {
+    return trimmed;
+  }
+
+  const difference = Date.now() - date.getTime();
+
+  if (difference < 60_000) {
+    return "Just now";
+  }
+
+  if (difference < 3_600_000) {
+    return Math.max(1, Math.floor(difference / 60_000)) + "m ago";
+  }
+
+  if (difference < 86_400_000) {
+    return Math.max(1, Math.floor(difference / 3_600_000)) + "h ago";
+  }
+
+  if (difference < 604_800_000) {
+    return Math.max(1, Math.floor(difference / 86_400_000)) + "d ago";
+  }
+
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(date);
 }

@@ -3,6 +3,7 @@ import "server-only";
 import type { RowDataPacket } from "mysql2/promise";
 
 import { db } from "@/lib/db";
+import { normalizeProjectModules } from "@/lib/projectModules";
 import type {
   ClientPortalActivity,
   ClientPortalComment,
@@ -38,6 +39,7 @@ export type ClientTicketAccess = {
   databaseId: number;
   ticketId: string;
   lifecycle: ClientTicketLifecycle;
+  title: string;
   createdBy: number | null;
   assignedTo: number | null;
   projectId: number | null;
@@ -288,6 +290,11 @@ function safeProjectData(data: Record<string, unknown>) {
     department: String(data.department ?? ""),
     moduleName: String(data.moduleName ?? ""),
     subModule: String(data.subModule ?? ""),
+    modules: normalizeProjectModules({
+      modules: Array.isArray(data.modules) ? data.modules : [],
+      moduleName: String(data.moduleName ?? ""),
+      subModule: String(data.subModule ?? ""),
+    }),
     links: {
       staging: typeof links.staging === "string" ? links.staging : undefined,
       live: typeof links.live === "string" ? links.live : undefined,
@@ -344,7 +351,7 @@ export async function listClientProjects(user: ClientPortalSessionUser) {
     `
       SELECT
         p.id, p.name, p.description, p.status, p.priority_type, p.progress,
-        p.due_date, p.updated_at, p.form_data,
+        p.due_date, p.start_date, p.updated_at, p.form_data,
         c.company, c.name AS client_name,
         SUM(CASE WHEN t.lifecycle = 'OPEN' AND t.status NOT IN ('Closed','Cancelled') THEN 1 ELSE 0 END) AS open_tickets
       FROM projects p
@@ -383,6 +390,7 @@ export async function listClientProjects(user: ClientPortalSessionUser) {
       priority: row.priority_type || String(data.priority ?? "Not Assigned"),
       progress: Number(row.progress ?? 0),
       dueDate: row.due_date || "",
+      startDate: row.start_date || "",
       updatedAt: row.updated_at,
       openTickets: Number(row.open_tickets ?? 0),
       criticalTickets: criticalCounts.get(row.id) ?? 0,
@@ -485,6 +493,7 @@ function mapTicket(row: TicketRow, attachments: ClientPortalTicketAttachment[]):
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     dueDate: row.deadline || "",
+    titleHistory: Array.isArray(data.titleHistory) ? data.titleHistory.filter((item): item is string => typeof item === "string" && item.trim().length > 0) : [],
     links: stringArray(data.urls),
     watcherIds: numberArray(data.watchers),
     attachments,
@@ -502,8 +511,12 @@ export async function listClientTickets(
   const scope =
     lifecycle === "DRAFT"
       ? "t.created_by = ?"
-      : "p.client_id = ? AND p.lifecycle = 'OPEN'";
-  params.push(lifecycle === "DRAFT" ? user.id : context.clientId);
+      : "((p.client_id = ? AND p.lifecycle = 'OPEN') OR t.created_by = ?)";
+  if (lifecycle === "DRAFT") {
+    params.push(user.id);
+  } else {
+    params.push(context.clientId, user.id);
+  }
 
   const [rows] = await db.query<TicketRow[]>(
     `
@@ -567,6 +580,7 @@ export async function getClientTicketAccess(
     databaseId: row.database_id,
     ticketId: row.ticket_id,
     lifecycle: row.lifecycle,
+    title: row.title,
     createdBy: row.created_by,
     assignedTo: row.assigned_to,
     projectId: row.project_id,
@@ -574,6 +588,50 @@ export async function getClientTicketAccess(
     status: row.status,
     formData: parseJson<Record<string, unknown>>(row.form_data, {}),
   };
+}
+
+function storedPortalComment(item: unknown, index: number): ClientPortalComment | null {
+  const row = item && typeof item === "object" && !Array.isArray(item)
+    ? (item as Record<string, unknown>)
+    : {};
+  const content = typeof row.content === "string"
+    ? row.content
+    : typeof row.text === "string"
+      ? row.text
+      : "";
+  if (!content.trim()) return null;
+
+  return {
+    id: String(row.id ?? `stored-comment-${index}`),
+    userId: typeof row.userId === "number" ? row.userId : Number(row.userId) || null,
+    user: typeof row.user === "string" ? row.user : typeof row.name === "string" ? row.name : "Support",
+    avatar: typeof row.avatar === "string" ? row.avatar : null,
+    attachments: stringArray(row.attachments),
+    content,
+    createdAt: typeof row.createdAt === "string" ? row.createdAt : typeof row.time === "string" ? row.time : "",
+  };
+}
+
+function portalCommentSignature(comment: { userId?: number | null; user?: string; content?: string }) {
+  return [
+    comment.userId ?? "",
+    (comment.user ?? "").trim().toLowerCase(),
+    (comment.content ?? "").trim(),
+  ].join("|");
+}
+
+function mergePortalComments<T extends { id: string; userId?: number | null; user?: string; content?: string }>(primary: T[], fallback: T[]) {
+  const seen = new Set<string>();
+  const merged: T[] = [];
+
+  for (const comment of [...primary, ...fallback]) {
+    const signature = portalCommentSignature(comment);
+    if (seen.has(signature)) continue;
+    seen.add(signature);
+    merged.push(comment);
+  }
+
+  return merged;
 }
 
 async function publicComments(databaseTicketId: number): Promise<ClientPortalComment[]> {
@@ -659,11 +717,18 @@ export async function findClientTicket(user: ClientPortalSessionUser, ticketId: 
   );
   if (!rows[0]) return undefined;
   const attachments = await ticketAttachments([ticketId]);
-  const [comments, activities] = await Promise.all([
+  const [tableComments, activities] = await Promise.all([
     publicComments(access.databaseId),
     ticketActivities(access.databaseId),
   ]);
   const ticket = mapTicket(rows[0], attachments.get(ticketId) ?? []);
+  const formData = parseJson<Record<string, unknown>>(rows[0].form_data, {});
+  const storedComments = Array.isArray(formData.comments)
+    ? formData.comments
+        .map((item, index) => storedPortalComment(item, index))
+        .filter((item): item is ClientPortalComment => Boolean(item))
+    : [];
+  const comments = mergePortalComments(tableComments, storedComments);
   const own = access.createdBy === user.id;
   const workNotStarted = ["Open", "Reviewed"].includes(access.status);
   ticket.comments = comments;
@@ -722,11 +787,12 @@ export async function canClientAccessTicketAttachment(
       created_by: number | null;
       lifecycle: ClientTicketLifecycle;
       client_id: number | null;
+      project_lifecycle: string | null;
     })[]
   >(
     `
       SELECT ta.attachment_id, ta.file_name, ta.mime_type, ta.size_bytes, ta.content,
-             t.created_by, t.lifecycle, p.client_id
+             t.created_by, t.lifecycle, p.client_id, p.lifecycle AS project_lifecycle
       FROM ticket_attachments ta
       JOIN tickets t ON t.ticket_id = ta.ticket_id
       LEFT JOIN projects p ON p.id = t.project_id

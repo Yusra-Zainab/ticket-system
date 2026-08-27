@@ -71,8 +71,6 @@ export async function POST(request: Request) {
       }
       projectId = parsed;
     }
-    if (values.lifecycle === "OPEN" && !projectId) return Response.json({ error: "Select an assigned project." }, { status: 400 });
-    if (values.lifecycle === "OPEN" && !values.title.trim()) return Response.json({ error: "Ticket title is required." }, { status: 400 });
 
     const ticketId = values.id || randomUUID();
     const existing = values.id ? await getResourceTicketAccess(user, values.id) : null;

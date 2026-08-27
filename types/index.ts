@@ -206,12 +206,27 @@ export interface TicketAttachment {
   uploadedAt: string;
 }
 
+export type TicketCommentRecord = {
+  id: string;
+  userId?: number | null;
+  user: string;
+  avatar?: string | null;
+  time: string;
+  text: string;
+  attachments?: string[];
+};
+
 export type TicketFormData = Record<string, unknown> & {
   attachments?: TicketAttachment[];
+  titleHistory?: string[];
+  activity?: string[];
+  comments?: TicketCommentRecord[];
 };
 
 export interface Ticket {
   id: string;
+
+  createdById?: number | null;
 
   title: string;
 
@@ -242,6 +257,20 @@ export interface Ticket {
    PROJECTS
    ========================================================= */
 
+export interface ProjectSubModuleDefinition {
+  id: string;
+
+  name: string;
+}
+
+export interface ProjectModuleDefinition {
+  id: string;
+
+  name: string;
+
+  subModules: ProjectSubModuleDefinition[];
+}
+
 export interface ProjectTeamMember {
   id: string;
 
@@ -270,6 +299,8 @@ export type ProjectFormData = Record<string, unknown> & {
   subModule?: string;
 
   moduleOwnerId?: string;
+
+  modules?: ProjectModuleDefinition[];
 
   links?: {
     staging?: string;

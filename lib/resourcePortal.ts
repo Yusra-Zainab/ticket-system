@@ -3,6 +3,7 @@ import "server-only";
 import type { RowDataPacket } from "mysql2/promise";
 
 import { db } from "@/lib/db";
+import { normalizeProjectModules } from "@/lib/projectModules";
 import type {
   ResourcePortalActivity,
   ResourcePortalComment,
@@ -30,6 +31,7 @@ export type ResourceTicketAccess = {
   databaseId: number;
   ticketId: string;
   lifecycle: ResourceTicketLifecycle;
+  title: string;
   createdBy: number | null;
   assignedTo: number | null;
   projectId: number | null;
@@ -192,6 +194,11 @@ function safeProjectData(data: Record<string, unknown>) {
   return {
     moduleName: String(data.moduleName ?? ""),
     subModule: String(data.subModule ?? ""),
+    modules: normalizeProjectModules({
+      modules: Array.isArray(data.modules) ? data.modules : [],
+      moduleName: String(data.moduleName ?? ""),
+      subModule: String(data.subModule ?? ""),
+    }),
     links: {
       staging: typeof links.staging === "string" ? links.staging : undefined,
       live: typeof links.live === "string" ? links.live : undefined,
@@ -208,7 +215,7 @@ export async function listResourceProjects(user: ResourcePortalSessionUser) {
     `
       SELECT
         p.id, p.name, p.description, p.status, p.priority_type, p.progress,
-        p.due_date, p.updated_at, ${formDataSelect} AS form_data,
+        p.due_date, p.start_date, p.updated_at, ${formDataSelect} AS form_data,
         c.name AS client_name, c.company,
         SUM(CASE WHEN t.lifecycle = 'OPEN' AND t.status NOT IN ('Closed','Cancelled') THEN 1 ELSE 0 END) AS open_tickets
       FROM project_resources pr
@@ -240,6 +247,7 @@ export async function listResourceProjects(user: ResourcePortalSessionUser) {
       priority: row.priority_type || String(data.priority ?? "Not Assigned"),
       progress: Number(row.progress ?? 0),
       dueDate: row.due_date || "",
+      startDate: row.start_date || "",
       updatedAt: row.updated_at,
       openTickets: Number(row.open_tickets ?? 0),
       team: Array.from(
@@ -356,6 +364,7 @@ function mapTicket(row: TicketRow, attachments: ResourcePortalTicketAttachment[]
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     dueDate: row.deadline || "",
+    titleHistory: Array.isArray(data.titleHistory) ? data.titleHistory.filter((item): item is string => typeof item === "string" && item.trim().length > 0) : [],
     links: stringArray(data.urls),
     attachments,
   };
@@ -365,11 +374,8 @@ export async function listResourceTickets(
   user: ResourcePortalSessionUser,
   lifecycle: ResourceTicketLifecycle,
 ) {
-  const scope = lifecycle === "DRAFT" ? "t.created_by = ?" : "pr.user_id = ?";
-  const joins =
-    lifecycle === "DRAFT"
-      ? "LEFT JOIN project_resources pr ON pr.project_id = t.project_id AND pr.user_id = ?"
-      : "JOIN project_resources pr ON pr.project_id = t.project_id";
+  const scope = lifecycle === "DRAFT" ? "t.created_by = ?" : "(pr.user_id = ? OR t.created_by = ?)";
+  const joins = "LEFT JOIN project_resources pr ON pr.project_id = t.project_id AND pr.user_id = ?";
   const projectFormData = await projectFormDataSelect();
 
 
@@ -386,11 +392,11 @@ export async function listResourceTickets(
       ${joins}
       LEFT JOIN users creator ON creator.id = t.created_by
       LEFT JOIN users assignee ON assignee.id = t.assigned_to
-      WHERE t.lifecycle = ? AND (${scope}) ${lifecycle === "OPEN" ? "AND p.lifecycle = 'OPEN'" : ""}
+      WHERE t.lifecycle = ? AND (${scope}) ${lifecycle === "OPEN" ? "AND (p.lifecycle = 'OPEN' OR t.project_id IS NULL)" : ""}
       GROUP BY t.id
       ORDER BY t.updated_at DESC
     `,
-    lifecycle === "DRAFT" ? [user.id, lifecycle, user.id] : [lifecycle, user.id],
+    lifecycle === "DRAFT" ? [user.id, lifecycle, user.id] : [user.id, lifecycle, user.id, user.id],
   );
 
   const attachments = await ticketAttachments(rows.map((row) => row.ticket_id));
@@ -440,6 +446,7 @@ export async function getResourceTicketAccess(
     databaseId: row.database_id,
     ticketId: row.ticket_id,
     lifecycle: row.lifecycle,
+    title: row.title,
     createdBy: row.created_by,
     assignedTo: row.assigned_to,
     projectId: row.project_id,
@@ -447,6 +454,50 @@ export async function getResourceTicketAccess(
     formData: parseJson<Record<string, unknown>>(row.form_data, {}),
     allowSelfAssign: projectData.allowResourceSelfAssign === true,
   };
+}
+
+function storedPortalComment(item: unknown, index: number): ResourcePortalComment | null {
+  const row = item && typeof item === "object" && !Array.isArray(item)
+    ? (item as Record<string, unknown>)
+    : {};
+  const content = typeof row.content === "string"
+    ? row.content
+    : typeof row.text === "string"
+      ? row.text
+      : "";
+  if (!content.trim()) return null;
+
+  return {
+    id: String(row.id ?? `stored-comment-${index}`),
+    userId: typeof row.userId === "number" ? row.userId : Number(row.userId) || null,
+    user: typeof row.user === "string" ? row.user : typeof row.name === "string" ? row.name : "Support",
+    avatar: typeof row.avatar === "string" ? row.avatar : null,
+    attachments: stringArray(row.attachments),
+    content,
+    createdAt: typeof row.createdAt === "string" ? row.createdAt : typeof row.time === "string" ? row.time : "",
+  };
+}
+
+function portalCommentSignature(comment: { userId?: number | null; user?: string; content?: string }) {
+  return [
+    comment.userId ?? "",
+    (comment.user ?? "").trim().toLowerCase(),
+    (comment.content ?? "").trim(),
+  ].join("|");
+}
+
+function mergePortalComments<T extends { id: string; userId?: number | null; user?: string; content?: string }>(primary: T[], fallback: T[]) {
+  const seen = new Set<string>();
+  const merged: T[] = [];
+
+  for (const comment of [...primary, ...fallback]) {
+    const signature = portalCommentSignature(comment);
+    if (seen.has(signature)) continue;
+    seen.add(signature);
+    merged.push(comment);
+  }
+
+  return merged;
 }
 
 async function comments(databaseTicketId: number): Promise<ResourcePortalComment[]> {
@@ -531,11 +582,18 @@ export async function findResourceTicket(user: ResourcePortalSessionUser, ticket
   );
   if (!rows[0]) return undefined;
   const attachments = await ticketAttachments([ticketId]);
-  const [ticketComments, activities] = await Promise.all([
+  const [tableComments, activities] = await Promise.all([
     comments(access.databaseId),
     ticketActivities(access.databaseId),
   ]);
   const ticket = mapTicket(rows[0], attachments.get(ticketId) ?? []);
+  const formData = parseJson<Record<string, unknown>>(rows[0].form_data, {});
+  const storedComments = Array.isArray(formData.comments)
+    ? formData.comments
+        .map((item, index) => storedPortalComment(item, index))
+        .filter((item): item is ResourcePortalComment => Boolean(item))
+    : [];
+  const ticketComments = mergePortalComments(tableComments, storedComments);
   const ownsOrAssigned = access.createdBy === user.id || access.assignedTo === user.id;
   ticket.comments = ticketComments;
   ticket.activities = activities;

@@ -232,7 +232,7 @@ export default function FloatingActionBar({
             router.push("/login");
             router.refresh();
           }}
-          className="dock-action"
+          className="dock-action-logout"
         >
           <LogOut size={22} />
         </button>

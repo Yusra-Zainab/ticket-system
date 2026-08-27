@@ -27,10 +27,26 @@ const projectPriority = z.enum([
   "Not Assigned",
 ]);
 
+const moduleDefinitionSchema = z.object({
+  id: z.string().max(255),
+  name: z.string().max(255),
+  subModules: z.array(
+    z.object({
+      id: z.string().max(255),
+      name: z.string().max(255),
+    }),
+  ).default([]),
+});
+
+const clientIdSchema = z.preprocess(
+  (value) => (value === "" || value === null ? null : value),
+  z.union([z.coerce.number().int().positive(), z.null()]),
+);
+
 const projectSchema = z.object({
   name: z.string().max(255).default(""),
   description: z.string().max(10000).default(""),
-  clientId: z.coerce.number().int().positive().nullable().optional(),
+  clientId: clientIdSchema.optional(),
   client: z.string().max(255).optional(),
   projectType: z.string().max(255).default(""),
   status: projectStatus.default("Not Started"),
@@ -45,6 +61,7 @@ const projectSchema = z.object({
   moduleName: z.string().max(255).default(""),
   subModule: z.string().max(255).default(""),
   moduleOwnerId: z.string().nullable().optional(),
+  modules: z.array(moduleDefinitionSchema).default([]),
   links: z
     .object({
       staging: z.string().default(""),
@@ -98,21 +115,6 @@ export async function POST(request: Request) {
     const { project, state } = bodySchema.parse(await request.json());
     const lifecycle = state === "draft" ? "DRAFT" : "OPEN";
 
-    if (lifecycle === "OPEN") {
-      if (project.name.trim().length < 3) {
-        return Response.json(
-          { error: "Project name must be at least 3 characters." },
-          { status: 400 },
-        );
-      }
-      if (!project.clientId && !project.client) {
-        return Response.json(
-          { error: "A client is required before registering the project." },
-          { status: 400 },
-        );
-      }
-    }
-
     const clientId = await resolveClientId(project.clientId, project.client);
 
     const safeName =
@@ -128,6 +130,7 @@ export async function POST(request: Request) {
       moduleName: project.moduleName,
       subModule: project.subModule,
       moduleOwnerId: project.moduleOwnerId ?? "",
+      modules: project.modules,
       links: project.links,
       internalNotes: project.internalNotes,
       priority: project.priority,

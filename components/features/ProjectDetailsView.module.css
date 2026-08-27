@@ -1,0 +1,970 @@
+.root {
+  width: 100%;
+  min-width: 0;
+}
+
+
+/* =========================================================
+   TAB CONTENT HEADER
+   ========================================================= */
+
+.tabPanel {
+  width: 100%;
+  min-width: 0;
+  padding-top: 4px;
+}
+
+.tabHeading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+
+  gap: 24px;
+
+  margin-bottom: 20px;
+}
+
+.tabHeading h2 {
+  margin: 0;
+
+  color: #101828;
+
+  font-family:
+    Geist,
+    Inter,
+    Arial,
+    sans-serif;
+
+  font-size: 20px;
+  font-weight: 650;
+  line-height: 28px;
+}
+
+.tabHeading p {
+  max-width: 760px;
+
+  margin: 4px 0 0;
+
+  color: #667085;
+
+  font-family:
+    Geist,
+    Inter,
+    Arial,
+    sans-serif;
+
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 21px;
+}
+
+
+/* =========================================================
+   MODULE SUMMARY
+   ========================================================= */
+
+.moduleSummary {
+  display: inline-flex;
+
+  flex: 0 0 auto;
+
+  align-items: center;
+
+  gap: 14px;
+
+  padding: 9px 12px;
+
+  border: 1px solid #eaecf0;
+
+  border-radius: 10px;
+
+  background: #ffffff;
+
+  box-shadow:
+    0 1px 2px
+    rgba(
+      16,
+      24,
+      40,
+      0.04
+    );
+}
+
+.summaryStat {
+  display: flex;
+
+  align-items: baseline;
+
+  gap: 5px;
+
+  white-space: nowrap;
+}
+
+.summaryValue {
+  color: #101828;
+
+  font-family:
+    Geist,
+    Inter,
+    Arial,
+    sans-serif;
+
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 20px;
+}
+
+.summaryLabel {
+  color: #667085;
+
+  font-family:
+    Geist,
+    Inter,
+    Arial,
+    sans-serif;
+
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 18px;
+}
+
+.summaryDivider {
+  width: 1px;
+
+  height: 18px;
+
+  flex: 0 0 auto;
+
+  background: #eaecf0;
+}
+
+
+/* =========================================================
+   MODULE TABLE
+
+   IMPORTANT:
+   These are DIRECT CSS MODULE selectors.
+
+   No :global().
+   No globals.css dependency.
+   ========================================================= */
+
+.tableFrame {
+  width: 100%;
+
+  min-width: 0;
+
+  overflow: hidden;
+
+  border: 1px solid #eaecf0;
+
+  border-radius: 12px;
+
+  background: #ffffff;
+
+  box-shadow:
+    0 1px 2px
+    rgba(
+      16,
+      24,
+      40,
+      0.05
+    );
+}
+
+.tableFrameCompact {
+  margin-top: 8px;
+}
+
+.tableScroll {
+  width: 100%;
+
+  overflow-x: auto;
+}
+
+.moduleTable {
+  width: 100%;
+
+  min-width: 900px;
+
+  table-layout: fixed;
+
+  border-collapse: separate;
+
+  border-spacing: 0;
+
+  background: #ffffff;
+
+  font-family:
+    Geist,
+    Inter,
+    Arial,
+    sans-serif;
+}
+
+
+/* Column sizes */
+
+.moduleColumn {
+  width: 38%;
+}
+
+.subModuleColumn {
+  width: 34%;
+}
+
+.openTicketsColumn {
+  width: 14%;
+}
+
+.statusColumn {
+  width: 14%;
+}
+
+
+/* Header */
+
+.moduleTable thead {
+  background: #f9fafb;
+}
+
+.moduleTable th {
+  height: 44px;
+
+  padding: 12px 16px;
+
+  border-bottom:
+    1px solid
+    #eaecf0;
+
+  color: #475467;
+
+  font-size: 12px;
+
+  font-weight: 600;
+
+  line-height: 18px;
+
+  text-align: left;
+
+  vertical-align: middle;
+
+  white-space: nowrap;
+}
+
+.moduleTable th:first-child {
+  padding-left: 32px;
+}
+
+.moduleTable th:nth-child(3),
+.moduleTable th:nth-child(4) {
+  text-align: center;
+}
+
+
+/* Rows */
+
+.moduleTable td {
+  height: 72px;
+
+  padding: 16px;
+
+  border-bottom:
+    1px solid
+    #eaecf0;
+
+  color: #667085;
+
+  font-size: 14px;
+
+  font-weight: 400;
+
+  line-height: 20px;
+
+  text-align: left;
+
+  vertical-align: middle;
+}
+
+.moduleTable td:first-child {
+  padding-left: 32px;
+}
+
+.moduleTable tbody tr:nth-child(odd) {
+  background: #ffffff;
+}
+
+.moduleTable tbody tr:nth-child(even) {
+  background: #f2f4f7;
+}
+
+.moduleTable tbody tr:hover {
+  background: #f8fafc;
+}
+
+.moduleTable tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+
+/* Module text */
+
+.moduleName,
+.subModuleName {
+  display: block;
+
+  overflow: hidden;
+
+  text-overflow: ellipsis;
+
+  white-space: nowrap;
+}
+
+.moduleName {
+  color: #101828;
+
+  font-weight: 600;
+}
+
+.subModuleName {
+  color: #475467;
+
+  font-weight: 500;
+}
+
+.centerCell {
+  text-align: center !important;
+}
+
+
+/* Open ticket number */
+
+.openTicketValue {
+  display: inline-flex;
+
+  min-width: 36px;
+
+  height: 28px;
+
+  align-items: center;
+
+  justify-content: center;
+
+  padding: 0 9px;
+
+  border: 1px solid #d0d5dd;
+
+  border-radius: 8px;
+
+  background: #ffffff;
+
+  color: #344054;
+
+  font-size: 13px;
+
+  font-weight: 650;
+
+  line-height: 18px;
+
+  box-shadow:
+    0 1px 2px
+    rgba(
+      16,
+      24,
+      40,
+      0.03
+    );
+}
+
+
+/* Status */
+
+.moduleStatus {
+  display: inline-flex;
+
+  min-width: 84px;
+
+  height: 24px;
+
+  align-items: center;
+
+  justify-content: center;
+
+  gap: 6px;
+
+  padding: 2px 10px;
+
+  border: 1px solid;
+
+  border-radius: 16px;
+
+  font-size: 12px;
+
+  font-weight: 600;
+
+  line-height: 18px;
+
+  white-space: nowrap;
+}
+
+.moduleStatusDot {
+  width: 6px;
+
+  height: 6px;
+
+  flex: 0 0 auto;
+
+  border-radius: 999px;
+
+  background: currentColor;
+}
+
+.moduleStatusActive {
+  border-color: #abefc6;
+
+  background: #ecfdf3;
+
+  color: #067647;
+}
+
+.moduleStatusInactive {
+  border-color: #d0d5dd;
+
+  background: #f9fafb;
+
+  color: #475467;
+}
+
+.emptyCell {
+  height: 118px !important;
+
+  padding: 28px !important;
+
+  color: #98a2b3 !important;
+
+  font-size: 14px !important;
+
+  font-weight: 400 !important;
+
+  text-align: center !important;
+}
+
+
+/* =========================================================
+   TIMELINE SUMMARY
+   ========================================================= */
+
+.timelineSummary {
+  display: inline-flex;
+
+  flex: 0 0 auto;
+
+  align-items: baseline;
+
+  gap: 5px;
+
+  padding: 8px 12px;
+
+  border: 1px solid #eaecf0;
+
+  border-radius: 9px;
+
+  background: #ffffff;
+}
+
+.timelineSummary span {
+  color: #101828;
+
+  font-size: 15px;
+
+  font-weight: 700;
+}
+
+.timelineSummary small {
+  color: #667085;
+
+  font-size: 12px;
+
+  font-weight: 500;
+}
+
+
+/* =========================================================
+   TIMELINE FRAME
+   ========================================================= */
+
+.timelineFrame {
+  width: 100%;
+
+  min-width: 0;
+
+  overflow: hidden;
+
+  border: 1px solid #eaecf0;
+
+  border-radius: 12px;
+
+  background: #ffffff;
+
+  box-shadow:
+    0 1px 2px
+    rgba(
+      16,
+      24,
+      40,
+      0.05
+    );
+}
+
+
+/* =========================================================
+   TIMELINE ROW
+   ========================================================= */
+
+.timelineRow {
+  position: relative;
+
+  display: grid;
+
+  grid-template-columns:
+    minmax(
+      135px,
+      170px
+    )
+    30px
+    minmax(
+      0,
+      1fr
+    );
+
+  gap: 18px;
+
+  min-height: 112px;
+
+  padding: 22px 28px;
+
+  border-bottom:
+    1px solid
+    #eaecf0;
+
+  background: #ffffff;
+}
+
+.timelineRow:nth-child(even) {
+  background: #fcfcfd;
+}
+
+.timelineRow:last-child {
+  border-bottom: 0;
+}
+
+
+/* =========================================================
+   DATE
+   ========================================================= */
+
+.timelineDateColumn {
+  padding-top: 1px;
+}
+
+.timelineDate {
+  display: block;
+
+  color: #475467;
+
+  font-family:
+    Geist,
+    Inter,
+    Arial,
+    sans-serif;
+
+  font-size: 13px;
+
+  font-weight: 600;
+
+  line-height: 20px;
+}
+
+
+/* =========================================================
+   RAIL
+   ========================================================= */
+
+.timelineMarkerColumn {
+  position: relative;
+
+  display: flex;
+
+  justify-content: center;
+}
+
+.timelineMarker {
+  position: relative;
+
+  z-index: 2;
+
+  width: 12px;
+
+  height: 12px;
+
+  margin-top: 5px;
+
+  border: 3px solid #ffffff;
+
+  border-radius: 999px;
+}
+
+.timelineMarkerProject {
+  background: #0284c7;
+
+  box-shadow:
+    0
+    0
+    0
+    3px
+    #e6f8fb;
+}
+
+.timelineMarkerTicket {
+  background: #7f56d9;
+
+  box-shadow:
+    0
+    0
+    0
+    3px
+    #f4ebff;
+}
+
+.timelineMarkerDeadline {
+  background: #dc6803;
+
+  box-shadow:
+    0
+    0
+    0
+    3px
+    #fef0c7;
+}
+
+.timelineLine {
+  position: absolute;
+
+  z-index: 1;
+
+  top: 20px;
+
+  bottom: -42px;
+
+  left: 50%;
+
+  width: 1px;
+
+  background: #d0d5dd;
+
+  transform:
+    translateX(
+      -50%
+    );
+}
+
+
+/* =========================================================
+   TIMELINE BODY
+   ========================================================= */
+
+.timelineBody {
+  min-width: 0;
+}
+
+.timelineTagRow {
+  display: flex;
+
+  flex-wrap: wrap;
+
+  align-items: center;
+
+  gap: 8px;
+
+  margin-bottom: 10px;
+}
+
+
+/* =========================================================
+   TAG BASE
+   ========================================================= */
+
+.timelineKindTag,
+.timelineStatusTag {
+  display: inline-flex;
+
+  min-height: 24px;
+
+  align-items: center;
+
+  justify-content: center;
+
+  padding: 2px 9px;
+
+  border: 1px solid;
+
+  border-radius: 16px;
+
+  font-family:
+    Geist,
+    Inter,
+    Arial,
+    sans-serif;
+
+  font-size: 12px;
+
+  font-weight: 600;
+
+  line-height: 18px;
+
+  white-space: nowrap;
+}
+
+
+/* Event type tags */
+
+.timelineKindProject {
+  border-color: #b2e8f2;
+
+  background: #e6f8fb;
+
+  color: #0284c7;
+}
+
+.timelineKindTicket {
+  border-color: #d6bbfb;
+
+  background: #f9f5ff;
+
+  color: #6941c6;
+}
+
+.timelineKindDeadline {
+  border-color: #fedf89;
+
+  background: #fffaeb;
+
+  color: #b54708;
+}
+
+
+/* Status tags */
+
+.timelineStatusSuccess {
+  border-color: #abefc6;
+
+  background: #ecfdf3;
+
+  color: #067647;
+}
+
+.timelineStatusDanger {
+  border-color: #fecdca;
+
+  background: #fef3f2;
+
+  color: #b42318;
+}
+
+.timelineStatusInfo {
+  border-color: #b2ddff;
+
+  background: #eff8ff;
+
+  color: #175cd3;
+}
+
+.timelineStatusNeutral {
+  border-color: #eaecf0;
+
+  background: #f9fafb;
+
+  color: #344054;
+}
+
+
+/* =========================================================
+   TITLE / META
+   ========================================================= */
+
+.timelineTitle {
+  color: #101828;
+
+  font-family:
+    Geist,
+    Inter,
+    Arial,
+    sans-serif;
+
+  font-size: 15px;
+
+  font-weight: 650;
+
+  line-height: 22px;
+}
+
+.timelineLink {
+  color: #101828;
+
+  text-decoration: none;
+
+  transition:
+    color
+    120ms
+    ease;
+}
+
+.timelineLink:hover {
+  color: #0284c7;
+}
+
+.timelineMeta {
+  display: flex;
+
+  flex-wrap: wrap;
+
+  align-items: center;
+
+  gap: 5px;
+
+  margin-top: 7px;
+
+  color: #667085;
+
+  font-family:
+    Geist,
+    Inter,
+    Arial,
+    sans-serif;
+
+  font-size: 13px;
+
+  font-weight: 400;
+
+  line-height: 20px;
+}
+
+.timelineMetaLabel {
+  color: #98a2b3;
+}
+
+.timelineUser {
+  color: #475467;
+
+  font-weight: 600;
+}
+
+.timelineEmpty {
+  padding: 56px 24px;
+
+  color: #98a2b3;
+
+  font-family:
+    Geist,
+    Inter,
+    Arial,
+    sans-serif;
+
+  font-size: 14px;
+
+  line-height: 20px;
+
+  text-align: center;
+}
+
+
+/* =========================================================
+   RESPONSIVE
+   ========================================================= */
+
+@media (
+  max-width: 900px
+) {
+  .tabHeading {
+    align-items: flex-start;
+
+    flex-direction: column;
+  }
+
+  .moduleSummary {
+    width: 100%;
+
+    justify-content: space-between;
+  }
+
+  .timelineRow {
+    grid-template-columns:
+      120px
+      24px
+      minmax(
+        0,
+        1fr
+      );
+
+    gap: 12px;
+
+    padding: 20px 18px;
+  }
+}
+
+@media (
+  max-width: 640px
+) {
+  .moduleSummary {
+    overflow-x: auto;
+  }
+
+  .summaryStat {
+    min-width: max-content;
+
+    flex-direction: column;
+
+    gap: 0;
+  }
+
+  .summaryDivider {
+    height: 34px;
+  }
+
+  .timelineRow {
+    grid-template-columns:
+      24px
+      minmax(
+        0,
+        1fr
+      );
+
+    gap: 12px;
+
+    min-height: 124px;
+
+    padding: 18px 16px;
+  }
+
+  .timelineDateColumn {
+    grid-column: 2;
+
+    grid-row: 1;
+
+    padding: 0;
+  }
+
+  .timelineMarkerColumn {
+    grid-column: 1;
+
+    grid-row:
+      1 /
+      span 2;
+  }
+
+  .timelineBody {
+    grid-column: 2;
+
+    grid-row: 2;
+  }
+}

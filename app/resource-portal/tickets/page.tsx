@@ -1,113 +1,89 @@
-import ResourcePageHeader from "@/components/resource-portal/ResourcePageHeader";
-import ResourceTicketList from "@/components/resource-portal/ResourceTicketList";
+import { Plus } from "lucide-react";
+
+import TicketsTable from "@/components/features/TicketsTable";
+import PageHeader from "@/components/ui/PageHeader";
+
 import { requireResourcePageSession } from "@/lib/auth";
+import { getRolePermissions } from "@/lib/db";
+
 import { listResourceTickets } from "@/lib/resourcePortal";
+
+import { getTicketListMeta } from "@/lib/ticketListMeta";
+
+import type { TicketListRow } from "@/types/ticketList";
 
 export const dynamic = "force-dynamic";
 
 export default async function ResourceTicketsPage() {
   const user = await requireResourcePageSession();
-  const tickets = await listResourceTickets(user, "OPEN");
+
+  /*
+   * Keep the existing resource authorization
+   * and assigned-project scoping.
+   */
+  const [tickets, permissions] = await Promise.all([
+    listResourceTickets(user, "OPEN"),
+    getRolePermissions(user.role),
+  ]);
+
+  const canViewTickets = permissions.includes("View Tickets");
+  const canCreateTickets = permissions.includes("Create Tickets");
+
+  const meta = await getTicketListMeta(tickets.map((ticket) => ticket.id));
+
+  const rows: TicketListRow[] = tickets.map((ticket) => {
+    const stored = meta.get(ticket.id);
+
+    return {
+      id: ticket.id,
+
+      title: ticket.title,
+
+      type: ticket.type || "Task",
+
+      priorityType: stored?.priorityType ?? ticket.priority,
+
+      priorityNumber: stored?.priorityNumber ?? 1,
+
+      project: ticket.project,
+
+      createdBy: ticket.reporter,
+
+      createdById: stored?.createdById ?? "",
+
+      assignedTo: ticket.assignee || "Unassigned",
+
+      createdAt: stored?.createdAt ?? ticket.createdAt,
+
+      updatedAt: stored?.updatedAt ?? ticket.updatedAt,
+
+      dueDate: stored?.dueDate ?? ticket.dueDate,
+
+      status: ticket.status,
+
+          history:
+            ticket.titleHistory,
+    };
+  });
 
   return (
-    <div className="resource-admin-ticket-page">
-      <style>{ticketPageStyles}</style>
-      <ResourcePageHeader
+    <div className="space-y-7 px-14 pb-8 pt-4">
+      <PageHeader
         title="Tickets List"
-        crumbs={[{ label: "Tickets" }]}
-        actionLabel="Create a New Ticket"
-        actionHref="/resource-portal/tickets/new"
+        action={canCreateTickets ? "Create a New Ticket" : undefined}
+        actionHref={canCreateTickets ? "/resource-portal/tickets/new" : undefined}
+        actionIcon={Plus}
       />
-      <ResourceTicketList tickets={tickets} />
+
+      {canViewTickets ? (
+        <TicketsTable
+          initialTickets={rows}
+          currentUserId={String(user.id)}
+          portal="resource"
+          detailBaseHref="/resource-portal/tickets"
+          now={Date.now()}
+        />
+      ) : null}
     </div>
   );
 }
-
-const ticketPageStyles = `
-  .resource-admin-ticket-page {
-    width: 100%;
-    min-width: 0;
-    padding: 0 32px 32px;
-  }
-
-  .resource-admin-ticket-page .resource-page-header {
-    position: sticky;
-    top: 0;
-    z-index: 30;
-    margin: 0 -12px 28px;
-    border-bottom: 1px solid #f1f5f9;
-    background: rgba(255, 255, 255, 0.95);
-    padding: 12px;
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-  }
-
-  .resource-admin-ticket-page .resource-page-header-container,
-  .resource-admin-ticket-page .resource-page-header-inner {
-    width: 100%;
-  }
-
-  .resource-admin-ticket-page .resource-page-title-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 20px;
-  }
-
-  .resource-admin-ticket-page .resource-page-title-copy {
-    min-width: 0;
-  }
-
-  .resource-admin-ticket-page .resource-page-title-copy h1 {
-    margin: 0;
-    color: #020617;
-    font-family: Satoshi, Geist, Arial, sans-serif;
-    font-size: clamp(32px, 3vw, 38px);
-    font-weight: 700;
-    line-height: 1.12;
-    letter-spacing: -0.025em;
-  }
-
-  .resource-admin-ticket-page .resource-page-supporting-text {
-    margin-top: 6px;
-    color: #64748b;
-    font-size: 14px;
-  }
-
-  .resource-admin-ticket-page .resource-page-primary-action {
-    display: inline-flex;
-    min-height: 44px;
-    flex: 0 0 auto;
-    align-items: center;
-    justify-content: center;
-    gap: 9px;
-    border-radius: 10px;
-    background: linear-gradient(105deg, #078dcc, #20c9d8);
-    padding: 10px 16px;
-    color: #ffffff;
-    font-size: 14px;
-    font-weight: 700;
-    text-decoration: none;
-    box-shadow: 0 4px 10px rgba(14, 165, 233, 0.16);
-  }
-
-  .resource-admin-ticket-page .resource-page-primary-action:hover {
-    filter: brightness(0.96);
-    transform: translateY(-1px);
-  }
-
-  @media (max-width: 760px) {
-    .resource-admin-ticket-page {
-      padding: 0 16px 24px;
-    }
-
-    .resource-admin-ticket-page .resource-page-title-row {
-      align-items: flex-start;
-      flex-direction: column;
-    }
-
-    .resource-admin-ticket-page .resource-page-primary-action {
-      width: 100%;
-    }
-  }
-`;

@@ -23,11 +23,27 @@ const prioritySchema = z.enum([
   "Not Assigned",
 ]);
 
+const moduleDefinitionSchema = z.object({
+  id: z.string().max(255),
+  name: z.string().max(255),
+  subModules: z.array(
+    z.object({
+      id: z.string().max(255),
+      name: z.string().max(255),
+    }),
+  ).default([]),
+});
+
+const clientIdSchema = z.preprocess(
+  (value) => (value === "" || value === null ? null : value),
+  z.union([z.coerce.number().int().positive(), z.null()]),
+);
+
 const patchSchema = z.object({
   lifecycle: z.enum(["DRAFT", "OPEN"]).optional(),
-  name: z.string().min(1).max(255).optional(),
+  name: z.string().max(255).optional(),
   description: z.string().max(10000).optional(),
-  clientId: z.coerce.number().int().positive().nullable().optional(),
+  clientId: clientIdSchema.optional(),
   status: statusSchema.optional(),
   priority: prioritySchema.optional(),
   progress: z.coerce.number().int().min(0).max(100).optional(),
@@ -41,6 +57,7 @@ const patchSchema = z.object({
   moduleName: z.string().max(255).optional(),
   subModule: z.string().max(255).optional(),
   moduleOwnerId: z.string().nullable().optional(),
+  modules: z.array(moduleDefinitionSchema).default([]),
   links: z
     .object({
       staging: z.string().default(""),
@@ -96,6 +113,9 @@ export async function PATCH(
     }
 
     const currentForm = current.formData ?? {};
+    const nextName = (values.name ?? current.name ?? "").trim();
+    const safeName = nextName || `Untitled project ${new Date().toISOString().slice(0, 10)}`;
+
     const formData = {
       ...currentForm,
       ...(values.priority !== undefined ? { priority: values.priority } : {}),
@@ -121,6 +141,9 @@ export async function PATCH(
       ...(values.moduleOwnerId !== undefined
         ? { moduleOwnerId: values.moduleOwnerId ?? "" }
         : {}),
+      ...(values.modules !== undefined
+        ? { modules: values.modules }
+        : {}),
       ...(values.links !== undefined ? { links: values.links } : {}),
       ...(values.internalNotes !== undefined
         ? { internalNotes: values.internalNotes }
@@ -139,7 +162,7 @@ export async function PATCH(
     };
 
     if (values.lifecycle !== undefined) add("lifecycle", values.lifecycle);
-    if (values.name !== undefined) add("name", values.name);
+    if (values.name !== undefined) add("name", safeName);
     if (values.description !== undefined)
       add("description", values.description);
     if (values.clientId !== undefined) add("client_id", values.clientId);
@@ -161,6 +184,7 @@ export async function PATCH(
       "moduleName",
       "subModule",
       "moduleOwnerId",
+      "modules",
       "links",
       "priority",
       "internalNotes",

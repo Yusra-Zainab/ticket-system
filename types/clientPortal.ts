@@ -59,6 +59,15 @@ export interface ClientPortalProjectMember {
   avatar?: string | null;
 }
 
+export interface ClientPortalProjectModule {
+  id: string;
+  name: string;
+  subModules: Array<{
+    id: string;
+    name: string;
+  }>;
+}
+
 export interface ClientPortalProject {
   id: string;
   name: string;
@@ -68,6 +77,7 @@ export interface ClientPortalProject {
   priority: string;
   progress: number;
   dueDate: string;
+  startDate: string;
   updatedAt: string;
   openTickets: number;
   criticalTickets: number;
@@ -77,6 +87,7 @@ export interface ClientPortalProject {
   files: ClientPortalProjectFile[];
   moduleName: string;
   subModule: string;
+  modules: ClientPortalProjectModule[];
   links: {
     staging?: string;
     live?: string;
@@ -99,6 +110,7 @@ export interface ClientPortalComment {
   userId?: number | null;
   user: string;
   avatar?: string | null;
+  attachments?: string[];
   content: string;
   createdAt: string;
 }
@@ -129,6 +141,7 @@ export interface ClientPortalTicket {
   createdAt: string;
   updatedAt: string;
   dueDate: string;
+  titleHistory: string[];
   links: string[];
   watcherIds: number[];
   attachments: ClientPortalTicketAttachment[];

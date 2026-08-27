@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 
-import ClientTicketDetail from "@/components/client-portal/ClientTicketDetail";
+import PortalTicketDetailsView from "@/components/features/PortalTicketDetailsView";
 import { requireClientPageSession } from "@/lib/auth";
 import { findClientTicket } from "@/lib/clientPortal";
 
@@ -15,9 +15,16 @@ export default async function ClientTicketDetailsPage({
   const { id } = await params;
   const ticket = await findClientTicket(user, id);
 
-  if (!ticket) {
-    notFound();
-  }
+  if (!ticket) notFound();
 
-  return <ClientTicketDetail ticket={ticket} currentUserId={user.id} />;
+  return (
+    <div className="px-5 pb-8 sm:px-8 lg:px-10">
+      <PortalTicketDetailsView
+        portal="client"
+        ticket={ticket}
+        currentUserId={String(user.id)}
+        currentUserName={user.name}
+      />
+    </div>
+  );
 }

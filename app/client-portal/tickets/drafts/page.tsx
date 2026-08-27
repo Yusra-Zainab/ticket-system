@@ -12,7 +12,7 @@ export default async function ClientTicketDraftsPage() {
   return (
     <div className="space-y-7">
       <PageHeader title="Ticket Drafts" />
-      <ClientTicketList tickets={drafts} drafts />
+      <ClientTicketList tickets={drafts} drafts currentUserId={user.id} />
     </div>
   );
 }

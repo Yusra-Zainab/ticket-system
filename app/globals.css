@@ -241,9 +241,36 @@ button:not(:disabled),
     transform 0.15s ease;
 }
 
+
+.dock-action-logout {
+  position: relative;
+
+  display: grid;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  place-items: center;
+
+  border: 0;
+  border-radius: 9999px;
+
+  background: transparent;
+  color: #0284c7;
+
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease,
+    transform 0.15s ease;
+}
+
 .dock-action:hover {
   background: #e6f8fb;
   color: #0284c7;
+}
+
+.dock-action-logout:hover {
+  background: #f1ecec;
+  color: red;
 }
 
 .dock-action:active {
@@ -9330,5 +9357,300 @@ input.field:-webkit-autofill,
 
   .admin-dashboard-health-card {
     width: 100%;
+  }
+}
+
+/* =========================================================
+   PROJECT DETAILS — SHARED ADMIN / CLIENT / RESOURCE
+   Matches the supplied Project Details design language.
+   ========================================================= */
+
+.project-details-view {
+  width: 100%;
+  min-width: 0;
+  color: #101828;
+  font-family: Geist, var(--font-inter), Inter, Arial, sans-serif;
+}
+
+.project-details-view *,
+.project-details-view *::before,
+.project-details-view *::after {
+  box-sizing: border-box;
+}
+
+.project-details-header {
+  width: 100%;
+}
+
+.project-details-view .project-action-outline {
+  min-height: 40px;
+  border: 1px solid #06b6d4;
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: #0284c7;
+  font-family: Geist, var(--font-inter), Inter, sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+.project-details-view .project-metrics-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  border-radius: 8px;
+  background: #06b6d4;
+  padding: 8px;
+}
+
+.project-details-view .project-metric-card {
+  display: flex;
+  min-width: 0;
+  min-height: 98px;
+  flex-direction: column;
+  justify-content: center;
+  border-radius: 12px;
+  background: #f8fafc;
+  padding: 16px 12px;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+}
+
+.project-metric-label {
+  margin: 0;
+  color: #475467;
+  font-family: Geist, var(--font-inter), Inter, sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+.project-metric-value {
+  width: 100%;
+  min-width: 0;
+  margin-top: 8px;
+  overflow: hidden;
+  color: #101828;
+  font-family: Satoshi, var(--font-inter), Inter, sans-serif;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 38px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-details-view .project-tabs {
+  display: flex;
+  width: 100%;
+  min-height: 36px;
+  align-items: flex-start;
+  gap: 12px;
+  overflow-x: auto;
+  border-bottom: 1px solid #eaecf0;
+  scrollbar-width: none;
+}
+
+.project-details-view .project-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.project-details-view .project-tab {
+  height: 36px;
+  flex: none;
+  border-bottom: 2px solid transparent;
+  padding: 0 10px 12px;
+  color: #667085;
+  font-family: Geist, var(--font-inter), Inter, sans-serif;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 24px;
+}
+
+.project-details-view .project-tab:hover {
+  color: #344054;
+}
+
+.project-details-view .project-tab-active {
+  border-bottom-color: #06b6d4;
+  color: #0284c7;
+}
+
+.project-detail-tab-section {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.project-detail-tab-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.project-detail-tab-heading p {
+  margin: 0;
+  color: #667085;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.project-detail-table-frame {
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid #eaecf0;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+}
+
+.project-detail-data-table {
+  width: 100%;
+  min-width: 820px;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+  background: #ffffff;
+  color: #475467;
+  font-family: Geist, var(--font-inter), Inter, sans-serif;
+}
+
+.project-detail-data-table thead {
+  background: #f9fafb;
+}
+
+.project-detail-data-table th {
+  height: 44px;
+  border-bottom: 1px solid #eaecf0;
+  padding: 12px 16px;
+  color: #475467;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.project-detail-data-table td {
+  height: 72px;
+  border-bottom: 1px solid #eaecf0;
+  padding: 16px;
+  color: #667085;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 20px;
+  vertical-align: middle;
+}
+
+.project-detail-data-table tbody tr:nth-child(even) {
+  background: #f2f4f7;
+}
+
+.project-detail-data-table tbody tr:nth-child(odd) {
+  background: #ffffff;
+}
+
+.project-detail-data-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.project-detail-data-table .project-detail-primary-cell {
+  color: #101828;
+  font-weight: 500;
+}
+
+.project-detail-empty-cell {
+  height: 112px !important;
+  color: #98a2b3 !important;
+  text-align: center !important;
+}
+
+.project-detail-row-link {
+  color: #101828;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.project-detail-row-link:hover {
+  color: #0284c7;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.project-module-col-name {
+  width: 42%;
+}
+
+.project-module-col-submodule {
+  width: 18%;
+}
+
+.project-module-col-owner {
+  width: 15%;
+}
+
+.project-module-col-updated {
+  width: 15%;
+}
+
+.project-module-col-status {
+  width: 10%;
+}
+
+.project-timeline-col-date {
+  width: 18%;
+}
+
+.project-timeline-col-activity {
+  width: 44%;
+}
+
+.project-timeline-col-user {
+  width: 20%;
+}
+
+.project-timeline-col-status {
+  width: 18%;
+}
+
+.project-update-table th:first-child,
+.project-update-table td:first-child {
+  width: 22%;
+}
+
+.project-update-table th:nth-child(2),
+.project-update-table td:nth-child(2) {
+  width: 50%;
+}
+
+.project-update-table th:nth-child(3),
+.project-update-table td:nth-child(3) {
+  width: 28%;
+}
+
+@media (max-width: 1180px) {
+  .project-details-view .project-metrics-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .project-details-view .project-metrics-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .project-details-view .project-metric-card {
+    min-height: 92px;
+  }
+
+  .project-metric-value {
+    font-size: 24px;
+    line-height: 32px;
+  }
+}
+
+@media (max-width: 520px) {
+  .project-details-view .project-metrics-grid {
+    grid-template-columns: 1fr;
   }
 }

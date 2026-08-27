@@ -20,6 +20,8 @@ export interface AppLayoutProps {
   children: React.ReactNode;
   activeRoute?: string;
   breadcrumbs?: Array<{ label: string; href?: string }>;
+  notifications?: import("@/types").Notification[];
+  notificationStorageKey?: string;
 }
 
 const bareRoutes = [
@@ -329,7 +331,10 @@ function Shell({ children, breadcrumbs }: AppLayoutProps) {
 
 export default function AppLayout(props: AppLayoutProps) {
   return (
-    <AppProvider>
+    <AppProvider
+      initialNotifications={props.notifications ?? []}
+      notificationStorageKey={props.notificationStorageKey}
+    >
       <Shell {...props} />
     </AppProvider>
   );

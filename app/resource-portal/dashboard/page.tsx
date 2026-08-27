@@ -1,6 +1,7 @@
 import ResourceDashboardView from "@/components/resource-portal/ResourceDashboardView";
 import ResourcePageHeader from "@/components/resource-portal/ResourcePageHeader";
 import { requireResourcePageSession } from "@/lib/auth";
+import { getRolePermissions } from "@/lib/db";
 import {
   getResourceDashboardStats,
   listResourceProjects,
@@ -12,25 +13,35 @@ export const dynamic = "force-dynamic";
 export default async function ResourceDashboardPage() {
   const user = await requireResourcePageSession();
 
-  const [stats, projects, tickets] = await Promise.all([
+  const [stats, projects, tickets, permissions] = await Promise.all([
     getResourceDashboardStats(user),
     listResourceProjects(user),
     listResourceTickets(user, "OPEN"),
+    getRolePermissions(user.role),
   ]);
+
+  const canCreateTickets = permissions.includes("Create Tickets");
+  const canViewDashboard = permissions.includes("View Dashboard");
+  const canViewProjects = permissions.includes("View Projects");
+  const canViewTickets = permissions.includes("View Tickets");
 
   return (
     <div className="resource-page resource-dashboard-page">
       <ResourcePageHeader
         title="Resource Dashboard"
-        actionLabel="Create a New Ticket"
-        actionHref="/resource-portal/tickets/new"
+        actionLabel={canCreateTickets ? "Create a New Ticket" : undefined}
+        actionHref={canCreateTickets ? "/resource-portal/tickets/new" : undefined}
       />
 
-      <ResourceDashboardView
-        stats={stats}
-        projects={projects}
-        tickets={tickets}
-      />
+      {canViewDashboard ? (
+        <ResourceDashboardView
+          stats={stats}
+          projects={projects}
+          tickets={tickets}
+          canViewProjects={canViewProjects}
+          canViewTickets={canViewTickets}
+        />
+      ) : null}
 
       <style>{`
         /* =========================================================

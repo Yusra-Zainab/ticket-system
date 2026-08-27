@@ -33,10 +33,14 @@ export default function ResourceDashboardView({
   stats,
   projects,
   tickets,
+  canViewProjects = true,
+  canViewTickets = true,
 }: {
   stats: ResourcePortalDashboardStats;
   projects: ResourcePortalProject[];
   tickets: ResourcePortalTicket[];
+  canViewProjects?: boolean;
+  canViewTickets?: boolean;
 }) {
   const [selectedProjectId, setSelectedProjectId] = useState(
     projects[0]?.id ?? "",
@@ -95,6 +99,7 @@ export default function ResourceDashboardView({
         </div>
       </section>
 
+      {canViewProjects ? (
       <section className="resource-dashboard-project-section">
         <h2 className="resource-dashboard-section-title">Projects Health</h2>
 
@@ -152,6 +157,7 @@ export default function ResourceDashboardView({
           </Link>
         </div>
 
+        {canViewTickets ? (
         <div className="resource-dashboard-health-grid">
           <div className="resource-dashboard-health-card">
             <HealthBox label="Status">
@@ -207,6 +213,9 @@ export default function ResourceDashboardView({
           </DashboardTableCard>
         </div>
 
+        ) : null}
+
+        {canViewTickets ? (
         <DashboardTableCard title="Recent Activity" wide>
           <table className="resource-dashboard-activity-table">
             <thead>
@@ -253,7 +262,9 @@ export default function ResourceDashboardView({
             </tbody>
           </table>
         </DashboardTableCard>
+        ) : null}
       </section>
+      ) : null}
     </>
   );
 }

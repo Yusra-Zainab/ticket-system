@@ -1,0 +1,173 @@
+.root {
+  width: 100%;
+  min-width: 0;
+}
+
+/* =========================================================
+   PROJECT MODULE TABLE
+
+   Scoped only to Client / Resource Project Details.
+
+   app/globals.css IS NOT MODIFIED.
+
+   Design column sizes:
+   895 / 91 / 134 / 124 / 132
+   ========================================================= */
+
+.root :global(.project-module-table) {
+  width: 100%;
+  min-width: 1000px;
+
+  table-layout: fixed;
+
+  border-collapse: separate;
+  border-spacing: 0;
+
+  background: #ffffff;
+
+  color: #475467;
+
+  font-family: Geist, var(--font-inter), Inter, Arial, sans-serif;
+}
+
+/* =========================================================
+   COLUMN WIDTHS
+   ========================================================= */
+
+.root :global(.project-module-col-name) {
+  width: 65.04%;
+}
+
+.root :global(.project-module-col-submodule) {
+  width: 6.61%;
+}
+
+.root :global(.project-module-col-owner) {
+  width: 9.74%;
+}
+
+.root :global(.project-module-col-updated) {
+  width: 9.01%;
+}
+
+.root :global(.project-module-col-status) {
+  width: 9.6%;
+}
+
+/* =========================================================
+   TABLE HEADER
+   ========================================================= */
+
+.root :global(.project-module-table thead) {
+  background: #f9fafb;
+}
+
+.root :global(.project-module-table th) {
+  height: 44px;
+
+  border-bottom: 1px solid #eaecf0;
+
+  color: #475467;
+
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+
+  vertical-align: middle;
+}
+
+/* Module Name */
+
+.root :global(.project-module-table th:first-child) {
+  padding: 12px 24px 12px 32px;
+
+  text-align: left;
+}
+
+/* Sub Module / Owner / Last Updated / Status */
+
+.root :global(.project-module-table th:not(:first-child)) {
+  padding: 12px 8px;
+
+  text-align: center;
+}
+
+/* =========================================================
+   TABLE CELLS
+   ========================================================= */
+
+.root :global(.project-module-table td) {
+  height: 72px;
+
+  border-bottom: 1px solid #eaecf0;
+
+  color: #667085;
+
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 20px;
+
+  vertical-align: middle;
+}
+
+/* Module Name */
+
+.root :global(.project-module-table td:first-child) {
+  padding: 16px 24px 16px 32px;
+
+  color: #101828;
+
+  font-weight: 500;
+
+  text-align: left;
+}
+
+/* Sub Module / Owner / Last Updated / Status */
+
+.root :global(.project-module-table td:not(:first-child)) {
+  padding: 16px 8px;
+
+  text-align: center;
+}
+
+/* =========================================================
+   ALTERNATING ROWS
+   ========================================================= */
+
+.root :global(.project-module-table tbody tr:nth-child(odd)) {
+  background: #ffffff;
+}
+
+.root :global(.project-module-table tbody tr:nth-child(even)) {
+  background: #f2f4f7;
+}
+
+/* =========================================================
+   LAST ROW
+   ========================================================= */
+
+.root :global(.project-module-table tbody tr:last-child td) {
+  border-bottom: 0;
+}
+
+/* =========================================================
+   STATUS BADGE
+   ========================================================= */
+
+.root :global(.project-module-table td:last-child > *) {
+  margin-inline: auto;
+}
+
+/* =========================================================
+   EMPTY STATE
+   ========================================================= */
+
+.root :global(.project-module-table .project-detail-empty-cell) {
+  height: 112px !important;
+
+  padding: 24px !important;
+
+  color: #98a2b3 !important;
+
+  text-align: center !important;
+}

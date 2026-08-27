@@ -1,5 +1,6 @@
 import type { RowDataPacket } from "mysql2/promise";
 import { z } from "zod";
+import { getSessionUser } from "@/lib/auth";
 import { db, findTicket } from "@/lib/db";
 const updateSchema = z
   .object({
@@ -29,6 +30,7 @@ const updateSchema = z
       .nullable()
       .optional(),
     formData: z.record(z.string(), z.unknown()).optional(),
+    commentContent: z.string().trim().min(1).max(10000).optional(),
   })
   .refine(
     (value) => Object.keys(value).length > 0,
@@ -75,9 +77,37 @@ export async function PATCH(
     const { id } = await context.params;
     const body = updateSchema.parse(await request.json());
     const existing = await findTicket(id);
+    const sessionUser = await getSessionUser().catch(() => null);
 
     if (!existing) {
       return Response.json({ error: "Ticket not found" }, { status: 404 });
+    }
+
+    const currentFormData = (existing.formData ?? {}) as Record<string, unknown>;
+    const ownsTicket = existing.createdById != null && existing.createdById === sessionUser?.id;
+
+    if (body.title !== undefined && !ownsTicket) {
+      return Response.json({ error: "Only the creator can rename this ticket." }, { status: 403 });
+    }
+    const currentHistory = Array.isArray(currentFormData.titleHistory)
+      ? currentFormData.titleHistory.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+      : [];
+    const mergedFormData: Record<string, unknown> = {
+      ...currentFormData,
+      ...(body.formData ?? {}),
+    };
+
+    if (body.title !== undefined) {
+      mergedFormData.title = body.title;
+      if (body.title.trim() !== existing.title.trim()) {
+        mergedFormData.titleHistory = [existing.title, ...currentHistory].slice(0, 20);
+      } else if (!Array.isArray(mergedFormData.titleHistory)) {
+        mergedFormData.titleHistory = currentHistory;
+      }
+    }
+
+    if (body.description !== undefined) {
+      mergedFormData.description = body.description;
     }
 
     const columns: Record<string, string> = {
@@ -91,29 +121,63 @@ export async function PATCH(
       projectId: "project_id",
       formData: "form_data",
     };
-    const entries = await Promise.all(
-      Object.entries(body).map(async ([key, value]) => {
-        if (key === "formData") return [key, JSON.stringify(value)] as const;
-        if (key === "assignedTo" || key === "projectId") {
-          const resolved = await resolveForeignId(
-            key === "assignedTo" ? "users" : "projects",
-            value as string | number | null | undefined,
-          );
-          if (value != null && value !== "" && resolved == null) {
-            throw new Error(
-              `Unknown ${key === "assignedTo" ? "assignee" : "project"}.`,
-            );
-          }
-          return [key, resolved] as const;
+
+    const entries: Array<[keyof typeof columns, string | number | null]> = [];
+    for (const [key, value] of Object.entries(body)) {
+      if (key === "commentContent") continue;
+      if (key === "formData") continue;
+      if (key === "assignedTo" || key === "projectId") {
+        const foreignValue =
+          typeof value === "string" || typeof value === "number" || value == null
+            ? value
+            : null;
+        const resolved = await resolveForeignId(
+          key === "assignedTo" ? "users" : "projects",
+          foreignValue,
+        );
+        if (value != null && value !== "" && resolved == null) {
+          throw new Error(`Unknown ${key === "assignedTo" ? "assignee" : "project"}.`);
         }
-        return [key, value as string | number | null] as const;
-      }),
+        entries.push([key, resolved]);
+        continue;
+      }
+      entries.push([key, value as string | number | null]);
+    }
+
+    if (body.formData !== undefined || body.title !== undefined || body.description !== undefined) {
+      entries.push(["formData", JSON.stringify(mergedFormData)]);
+    }
+
+    if (entries.length > 0) {
+      const values = entries.map(([, value]) => value) as Array<string | number | null>;
+      const sql = `UPDATE tickets SET ${entries.map(([key]) => `${columns[key]}=?`).join(", ")}, updated_at = CURRENT_TIMESTAMP WHERE ticket_id=?`;
+      await db.execute(sql, [...values, id] as Array<string | number | null>);
+    }
+
+    const [ticketRows] = await db.query<IdRow[]>(
+      "SELECT id FROM tickets WHERE ticket_id = ? LIMIT 1",
+      [id],
     );
-    const values = entries.map(([, value]) => value);
-    await db.execute(
-      `UPDATE tickets SET ${entries.map(([key]) => `${columns[key]}=?`).join(", ")} WHERE ticket_id=?`,
-      [...values, id],
-    );
+    const databaseTicketId = ticketRows[0]?.id ?? null;
+
+    if (body.commentContent && databaseTicketId !== null) {
+      await db.execute(
+        "INSERT INTO comments (ticket_id, user_id, content) VALUES (?, ?, ?)",
+        [databaseTicketId, sessionUser?.id ?? null, body.commentContent],
+      );
+      await db.execute(
+        "INSERT INTO activities (ticket_id, user_id, action, status) VALUES (?, ?, ?, ?)",
+        [databaseTicketId, sessionUser?.id ?? null, "Added a comment", existing.status ?? null],
+      );
+    }
+
+    if (body.title !== undefined && body.title.trim() !== existing.title.trim() && databaseTicketId !== null) {
+      await db.execute(
+        "INSERT INTO activities (ticket_id, user_id, action, status) VALUES (?, ?, ?, ?)",
+        [databaseTicketId, sessionUser?.id ?? null, "Renamed ticket", existing.status ?? null],
+      );
+    }
+
     return Response.json(await findTicket(id));
   } catch (error) {
     if (error instanceof z.ZodError) {

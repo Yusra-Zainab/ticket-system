@@ -10,7 +10,9 @@ import {
   CircleHelp,
   Code2,
   FileLock2,
+  Mail,
   MessageCircle,
+  Phone,
   Plus,
   RefreshCcw,
   Save,
@@ -452,11 +454,19 @@ export default function NewClientForm({
       const clientId = String(body.id ?? existingId ?? "");
 
       if (existingId) {
-        showNotice(
-          targetLifecycle === "OPEN"
-            ? "Client changes saved successfully."
-            : "Client draft saved successfully.",
-        );
+        if (targetLifecycle === "DRAFT") {
+          showNotice("Client draft saved successfully.");
+          router.refresh();
+          return;
+        }
+
+        if (initialRecord?.lifecycle === "DRAFT") {
+          router.push("/clients");
+          router.refresh();
+          return;
+        }
+
+        showNotice("Client changes saved successfully.");
         router.refresh();
         return;
       }
@@ -815,6 +825,9 @@ export default function NewClientForm({
                   onChange={(value) => setField("preferredContact", value)}
                   placeholder="Select contact method"
                   options={contactMethods}
+                  searchable
+                  searchPlaceholder="Search contact method"
+                  renderOption={renderContactMethodOption}
                 />
               </Field>
             </div>
@@ -980,6 +993,9 @@ export default function NewClientForm({
                   }
                   placeholder="Select channel"
                   options={contactMethods}
+                  searchable
+                  searchPlaceholder="Search contact method"
+                  renderOption={renderContactMethodOption}
                 />
               </Field>
 
@@ -1344,6 +1360,28 @@ type SelectOption =
       value: string;
       label: string;
     };
+
+function renderContactMethodOption(value: string, label: string) {
+  const icon =
+    value === "Email" ? (
+      <Mail size={16} className="text-[#475467]" />
+    ) : value === "Phone" ? (
+      <Phone size={16} className="text-[#0284C7]" />
+    ) : value === "WhatsApp" ? (
+      <MessageCircle size={16} className="text-[#22C55E]" />
+    ) : value === "Viber" ? (
+      <MessageCircle size={16} className="text-[#7360F2]" />
+    ) : (
+      <span className="grid size-4 place-items-center rounded bg-[#4A154B] text-[9px] font-bold text-white">S</span>
+    );
+
+  return (
+    <span className="inline-flex min-w-0 items-center gap-3">
+      {icon}
+      <span className="truncate">{label}</span>
+    </span>
+  );
+}
 
 function normalizedOption(option: SelectOption) {
   return typeof option === "string"
@@ -1717,3 +1755,4 @@ function ProjectMultiSelect({
 function plainLength(value: string) {
   return value.replace(/<[^>]*>/g, "").trim().length;
 }
+

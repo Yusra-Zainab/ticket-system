@@ -232,13 +232,7 @@ export default function ResourceTicketForm({
   function validateSubmit() {
     const next: FormErrors = {};
 
-    if (!projectId) {
-      next.project = "Select a project";
-    }
-
-    if (title.trim().length < 5) {
-      next.title = "Use at least 5 characters";
-    } else if (title.trim().length > 200) {
+    if (title.trim().length > 200) {
       next.title = "Maximum 200 characters";
     }
 
@@ -249,11 +243,6 @@ export default function ResourceTicketForm({
 
     setErrors(next);
 
-    if (next.project) {
-      setNotice("Please correct the highlighted fields.");
-      jump("project");
-      return false;
-    }
 
     if (next.title || next.description) {
       setNotice("Please correct the highlighted fields.");
@@ -265,14 +254,7 @@ export default function ResourceTicketForm({
   }
 
   function requestSubmit(mode: "save" | "submit") {
-    if (mode === "save") {
-      setConfirmMode("save");
-      return;
-    }
-
-    if (validateSubmit()) {
-      setConfirmMode("submit");
-    }
+    setConfirmMode(mode);
   }
 
   function queueFiles(incoming: File[]) {
@@ -425,7 +407,7 @@ export default function ResourceTicketForm({
   const titleFieldClass = cn(
     "field",
     errors.title && "!border-red-500 !ring-red-100",
-    touched.title && !errors.title && title.trim().length >= 5 && "!border-green-500 !ring-green-100",
+    touched.title && !errors.title && title.trim().length > 0 && "!border-green-500 !ring-green-100",
   );
 
   return (
@@ -529,7 +511,7 @@ export default function ResourceTicketForm({
             onEnter={setActive}
           >
             <div className="grid gap-5 sm:grid-cols-2">
-              <Field label="Project Name" required error={errors.project}>
+              <Field label="Project Name" error={errors.project}>
                 <SearchDropdown
                   value={projectName}
                   onChange={(_value, _url, id) => {
@@ -538,7 +520,7 @@ export default function ResourceTicketForm({
                     setSelfAssign(false);
                     setErrors((current) => ({
                       ...current,
-                      project: nextProjectId ? undefined : "Select a project",
+                      project: undefined,
                     }));
                   }}
                   placeholder="Select related project."
@@ -559,7 +541,7 @@ export default function ResourceTicketForm({
             </div>
 
             <div className="grid gap-5 sm:grid-cols-2">
-              <Field label="Module" required>
+              <Field label="Module">
                 <input
                   value={selectedProject?.moduleName || ""}
                   readOnly
@@ -568,7 +550,7 @@ export default function ResourceTicketForm({
                 />
               </Field>
 
-              <Field label="Sub Module" required>
+              <Field label="Sub Module">
                 <input
                   value={selectedProject?.subModule || ""}
                   readOnly
@@ -659,7 +641,7 @@ export default function ResourceTicketForm({
                 />
               </Field>
 
-              <Field label="Ticket Type" required>
+              <Field label="Ticket Type">
                 <SearchDropdown
                   value={type}
                   onChange={(value) => setType(value as ResourceTicketType)}

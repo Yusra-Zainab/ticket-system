@@ -1,5 +1,6 @@
 import ResourcePortalShell from "@/components/resource-portal/ResourcePortalShell";
 import { requireResourcePageSession } from "@/lib/auth";
+import { getRolePermissions } from "@/lib/db";
 import { listResourceNotifications } from "@/lib/resourcePortal";
 
 export const dynamic = "force-dynamic";
@@ -10,7 +11,13 @@ export default async function ResourceLayout({
   children: React.ReactNode;
 }) {
   const user = await requireResourcePageSession();
-  const notifications = await listResourceNotifications(user);
+
+  const [notifications, permissions] = await Promise.all([
+    listResourceNotifications(user),
+    getRolePermissions(user.role),
+  ]);
+
+  console.log("[resource-layout]", { userRole: user.role, permissions });
 
   return (
     <>
@@ -222,6 +229,7 @@ export default async function ResourceLayout({
 
       <ResourcePortalShell
         notifications={notifications}
+        permissions={permissions}
         notificationReadStorageKey={`resource-notification-read-ids-${user.id}`}
       >
         {children}

@@ -52,6 +52,15 @@ export interface ResourcePortalProjectMember {
   avatar?: string | null;
 }
 
+export interface ResourcePortalProjectModule {
+  id: string;
+  name: string;
+  subModules: Array<{
+    id: string;
+    name: string;
+  }>;
+}
+
 export interface ResourcePortalProject {
   id: string;
   name: string;
@@ -61,12 +70,14 @@ export interface ResourcePortalProject {
   priority: string;
   progress: number;
   dueDate: string;
+  startDate: string;
   updatedAt: string;
   openTickets: number;
   team: ResourcePortalProjectMember[];
   files: ResourcePortalProjectFile[];
   moduleName: string;
   subModule: string;
+  modules: ResourcePortalProjectModule[];
   links: {
     staging?: string;
     live?: string;
@@ -90,6 +101,7 @@ export interface ResourcePortalComment {
   userId?: number | null;
   user: string;
   avatar?: string | null;
+  attachments?: string[];
   content: string;
   createdAt: string;
 }
@@ -120,6 +132,7 @@ export interface ResourcePortalTicket {
   createdAt: string;
   updatedAt: string;
   dueDate: string;
+  titleHistory: string[];
   links: string[];
   attachments: ResourcePortalTicketAttachment[];
   comments?: ResourcePortalComment[];

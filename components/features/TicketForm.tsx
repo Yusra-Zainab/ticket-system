@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Controller, useForm } from "react-hook-form";
@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import RichTextEditor from "@/components/ui/RichTextEditor";
 import { cn } from "@/lib/utils";
+import { findProjectModule, normalizeProjectModules } from "@/lib/projectModules";
 import { useApp } from "@/components/providers/AppProvider";
 import type { Project, Ticket, TicketAttachment, User } from "@/types";
 
@@ -47,27 +48,30 @@ const plainLength = (value: string) =>
 const createActivityEntry = (text: string) =>
   `${new Date().toLocaleString()} · ${text}`;
 const schema = z.object({
-  project: z.string().min(1, "Select a project"),
+  project: z.string().default(""),
   projectId: z.string().optional(),
-  module: z.string().min(1, "Select a module"),
-  subModule: z.string().min(1, "Select a sub module"),
-  title: z.string().min(5, "Use at least 5 characters").max(200),
-  type: z.string().min(1, "Select a ticket type"),
+  module: z.string().default(""),
+  subModule: z.string().default(""),
+  title: z.string().max(200).default(""),
+  type: z.string().default(""),
   description: z
     .string()
-    .refine((value) => plainLength(value) >= 12, "Use at least 12 characters")
     .refine((value) => plainLength(value) <= 1000, "Maximum 1000 characters"),
-  priority: z.string().min(1, "Select a priority"),
-  priorityNumber: z.number().min(1).max(999),
-  dueDate: z.string().min(1, "Choose a due date"),
-  estimatedTime: z.string().min(1, "Select estimated time"),
-  assignedTo: z.string().min(1, "Select a resource"),
-  createdBy: z.string(),
+  priority: z.string().default(""),
+  priorityNumber: z.preprocess(
+    (value) => (value === "" || Number.isNaN(value) ? 1 : value),
+    z.coerce.number().min(1).max(999),
+  ),
+  dueDate: z.string().default(""),
+  estimatedTime: z.string().default(""),
+  assignedTo: z.string().default(""),
+  createdBy: z.string().default(""),
   notes: z
     .string()
     .refine((value) => plainLength(value) <= 1000, "Maximum 1000 characters"),
 });
-type Values = z.infer<typeof schema>;
+type FormValues = z.input<typeof schema>;
+type Values = z.output<typeof schema>;
 type ConfirmMode = "reset" | "save" | "submit";
 const sections = [
   {
@@ -134,7 +138,7 @@ export default function TicketForm({
   );
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState(
-    savedForm?.projectId ?? initialSelection.projectId ?? "",
+    String(savedForm?.projectId ?? initialSelection.projectId ?? ""),
   );
   const [uploadMenu, setUploadMenu] = useState(false);
   const [confirmMode, setConfirmMode] = useState<ConfirmMode>();
@@ -158,19 +162,40 @@ export default function TicketForm({
     getValues,
     setValue,
     formState: { errors, touchedFields, isDirty },
-  } = useForm<Values>({
+  } = useForm<FormValues, undefined, Values>({
     resolver: zodResolver(schema),
     mode: "onChange",
     defaultValues: {
       ...defaults,
       ...savedForm,
-      project: savedForm?.project ?? initialSelection.project ?? "",
-      projectId: savedForm?.projectId ?? initialSelection.projectId ?? "",
-      module: savedForm?.module ?? initialSelection.module ?? "",
-      subModule: savedForm?.subModule ?? initialSelection.subModule ?? "",
-      createdBy: savedForm?.createdBy ?? users[0]?.name ?? "System",
+      project: String(savedForm?.project ?? initialTicket?.project ?? initialSelection.project ?? ""),
+      projectId: String(savedForm?.projectId ?? initialSelection.projectId ?? ""),
+      module: String(savedForm?.module ?? initialTicket?.tags?.[0] ?? initialSelection.module ?? ""),
+      subModule: String(savedForm?.subModule ?? initialTicket?.tags?.[1] ?? initialSelection.subModule ?? ""),
+      title: initialTicket?.title === "Untitled ticket" ? "" : String(savedForm?.title ?? initialTicket?.title ?? ""),
+      type: String(savedForm?.type ?? "Task"),
+      description: String(savedForm?.description ?? initialTicket?.description ?? ""),
+      priority: String(savedForm?.priority ?? "Not Assigned"),
+      priorityNumber: Number(savedForm?.priorityNumber ?? initialTicket?.priority ?? 1),
+      dueDate: String(savedForm?.dueDate ?? initialTicket?.dueDate ?? ""),
+      assignedTo: String(savedForm?.assignedTo ?? initialTicket?.assignedTo ?? ""),
+      createdBy: String(savedForm?.createdBy ?? initialTicket?.reporter ?? users[0]?.name ?? "System"),
     },
   });
+  const selectedProject = useMemo(
+    () =>
+      projects.find((project) => project.id === selectedProjectId) ??
+      projects.find((project) => project.name === getValues("project")),
+    [getValues, projects, selectedProjectId],
+  );
+  const availableModules = useMemo(
+    () => normalizeProjectModules(selectedProject),
+    [selectedProject],
+  );
+  const availableSubModules = useMemo(() => {
+    const module = findProjectModule(availableModules, getValues("module") ?? "");
+    return module?.subModules ?? [];
+  }, [availableModules, getValues]);
   const fieldClass = (name: keyof Values) =>
     cn(
       "field",
@@ -279,7 +304,7 @@ export default function TicketForm({
         updatedAt: new Date().toISOString(),
         dueDate: values.dueDate || "",
         description: values.description || "",
-        tags: [values.module, values.subModule].filter(Boolean),
+        tags: [values.module, values.subModule].filter((tag): tag is string => Boolean(tag)),
         formData: {
           id: ticketId,
           projectId: selectedProjectId,
@@ -323,22 +348,30 @@ export default function TicketForm({
       setLoading(false);
     }
   };
-  const requestSubmit = (mode: "save" | "submit") => {
-    if (mode === "save") {
-      setConfirmMode(mode);
+  useEffect(() => {
+    const currentModule = getValues("module");
+    const currentSubModule = getValues("subModule");
+
+    if (currentModule && !findProjectModule(availableModules, currentModule)) {
+      setValue("module", "", { shouldDirty: true, shouldValidate: true });
+      setValue("subModule", "", { shouldDirty: true, shouldValidate: true });
       return;
     }
-    handleSubmit(
-      () => setConfirmMode(mode),
-      () => {
-        setNotice("Please correct the highlighted fields.");
-        const first = Object.keys(errors)[0] as keyof Values | undefined;
-        if (first)
-          document
-            .querySelector(`[name="${first}"]`)
-            ?.scrollIntoView({ behavior: "smooth", block: "center" });
-      },
-    )();
+
+    if (currentSubModule) {
+      const activeModule = findProjectModule(availableModules, currentModule ?? "");
+      const validSubModule = activeModule?.subModules.some(
+        (subModule) => subModule.name === currentSubModule,
+      );
+
+      if (!validSubModule) {
+        setValue("subModule", "", { shouldDirty: true, shouldValidate: true });
+      }
+    }
+  }, [availableModules, getValues, setValue]);
+
+  const requestSubmit = (mode: "save" | "submit") => {
+    setConfirmMode(mode);
   };
 
   return (
@@ -437,9 +470,9 @@ export default function TicketForm({
               name="project"
               control={control}
               render={({ field }) => (
-                <Field label="Project Name" required error={errors.project?.message}>
+                <Field label="Project Name" error={errors.project?.message}>
                   <SearchDropdown
-                    value={field.value}
+                    value={field.value ?? ""}
                     onChange={(value, _url, id) => {
                       field.onChange(value);
                       setSelectedProjectId(id ?? "");
@@ -451,7 +484,7 @@ export default function TicketForm({
                       id: project.id,
                     }))}
                     newLabel="New Project"
-                    newHref="/projects/new?returnTo=ticket"
+                    newHref="/projects/new?returnTo=%2Ftickets%2Fnew"
                   />
                 </Field>
               )}
@@ -461,30 +494,29 @@ export default function TicketForm({
                 name="module"
                 control={control}
                 render={({ field }) => (
-                  <Field label="Module" required error={errors.module?.message}>
+                  <Field label="Module" error={errors.module?.message}>
                     <SearchDropdown
-                      value={field.value}
-                      onChange={(value, url) => {
+                      value={field.value ?? ""}
+                      onChange={(value) => {
                         field.onChange(value);
-                        if (url)
-                          setUrls((items) => [url, ...items.filter(Boolean)]);
+                        setValue("subModule", "", {
+                          shouldDirty: true,
+                          shouldValidate: true,
+                        });
                       }}
-                      placeholder="Select project area."
-                      searchPlaceholder="Search project area"
-                      options={[
-                        {
-                          label: "Authentication",
-                          url: "portal/authentication",
-                        },
-                        { label: "Dashboard", url: "portal/dashboard" },
-                        { label: "Client Management", url: "portal/clients" },
-                        {
-                          label: "Merchant Management",
-                          url: "portal/merchants",
-                        },
-                      ]}
+                      placeholder="Select or create a module"
+                      searchPlaceholder="Search module."
+                      options={availableModules.map((module) => ({
+                        label: module.name,
+                      }))}
                       newLabel="New Module"
-                      newHref={`/modules/new?returnTo=ticket${selectedProjectId ? `&projectId=${encodeURIComponent(selectedProjectId)}` : ""}${getValues("project") ? `&projectName=${encodeURIComponent(getValues("project"))}` : ""}`}
+                      onAction={() => {
+                        router.push(
+                          selectedProjectId
+                            ? `/projects/${selectedProjectId}/edit?section=modules-setup&returnTo=%2Ftickets%2Fnew`
+                            : "/projects/new?returnTo=%2Ftickets%2Fnew",
+                        );
+                      }}
                     />
                   </Field>
                 )}
@@ -493,27 +525,29 @@ export default function TicketForm({
                 name="subModule"
                 control={control}
                 render={({ field }) => (
-                  <Field label="Sub Module" required error={errors.subModule?.message}>
+                  <Field label="Sub Module" error={errors.subModule?.message}>
                     <SearchDropdown
-                      value={field.value}
-                      onChange={(value, url) => {
+                      value={field.value ?? ""}
+                      onChange={(value) => {
                         field.onChange(value);
-                        if (url)
-                          setUrls((items) => [url, ...items.filter(Boolean)]);
                       }}
-                      placeholder="Select specific section."
-                      searchPlaceholder="Search specific section"
-                      options={[
-                        { label: "Transactions", url: "portal/transactions" },
-                        {
-                          label: "Payment Processing",
-                          url: "portal/payment-processing",
-                        },
-                        { label: "Refunds", url: "portal/refunds" },
-                        { label: "Settlements", url: "portal/settlements" },
-                      ]}
+                      placeholder={
+                        getValues("module")
+                          ? "Select or create a sub module"
+                          : "Select a module first"
+                      }
+                      searchPlaceholder="Search sub module."
+                      options={availableSubModules.map((subModule) => ({
+                        label: subModule.name,
+                      }))}
                       newLabel="New Sub Module"
-                      newHref={`/submodules/new?returnTo=ticket${selectedProjectId ? `&projectId=${encodeURIComponent(selectedProjectId)}` : ""}${getValues("project") ? `&projectName=${encodeURIComponent(getValues("project"))}` : ""}`}
+                      onAction={() => {
+                        router.push(
+                          selectedProjectId
+                            ? `/projects/${selectedProjectId}/edit?section=modules-setup&returnTo=%2Ftickets%2Fnew`
+                            : "/projects/new?returnTo=%2Ftickets%2Fnew",
+                        );
+                      }}
                     />
                   </Field>
                 )}
@@ -583,7 +617,7 @@ export default function TicketForm({
                   <Field
                     label="Ticket Title"
                     error={errors.title?.message}
-                    count={`${field.value.length}/200 characters`}
+                    count={`${(field.value ?? "").length}/200 characters`}
                   >
                     <input
                       {...field}
@@ -598,9 +632,9 @@ export default function TicketForm({
                 name="type"
                 control={control}
                 render={({ field }) => (
-                  <Field label="Ticket Type" required error={errors.type?.message}>
+                  <Field label="Ticket Type" error={errors.type?.message}>
                     <SearchDropdown
-                      value={field.value}
+                      value={field.value ?? ""}
                       onChange={field.onChange}
                       placeholder="Select request type."
                       searchPlaceholder="Search request type"
@@ -653,10 +687,10 @@ export default function TicketForm({
                 <Field
                   label="Description"
                   error={errors.description?.message}
-                  count={`${field.value.replace(/<[^>]*>/g, "").length}/1000 characters`}
+                  count={`${(field.value ?? "").replace(/<[^>]*>/g, "").length}/1000 characters`}
                 >
                   <RichTextEditor
-                    value={field.value}
+                    value={field.value ?? ""}
                     onChange={field.onChange}
                     onBlur={field.onBlur}
                     validationState={
@@ -781,7 +815,7 @@ export default function TicketForm({
                     error={errors.priority?.message}
                   >
                     <SearchDropdown
-                      value={field.value}
+                      value={field.value ?? ""}
                       onChange={field.onChange}
                       placeholder="Select urgency."
                       searchPlaceholder="Search urgency"
@@ -822,7 +856,7 @@ export default function TicketForm({
                   placeholder="1 is highest priority."
                 />
               </Field>
-              <Field label="Due Date" required error={errors.dueDate?.message}>
+              <Field label="Due Date" error={errors.dueDate?.message}>
                 <input
                   type="date"
                   {...register("dueDate")}
@@ -835,11 +869,10 @@ export default function TicketForm({
                 render={({ field }) => (
                   <Field
                     label="Estimated Time"
-                    required
                     error={errors.estimatedTime?.message}
                   >
                     <SearchDropdown
-                      value={field.value}
+                      value={field.value ?? ""}
                       onChange={(value) => {
                         if (value === "Custom") {
                           setCustomStartedAt(Date.now());
@@ -870,17 +903,25 @@ export default function TicketForm({
             onEnter={setActive}
           >
             <div className="grid gap-5 sm:grid-cols-2">
-              <Field label="Assigned To" required error={errors.assignedTo?.message}>
-                <select
-                  {...register("assignedTo")}
-                  className={fieldClass("assignedTo")}
-                >
-                  <option value="">Select responsible person.</option>
-                  {users.map((user) => (
-                    <option key={user.id}>{user.name}</option>
-                  ))}
-                </select>
-              </Field>
+              <Controller
+                name="assignedTo"
+                control={control}
+                render={({ field }) => (
+                  <Field label="Assigned To" error={errors.assignedTo?.message}>
+                    <SearchDropdown
+                      value={field.value ?? ""}
+                      onChange={(value) => field.onChange(value)}
+                      placeholder="Select responsible person."
+                      searchPlaceholder="Search resources"
+                      options={users.map((user) => ({
+                        label: user.name,
+                        detail: user.role,
+                        id: user.id,
+                      }))}
+                    />
+                  </Field>
+                )}
+              />
               <Field label="Created By">
                 <input
                   {...register("createdBy")}
@@ -903,10 +944,10 @@ export default function TicketForm({
                 <Field
                   label="Notes"
                   error={errors.notes?.message}
-                  count={`${field.value.replace(/<[^>]*>/g, "").length}/1000 characters`}
+                  count={`${(field.value ?? "").replace(/<[^>]*>/g, "").length}/1000 characters`}
                 >
                   <RichTextEditor
-                    value={field.value}
+                    value={field.value ?? ""}
                     onChange={field.onChange}
                     onBlur={field.onBlur}
                     validationState={
@@ -1181,6 +1222,7 @@ function SearchDropdown({
   options,
   newLabel,
   newHref,
+  onAction,
 }: {
   value: string;
   onChange: (value: string, url?: string, id?: string) => void;
@@ -1195,6 +1237,7 @@ function SearchDropdown({
   }>;
   newLabel?: string;
   newHref?: string;
+  onAction?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -1229,23 +1272,37 @@ function SearchDropdown({
         />
       </button>
       {open && (
-        <div className="absolute z-30 mt-1 w-full rounded-lg border border-slate-200 bg-white p-2 shadow-xl">
-          <div className="flex gap-2">
+        <div className="absolute z-30 mt-1 w-full overflow-hidden rounded-xl border border-slate-200 bg-white p-2 shadow-[0_18px_50px_rgba(15,23,42,0.18)]">
+          <div className="flex gap-2 border-b border-slate-100 p-1 pb-3">
             <input
               autoFocus
-              className="field !min-h-9 !py-2"
+              className="field !min-h-10 !rounded-lg !border-slate-200 !py-2.5"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder={searchPlaceholder}
             />
-            {newLabel && newHref && (
-              <Link
-                href={newHref}
-                className="inline-flex shrink-0 items-center justify-center rounded-md border border-[#0284C7] px-3 py-2 text-center text-xs font-semibold text-[#0284C7] hover:bg-sky-50"
-              >
-                {newLabel}
-              </Link>
-            )}
+            {newLabel && (newHref || onAction) ? (
+              newHref ? (
+                <Link
+                  href={newHref}
+                  className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-lg border border-[#0284C7] px-3 py-2 text-center text-xs font-semibold text-[#0284C7] hover:bg-sky-50"
+                >
+                  {newLabel}
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpen(false);
+                    setQuery("");
+                    onAction?.();
+                  }}
+                  className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-lg border border-[#0284C7] px-3 py-2 text-center text-xs font-semibold text-[#0284C7] hover:bg-sky-50"
+                >
+                  {newLabel}
+                </button>
+              )
+            ) : null}
           </div>
           <div className="mt-2 max-h-52 overflow-y-auto">
             {filtered.map((option) => (
@@ -1257,7 +1314,7 @@ function SearchDropdown({
                   setOpen(false);
                   setQuery("");
                 }}
-                className="flex w-full items-center gap-3 border-b border-slate-100 px-2 py-2.5 text-left text-sm last:border-0 hover:bg-slate-50"
+                className="flex w-full items-center gap-3 rounded-lg border-b border-slate-100 px-3 py-3 text-left text-sm last:border-0 hover:bg-slate-50"
               >
                 <div className="flex min-w-0 items-center gap-3">
                   {option.color ? (
@@ -1346,3 +1403,4 @@ function ConfirmDialog({
     </div>
   );
 }
+

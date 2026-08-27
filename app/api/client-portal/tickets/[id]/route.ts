@@ -16,10 +16,12 @@ const editSchema = z.object({
   dueDate: z.string().optional().default(""),
 });
 const commentSchema = z.object({ action: z.literal("comment"), content: z.string().trim().min(1).max(10000) });
+const renameSchema = z.object({ action: z.literal("rename"), title: z.string().trim().min(1).max(255) });
+const undoTitleSchema = z.object({ action: z.literal("undoTitle") });
 const closeSchema = z.object({ action: z.literal("close") });
 const reopenSchema = z.object({ action: z.literal("reopen") });
 const watchSchema = z.object({ action: z.literal("watch") });
-const bodySchema = z.discriminatedUnion("action", [editSchema, commentSchema, closeSchema, reopenSchema, watchSchema]);
+const bodySchema = z.discriminatedUnion("action", [editSchema, commentSchema, renameSchema, undoTitleSchema, closeSchema, reopenSchema, watchSchema]);
 
 async function clientUser() {
   const user = await getSessionUser();
@@ -64,6 +66,50 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         [access.databaseId, user.id, values.content],
       );
       await addClientActivity(access.databaseId, user.id, "Added a comment", access.status);
+    }
+
+    if (values.action === "rename") {
+      if (!own || !["Open", "Reviewed"].includes(access.status)) {
+        return Response.json({ error: "This ticket can no longer be renamed by the client." }, { status: 403 });
+      }
+      const currentHistory = Array.isArray(access.formData.titleHistory)
+        ? access.formData.titleHistory.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+        : [];
+      const nextTitle = values.title.trim();
+      const currentTitle = access.title.trim();
+      if (nextTitle !== currentTitle) {
+        await db.execute(
+          "UPDATE tickets SET title = ?, form_data = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+          [
+            nextTitle,
+            JSON.stringify({ ...access.formData, title: nextTitle, titleHistory: [access.title, ...currentHistory].slice(0, 20) }),
+            access.databaseId,
+          ],
+        );
+        await addClientActivity(access.databaseId, user.id, "Renamed ticket", access.status);
+      }
+    }
+
+    if (values.action === "undoTitle") {
+      if (!own || !["Open", "Reviewed"].includes(access.status)) {
+        return Response.json({ error: "This ticket title cannot be restored by the client." }, { status: 403 });
+      }
+      const currentHistory = Array.isArray(access.formData.titleHistory)
+        ? access.formData.titleHistory.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+        : [];
+      const [previousTitle, ...remainingHistory] = currentHistory;
+      if (!previousTitle) {
+        return Response.json({ error: "No previous ticket title found." }, { status: 400 });
+      }
+      await db.execute(
+        "UPDATE tickets SET title = ?, form_data = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+        [
+          previousTitle,
+          JSON.stringify({ ...access.formData, title: previousTitle, titleHistory: remainingHistory }),
+          access.databaseId,
+        ],
+      );
+      await addClientActivity(access.databaseId, user.id, "Restored previous ticket title", access.status);
     }
 
     if (values.action === "close") {

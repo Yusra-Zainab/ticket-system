@@ -4,9 +4,13 @@ import Link from "next/link";
 import {
   ArrowRight,
   ChevronDown,
+  Clock3,
   Edit3,
   Filter,
+  History,
   Search,
+  Undo2,
+  X,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 
@@ -168,13 +172,21 @@ function timeRemainingLabel(value: string) {
 export default function ClientTicketList({
   tickets,
   drafts = false,
+  currentUserId,
 }: {
   tickets: ClientPortalTicket[];
   drafts?: boolean;
+  currentUserId: number;
 }) {
   const { query, setQuery } = usePageSearch();
 
+  const [rows, setRows] = useState(tickets);
   const [status, setStatus] = useState<"All" | ClientTicketStatus>("All");
+  const [renameId, setRenameId] = useState<string>();
+  const [renameValue, setRenameValue] = useState("");
+  const [renameConfirmationOpen, setRenameConfirmationOpen] = useState(false);
+  const [historyId, setHistoryId] = useState<string>();
+  const [toast, setToast] = useState("");
   const [type, setType] = useState<"All" | ClientTicketType>("All");
   const [priority, setPriority] = useState<"All" | ClientTicketPriority>("All");
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -185,7 +197,7 @@ export default function ClientTicketList({
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
 
-    const rows = tickets.filter((ticket) => {
+    const filteredRows = rows.filter((ticket) => {
       const matchesSearch =
         !normalized ||
         `${ticket.id} ${ticket.title} ${ticket.project} ${ticket.assignee} ${ticket.reporter} ${ticket.type}`
@@ -200,9 +212,9 @@ export default function ClientTicketList({
       );
     });
 
-    if (!sort) return rows;
+    if (!sort) return filteredRows;
 
-    return [...rows].sort((a, b) => {
+    return [...filteredRows].sort((a, b) => {
       let left: string | number = "";
       let right: string | number = "";
 
@@ -231,7 +243,7 @@ export default function ClientTicketList({
 
       return sort.direction === "asc" ? result : -result;
     });
-  }, [tickets, query, drafts, status, type, priority, sort]);
+  }, [rows, query, drafts, status, type, priority, sort]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const currentPage = Math.min(page, totalPages);
@@ -255,6 +267,52 @@ export default function ClientTicketList({
     setPriority("All");
     setQuery("");
     setPage(1);
+  }
+
+  async function patchTicket(id: string, body: Record<string, unknown>) {
+    const response = await fetch(`/api/client-portal/tickets/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) throw new Error(payload?.error || "Unable to update ticket.");
+    return payload as ClientPortalTicket;
+  }
+
+  function requestRename(id: string, title: string) {
+    setRenameId(id);
+    setRenameValue(title);
+    setRenameConfirmationOpen(false);
+  }
+
+  async function confirmRename() {
+    const id = renameId;
+    const value = renameValue.trim();
+    const row = rows.find((ticket) => ticket.id === id);
+    if (!id || !row || !value) return;
+    try {
+      const updated = await patchTicket(id, { action: "rename", title: value });
+      setRows((current) => current.map((ticket) => (ticket.id === id ? updated : ticket)));
+      setRenameId(undefined);
+      setRenameValue("");
+      setRenameConfirmationOpen(false);
+      setToast("Ticket name updated successfully");
+      window.setTimeout(() => setToast(""), 2200);
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : "Unable to update ticket.");
+    }
+  }
+
+  async function undoRename(id: string) {
+    try {
+      const updated = await patchTicket(id, { action: "undoTitle" });
+      setRows((current) => current.map((ticket) => (ticket.id === id ? updated : ticket)));
+      setToast("Previous ticket name restored");
+      window.setTimeout(() => setToast(""), 2200);
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : "Unable to update ticket.");
+    }
   }
 
   return (
@@ -453,6 +511,8 @@ export default function ClientTicketList({
                   ? `/client-portal/tickets/new?draft=${encodeURIComponent(ticket.id)}`
                   : `/client-portal/tickets/${encodeURIComponent(ticket.id)}`;
 
+                const canRename = !drafts && ticket.createdById != null && ticket.createdById === currentUserId;
+
                 return (
                   <tr
                     key={ticket.id}
@@ -467,17 +527,28 @@ export default function ClientTicketList({
                     </td>
 
                     <td>
-                      <div className="ticket-title-wrap">
-                        <Link
-                          href={href}
-                          title={ticket.title}
-                          className="block truncate font-semibold text-slate-900 hover:text-[#0284C7]"
-                        >
-                          {ticket.title || "Untitled ticket"}
-                        </Link>
-                        <span className="mt-1 block truncate text-xs text-slate-400">
-                          {ticket.id} · {ticket.type}
-                        </span>
+                      <div className="group ticket-title-wrap">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <Link
+                              href={href}
+                              title={ticket.title}
+                              className="block truncate font-semibold text-slate-900 hover:text-[#0284C7]"
+                            >
+                              {ticket.title || "Untitled ticket"}
+                            </Link>
+                            <span className="mt-1 block truncate text-xs text-slate-400">
+                              {ticket.id} · {ticket.type}
+                            </span>
+                          </div>
+                          {canRename ? (
+                            <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                              <button type="button" className="row-icon hover:!bg-transparent hover:text-[#0284C7]" title="Rename ticket" onClick={() => requestRename(ticket.id, ticket.title)}><Edit3 size={16} /></button>
+                              <button type="button" className="row-icon hover:!bg-transparent hover:text-[#0284C7]" title="View title history" onClick={() => setHistoryId(ticket.id)}><History size={16} /></button>
+                              <button type="button" disabled={!ticket.titleHistory.length} className="row-icon hover:!bg-transparent hover:text-[#0284C7] disabled:opacity-40" title="Undo title change" onClick={() => void undoRename(ticket.id)}><Undo2 size={16} /></button>
+                            </div>
+                          ) : null}
+                        </div>
                       </div>
                     </td>
 
@@ -597,6 +668,70 @@ export default function ClientTicketList({
           </footer>
         </div>
       </div>
+
+      {renameId && !renameConfirmationOpen ? (
+        <div className="modal-backdrop">
+          <div role="dialog" aria-modal="true" className="ticket-modal !w-[675px]">
+            <h2 className="text-[1.65rem] font-bold text-slate-700">Rename</h2>
+            <div className="mt-5">
+              <span className="mb-2 block text-base font-semibold text-slate-700">Previous Title</span>
+              <div className="rounded-lg border border-slate-300 bg-white px-4 py-3 text-base font-medium text-slate-900 shadow-sm">
+                {rows.find((ticket) => ticket.id === renameId)?.title}
+              </div>
+            </div>
+            <label className="mt-4 block">
+              <span className="mb-2 block text-base font-semibold text-slate-700">New Title</span>
+              <input autoFocus maxLength={255} className="field !min-h-14 !px-4 !text-base" value={renameValue} onChange={(event) => setRenameValue(event.target.value)} onKeyDown={(event) => event.key === "Enter" && setRenameConfirmationOpen(true)} placeholder="Write new title" />
+            </label>
+            <div className="mt-5 flex justify-end gap-2">
+              <button className="rounded-xl border border-cyan-500 px-5 py-3 text-sm font-bold text-[#0284C7] hover:bg-[#E6F8FB]" onClick={() => { setRenameId(undefined); setRenameValue(""); }}>Cancel</button>
+              <button className="button-primary !px-6 !py-3" onClick={() => setRenameConfirmationOpen(true)}>Rename</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {renameId && renameConfirmationOpen ? (
+        <div className="modal-backdrop">
+          <div role="alertdialog" aria-modal="true" className="ticket-modal !w-[390px] !p-5">
+            <h2 className="text-[1.65rem] font-bold text-slate-700">Confirmation</h2>
+            <p className="mt-5 text-base font-semibold text-slate-700">Do you want to rename the title?</p>
+            <div className="mt-5 flex items-center justify-between">
+              <button className="rounded-xl border border-cyan-500 px-7 py-3 text-sm font-bold text-[#0284C7] hover:bg-[#E6F8FB]" onClick={() => setRenameConfirmationOpen(false)}>No</button>
+              <button className="button-primary !px-7 !py-3" onClick={() => void confirmRename()}>Yes</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {historyId ? (
+        <div className="modal-backdrop">
+          <div role="dialog" aria-modal="true" className="ticket-modal">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold">Previous Ticket Names</h2>
+              <button type="button" onClick={() => setHistoryId(undefined)}><X /></button>
+            </div>
+            <div className="mt-5 space-y-2">
+              {rows.find((item) => item.id === historyId)?.titleHistory.map((name, index) => (
+                <div key={`${name}-${index}`} className="flex items-center gap-3 rounded-lg bg-slate-50 p-3 text-sm">
+                  <Clock3 size={16} className="text-sky-600" />
+                  {name}
+                </div>
+              ))}
+              {!rows.find((item) => item.id === historyId)?.titleHistory.length ? (
+                <p className="text-sm text-slate-500">No previous name changes.</p>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {toast ? (
+        <div role="status" className="ticket-toast ticket-toast-success">
+          <p className="text-sm">{toast}</p>
+          <button className="ml-auto" aria-label="Dismiss notification" onClick={() => setToast("")}><X size={17} /></button>
+        </div>
+      ) : null}
     </div>
   );
 }

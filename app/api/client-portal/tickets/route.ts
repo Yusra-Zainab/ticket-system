@@ -65,12 +65,6 @@ export async function POST(request: Request) {
       if (!projectId) return Response.json({ error: "You cannot create a ticket for that project." }, { status: 403 });
     }
 
-    if (values.lifecycle === "OPEN" && !projectId) {
-      return Response.json({ error: "Select one of your company projects." }, { status: 400 });
-    }
-    if (values.lifecycle === "OPEN" && !values.title.trim()) {
-      return Response.json({ error: "Ticket title is required." }, { status: 400 });
-    }
 
     const ticketId = values.id || randomUUID();
     const existing = values.id ? await getClientTicketAccess(user, values.id) : null;

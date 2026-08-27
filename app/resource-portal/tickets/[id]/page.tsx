@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 
-import ResourceTicketDetail from "@/components/resource-portal/ResourceTicketDetail";
+import PortalTicketDetailsView from "@/components/features/PortalTicketDetailsView";
 import { requireResourcePageSession } from "@/lib/auth";
 import { findResourceTicket } from "@/lib/resourcePortal";
 
@@ -18,22 +18,13 @@ export default async function ResourceTicketDetailsPage({
   if (!ticket) notFound();
 
   return (
-    <div className="resource-admin-ticket-detail-shell">
-      <style>{`
-        .resource-admin-ticket-detail-shell {
-          width: min(100%, 1400px);
-          margin: 0 auto;
-          padding: 0 32px 40px;
-        }
-
-        @media (max-width: 760px) {
-          .resource-admin-ticket-detail-shell {
-            padding: 0 16px 28px;
-          }
-        }
-      `}</style>
-
-      <ResourceTicketDetail ticket={ticket} />
+    <div className="px-5 pb-8 sm:px-8 lg:px-12 xl:px-16">
+      <PortalTicketDetailsView
+        portal="resource"
+        ticket={ticket}
+        currentUserId={String(user.id)}
+        currentUserName={user.name}
+      />
     </div>
   );
 }

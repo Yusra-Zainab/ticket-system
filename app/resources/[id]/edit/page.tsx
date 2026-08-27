@@ -5,7 +5,8 @@ import NewResourceForm, {
   type SectionId,
 } from "@/components/features/NewResourceForm";
 
-import { findResource } from "@/lib/db";
+import { findResource, listRoles } from "@/lib/db";
+import { isResourceRole } from "@/lib/userRoles";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +35,10 @@ export default async function EditResourcePage({
   const { section } = await searchParams;
 
   const resource = await findResource(id);
+  const roles = await listRoles();
+  const roleOptions = roles
+    .map((role) => role.name)
+    .filter((role) => isResourceRole(role));
 
   if (!resource || resource.lifecycle !== "OPEN") {
     notFound();
@@ -56,6 +61,7 @@ export default async function EditResourcePage({
 
   return (
     <NewResourceForm
+      roleOptions={roleOptions}
       initialResource={initialResource}
       initialSection={initialSection}
     />

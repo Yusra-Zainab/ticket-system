@@ -1,171 +1,621 @@
-import { randomBytes, randomUUID } from "node:crypto";
+import {
+  randomBytes,
+} from "node:crypto";
 
-import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
-import { z } from "zod";
+import type {
+  ResultSetHeader,
+  RowDataPacket,
+} from "mysql2/promise";
 
-import { hashPassword } from "@/lib/auth";
-import { db, findResource, listResourceRows } from "@/lib/db";
+import {
+  z,
+} from "zod";
 
-const schema = z.object({
-  id: z.string().min(1).max(64).optional(),
-  lifecycle: z.enum(["OPEN", "DRAFT"]).default("DRAFT"),
-  name: z.string().min(1).max(255),
-  email: z.string().trim().max(255),
-  role: z.string().min(1).max(100),
-  avatar: z.string().nullable().optional(),
-  formData: z.record(z.string(), z.unknown()).default({}),
-});
+import {
+  hashPassword,
+  sendMail,
+} from "@/lib/auth";
 
-type ExistingUserRow = RowDataPacket & {
-  id: number;
-};
+import {
+  db,
+  findResource,
+  listResourceRows,
+} from "@/lib/db";
 
-async function syncProjectAssignments(userId: number, projectId?: string) {
-  await db.execute("DELETE FROM project_resources WHERE user_id = ?", [userId]);
+import {
+  isResourceRole,
+  normalizeUserRole,
+  portalForRole,
+  portalHomeForRole,
+} from "@/lib/userRoles";
 
-  const numericProjectId = Number(projectId);
+const DEFAULT_ONBOARDING_PASSWORD = "Password123!";
 
-  if (Number.isInteger(numericProjectId) && numericProjectId > 0) {
+const schema =
+  z.object({
+    id:
+      z
+        .string()
+        .min(1)
+        .max(64)
+        .optional(),
+
+    lifecycle:
+      z
+        .enum([
+          "OPEN",
+          "DRAFT",
+        ])
+        .default(
+          "DRAFT",
+        ),
+
+    name:
+      z
+        .string()
+        .min(1)
+        .max(255),
+
+    email:
+      z
+        .string()
+        .email(),
+
+    role:
+      z
+        .string()
+        .min(1)
+        .max(100),
+
+    avatar:
+      z
+        .string()
+        .nullable()
+        .optional(),
+
+    formData:
+      z
+        .record(
+          z.string(),
+          z.unknown(),
+        )
+        .default({}),
+  });
+
+type ExistingEmailRow =
+  RowDataPacket & {
+    id: number;
+  };
+
+async function syncProjectAssignments(
+  userId: number,
+  projectId?: string,
+) {
+  await db.execute(
+    `
+      DELETE FROM
+        project_resources
+
+      WHERE
+        user_id = ?
+    `,
+    [
+      userId,
+    ],
+  );
+
+  const numericProjectId =
+    Number(
+      projectId,
+    );
+
+  if (
+    Number.isInteger(
+      numericProjectId,
+    ) &&
+    numericProjectId >
+      0
+  ) {
     await db.execute(
       `
-        INSERT INTO project_resources (
-          project_id,
-          user_id
-        )
+        INSERT INTO
+          project_resources (
+            project_id,
+            user_id
+          )
+
         VALUES (?, ?)
       `,
-      [numericProjectId, userId],
+      [
+        numericProjectId,
+        userId,
+      ],
     );
   }
 }
 
-export async function GET(request: Request) {
+export async function GET(
+  request: Request,
+) {
   try {
-    const state = new URL(request.url).searchParams.get("state");
-    const lifecycle = state === "draft" ? "DRAFT" : "OPEN";
-    return Response.json(await listResourceRows(lifecycle));
-  } catch (error) {
-    console.error(error);
-    return Response.json({ error: "Unable to load resources." }, { status: 503 });
-  }
-}
-
-export async function POST(request: Request) {
-  try {
-    const value = schema.parse(await request.json());
-    const current = value.id ? await findResource(value.id) : undefined;
-    const normalizedRole = value.role.trim().toLowerCase().replaceAll(" ", "_");
-    const rawEmail = value.email.trim().toLowerCase();
-    const email =
-      rawEmail ||
-      current?.email ||
-      `draft-${randomUUID()}@draft.local`;
-    const storedFormData = JSON.stringify(value.formData);
-
-    if (
-      value.lifecycle === "OPEN" &&
-      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rawEmail)
-    ) {
-      return Response.json(
-        { error: "Enter a valid email address." },
-        { status: 400 },
+    const state =
+      new URL(
+        request.url,
+      ).searchParams.get(
+        "state",
       );
-    }
 
-    const [existingUsers] = await db.query<ExistingUserRow[]>(
-      `
-        SELECT id
-        FROM users
-        WHERE LOWER(email) = LOWER(?)
-          AND (? IS NULL OR id <> ?)
-        LIMIT 1
-      `,
-      [email, current ? Number(current.id) : null, current ? Number(current.id) : null],
+    const lifecycle =
+      state === "draft"
+        ? "DRAFT"
+        : "OPEN";
+
+    return Response.json(
+      await listResourceRows(
+        lifecycle,
+      ),
     );
-
-    if (existingUsers[0]) {
-      return Response.json(
-        { error: "A user with this email already exists." },
-        { status: 409 },
-      );
-    }
-
-    let userId = current ? Number(current.id) : 0;
-
-    if (current) {
-      await db.execute(
-        `
-          UPDATE users
-          SET
-            name = ?,
-            email = ?,
-            role = ?,
-            avatar = ?,
-            lifecycle = ?,
-            form_data = ?,
-            updated_at = CURRENT_TIMESTAMP
-          WHERE id = ?
-        `,
-        [
-          value.name,
-          email,
-          normalizedRole,
-          value.avatar ?? null,
-          value.lifecycle,
-          storedFormData,
-          userId,
-        ],
-      );
-    } else {
-      const password = await hashPassword(randomBytes(18).toString("base64url"));
-      const [result] = await db.execute<ResultSetHeader>(
-        `
-          INSERT INTO users (
-            name,
-            email,
-            password,
-            role,
-            avatar,
-            lifecycle,
-            form_data
-          )
-          VALUES (?, ?, ?, ?, ?, ?, ?)
-        `,
-        [
-          value.name,
-          email,
-          password,
-          normalizedRole,
-          value.avatar ?? null,
-          value.lifecycle,
-          storedFormData,
-        ],
-      );
-
-      userId = result.insertId;
-    }
-
-    await syncProjectAssignments(
-      userId,
-      typeof value.formData.projectId === "string" ? value.formData.projectId : undefined,
+  } catch (
+    error
+  ) {
+    console.error(
+      error,
     );
 
     return Response.json(
       {
-        id: String(userId),
-        lifecycle: value.lifecycle,
+        error:
+          "Unable to load resources.",
       },
-      { status: current ? 200 : 201 },
+      {
+        status: 503,
+      },
     );
-  } catch (error) {
-    if (error instanceof z.ZodError) {
+  }
+}
+
+export async function POST(
+  request: Request,
+) {
+  try {
+    const value =
+      schema.parse(
+        await request.json(),
+      );
+
+    const storedRole = (() => {
+      const explicitRole = String(value.role ?? "").trim();
+      if (explicitRole && explicitRole !== "resource") {
+        return explicitRole;
+      }
+
+      return String(value.formData.jobTitle ?? "").trim();
+    })();
+
+    const normalizedRole =
+      normalizeUserRole(
+        storedRole,
+      );
+
+    /*
+     * Resource endpoint may create
+     * every role EXCEPT:
+     *
+     * Admin
+     * Super Admin
+     * Client
+     * Client Team
+     */
+    if (
+      !isResourceRole(
+        normalizedRole,
+      )
+    ) {
       return Response.json(
-        { error: "Invalid resource data.", details: error.flatten() },
-        { status: 400 },
+        {
+          error:
+            "Admin, Super Admin, Client and Client Team roles cannot be saved as resources.",
+        },
+        {
+          status: 400,
+        },
       );
     }
 
-    console.error(error);
-    return Response.json({ error: "Unable to save resource." }, { status: 500 });
+    const current =
+      value.id
+        ? await findResource(
+            value.id,
+          )
+        : undefined;
+
+    /*
+     * If an ID was supplied but
+     * findResource refuses it, it
+     * either doesn't exist or is not
+     * actually a Resource.
+     */
+    if (
+      value.id &&
+      !current
+    ) {
+      return Response.json(
+        {
+          error:
+            "Resource not found.",
+        },
+        {
+          status: 404,
+        },
+      );
+    }
+
+    const email =
+      value.email
+        .trim()
+        .toLowerCase();
+
+    const [existing] =
+      await db.query<
+        ExistingEmailRow[]
+      >(
+        `
+          SELECT
+            id
+
+          FROM users
+
+          WHERE
+            LOWER(email) =
+            LOWER(?)
+
+            ${
+              current
+                ? "AND id <> ?"
+                : ""
+            }
+
+          LIMIT 1
+        `,
+        current
+          ? [
+              email,
+              Number(
+                current.id,
+              ),
+            ]
+          : [
+              email,
+            ],
+      );
+
+    if (
+      existing[0]
+    ) {
+      return Response.json(
+        {
+          error:
+            "A user with this email already exists.",
+        },
+        {
+          status: 409,
+        },
+      );
+    }
+
+    const storedFormData =
+      JSON.stringify(
+        value.formData,
+      );
+
+    /*
+     * Credentials are generated when:
+     *
+     * 1. A brand-new OPEN resource
+     *    is created.
+     *
+     * 2. An existing DRAFT resource
+     *    is registered as OPEN.
+     */
+    const shouldIssueCredentials =
+      value.lifecycle ===
+        "OPEN" &&
+      (
+        !current ||
+        current.lifecycle !==
+          "OPEN"
+      );
+
+    const temporaryPassword =
+      shouldIssueCredentials
+        ? DEFAULT_ONBOARDING_PASSWORD
+        : "";
+
+    let userId =
+      current
+        ? Number(
+            current.id,
+          )
+        : 0;
+
+    if (current) {
+      if (
+        shouldIssueCredentials
+      ) {
+        await db.execute(
+          `
+            UPDATE users
+
+            SET
+              name = ?,
+              email = ?,
+              password = ?,
+              role = ?,
+              avatar = ?,
+              lifecycle = ?,
+              form_data = ?,
+              updated_at =
+                CURRENT_TIMESTAMP
+
+            WHERE
+              id = ?
+          `,
+          [
+            value.name,
+
+            email,
+
+            await hashPassword(
+              temporaryPassword,
+            ),
+
+            normalizedRole,
+
+            value.avatar ??
+              null,
+
+            value.lifecycle,
+
+            storedFormData,
+
+            userId,
+          ],
+        );
+      } else {
+        /*
+         * Normal edit.
+         *
+         * IMPORTANT:
+         * Do not reset their password.
+         */
+        await db.execute(
+          `
+            UPDATE users
+
+            SET
+              name = ?,
+              email = ?,
+              role = ?,
+              avatar = ?,
+              lifecycle = ?,
+              form_data = ?,
+              updated_at =
+                CURRENT_TIMESTAMP
+
+            WHERE
+              id = ?
+          `,
+          [
+            value.name,
+
+            email,
+
+            normalizedRole,
+
+            value.avatar ??
+              null,
+
+            value.lifecycle,
+
+            storedFormData,
+
+            userId,
+          ],
+        );
+      }
+    } else {
+      /*
+       * Drafts still need some hash
+       * because users.password may be
+       * non-nullable.
+       *
+       * The hidden draft password is
+       * replaced when the draft is
+       * registered.
+       */
+      const initialPassword =
+        temporaryPassword ||
+        randomBytes(
+          18,
+        ).toString(
+          "base64url",
+        );
+
+      const [result] =
+        await db.execute<
+          ResultSetHeader
+        >(
+          `
+            INSERT INTO users (
+              name,
+              email,
+              password,
+              role,
+              avatar,
+              lifecycle,
+              form_data
+            )
+
+            VALUES (
+              ?,
+              ?,
+              ?,
+              ?,
+              ?,
+              ?,
+              ?
+            )
+          `,
+          [
+            value.name,
+
+            email,
+
+            await hashPassword(
+              initialPassword,
+            ),
+
+            normalizedRole,
+
+            value.avatar ??
+              null,
+
+            value.lifecycle,
+
+            storedFormData,
+          ],
+        );
+
+      userId =
+        result.insertId;
+    }
+
+    await syncProjectAssignments(
+      userId,
+
+      typeof value
+        .formData
+        .projectId ===
+        "string"
+        ? value.formData
+            .projectId
+        : undefined,
+    );
+
+    let warning:
+      | string
+      | undefined;
+
+    if (
+      shouldIssueCredentials
+    ) {
+      try {
+        await sendMail({
+          to:
+            email,
+
+          subject:
+            "Your Support Portal account has been created",
+
+          html: `
+            <p>Your resource account has been created.</p>
+
+            <p>
+              <strong>Email:</strong>
+              ${email}
+            </p>
+
+            <p>
+              <strong>Temporary Password:</strong>
+              ${temporaryPassword}
+            </p>
+
+            <p>
+              Please sign in and change your password.
+            </p>
+          `,
+        });
+      } catch (
+        mailError
+      ) {
+        console.error(
+          mailError,
+        );
+
+        warning =
+          "Resource saved, but the onboarding email could not be sent.";
+      }
+    }
+
+    return Response.json(
+      {
+        id:
+          String(
+            userId,
+          ),
+
+        lifecycle:
+          value.lifecycle,
+
+        role:
+          normalizedRole,
+
+        portal:
+          portalForRole(
+            normalizedRole,
+          ),
+
+        redirectTo:
+          portalHomeForRole(
+            normalizedRole,
+          ),
+
+        ...(warning
+          ? {
+              warning,
+            }
+          : {}),
+      },
+      {
+        status:
+          current
+            ? 200
+            : 201,
+      },
+    );
+  } catch (
+    error
+  ) {
+    if (
+      error instanceof
+      z.ZodError
+    ) {
+      return Response.json(
+        {
+          error:
+            "Invalid resource data.",
+
+          details:
+            error.flatten(),
+        },
+        {
+          status: 400,
+        },
+      );
+    }
+
+    console.error(
+      error,
+    );
+
+    return Response.json(
+      {
+        error:
+          "Unable to save resource.",
+      },
+      {
+        status: 500,
+      },
+    );
   }
 }

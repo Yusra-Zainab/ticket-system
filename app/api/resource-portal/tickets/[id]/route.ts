@@ -14,6 +14,8 @@ const bodySchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("edit"), title: z.string().min(1).max(255), description: z.string().max(65535), dueDate: z.string().optional().default("") }),
   z.object({ action: z.literal("status"), status: z.enum(allowedStatuses) }),
   z.object({ action: z.literal("selfAssign") }),
+  z.object({ action: z.literal("rename"), title: z.string().trim().min(1).max(255) }),
+  z.object({ action: z.literal("undoTitle") }),
   z.object({ action: z.literal("comment"), content: z.string().trim().min(1).max(10000) }),
   z.object({ action: z.literal("addLink"), url: z.string().url().max(2000) }),
 ]);
@@ -39,7 +41,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const access = await getResourceTicketAccess(user, id);
     if (!access || access.lifecycle !== "OPEN") return Response.json({ error: "Ticket not found." }, { status: 404 });
     const values = bodySchema.parse(await request.json());
-    const ownsOrAssigned = access.createdBy === user.id || access.assignedTo === user.id;
+    const own = access.createdBy === user.id;
+    const ownsOrAssigned = own || access.assignedTo === user.id;
 
     if (values.action === "edit") {
       if (!ownsOrAssigned) return Response.json({ error: "Only the creator or assigned resource can edit this ticket." }, { status: 403 });
@@ -66,6 +69,46 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         [access.databaseId, user.id, values.content],
       );
       await addResourceActivity(access.databaseId, user.id, "Added a comment", access.status);
+    }
+
+    if (values.action === "rename") {
+      if (!own) return Response.json({ error: "Only the creator can rename this ticket." }, { status: 403 });
+      const currentHistory = Array.isArray(access.formData.titleHistory)
+        ? access.formData.titleHistory.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+        : [];
+      const nextTitle = values.title.trim();
+      const currentTitle = access.title.trim();
+      if (nextTitle !== currentTitle) {
+        await db.execute(
+          "UPDATE tickets SET title = ?, form_data = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+          [
+            nextTitle,
+            JSON.stringify({ ...access.formData, title: nextTitle, titleHistory: [access.title, ...currentHistory].slice(0, 20) }),
+            access.databaseId,
+          ],
+        );
+        await addResourceActivity(access.databaseId, user.id, "Renamed ticket", access.status);
+      }
+    }
+
+    if (values.action === "undoTitle") {
+      if (!own) return Response.json({ error: "Only the creator can restore this ticket title." }, { status: 403 });
+      const currentHistory = Array.isArray(access.formData.titleHistory)
+        ? access.formData.titleHistory.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+        : [];
+      const [previousTitle, ...remainingHistory] = currentHistory;
+      if (!previousTitle) {
+        return Response.json({ error: "No previous ticket title found." }, { status: 400 });
+      }
+      await db.execute(
+        "UPDATE tickets SET title = ?, form_data = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+        [
+          previousTitle,
+          JSON.stringify({ ...access.formData, title: previousTitle, titleHistory: remainingHistory }),
+          access.databaseId,
+        ],
+      );
+      await addResourceActivity(access.databaseId, user.id, "Restored previous ticket title", access.status);
     }
 
     if (values.action === "addLink") {

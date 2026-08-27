@@ -6,31 +6,30 @@ import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 
 import { hashPassword, sendMail } from "@/lib/auth";
 import { db, listUsers } from "@/lib/db";
+import { isAdminRole, normalizeUserRole } from "@/lib/userRoles";
 
 const DEFAULT_ADMIN_PASSWORD = "Password123!";
 
 const schema = z.object({
   name: z.string().min(2).max(255),
-
   email: z.email(),
-
   role: z.string().min(2).max(100),
-
   avatar: z.string().nullable().optional(),
-
   lifecycle: z.enum(["OPEN", "DRAFT"]).default("OPEN"),
-
   formData: z.record(z.string(), z.unknown()).default({}),
-
   password: z.string().min(8).max(200).optional(),
 });
 
-function normalizeRole(role: string) {
-  return role.trim().toLowerCase().replaceAll(" ", "_");
-}
-
-function isAdminRole(role: string) {
-  return ["admin", "super_admin"].includes(normalizeRole(role));
+/*
+ * IMPORTANT: this must be the SAME normalizer /api/resources uses
+ * (lib/userRoles.ts -> normalizeUserRole). Two different slugifiers
+ * writing to the same users.role column is how that column ends up
+ * with mismatched formats depending on which endpoint touched the
+ * row, which breaks any downstream lookup (e.g. matching a role
+ * name in the roles table to compute resource-portal permissions).
+ */
+function persistedRoleFromInput(role: string) {
+  return normalizeUserRole(role);
 }
 
 type ExistingUserRow = RowDataPacket & {
@@ -55,7 +54,15 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const value = schema.parse(await request.json());
-    const normalizedRole = normalizeRole(value.role);
+    const persistedRole = (() => {
+      const explicitRole = persistedRoleFromInput(value.role || "");
+      if (explicitRole && explicitRole !== "resource") {
+        return explicitRole;
+      }
+
+      const fallbackRole = persistedRoleFromInput(String(value.formData.jobTitle ?? ""));
+      return fallbackRole || explicitRole;
+    })();
     const workEmail =
       typeof value.formData.workEmail === "string" &&
       value.formData.workEmail.trim()
@@ -66,6 +73,8 @@ export async function POST(request: Request) {
       ...value.formData,
       email: workEmail,
       workEmail,
+      jobTitle: String(value.formData.jobTitle ?? ""),
+      role: persistedRole,
     };
     const [existingUsers] = await db.query<ExistingUserRow[]>(
       `
@@ -114,12 +123,23 @@ export async function POST(request: Request) {
         value.name,
         workEmail,
         await hashPassword(password),
-        normalizedRole,
+        persistedRole,
         value.avatar ?? null,
         value.lifecycle,
         JSON.stringify(formData),
       ],
     );
+
+    if (persistedRole === "superadmin") {
+      await db.execute(
+        `
+          UPDATE users
+          SET role = 'superadmin', updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `,
+        [result.insertId],
+      );
+    }
 
     if (isAdminRole(value.role)) {
       try {
@@ -140,7 +160,7 @@ export async function POST(request: Request) {
             id: String(result.insertId),
             name: value.name,
             email: workEmail,
-            role: value.role,
+            role: persistedRole,
             avatar: value.avatar ?? null,
             warning:
               "User created, but the onboarding email could not be sent to the work email.",
@@ -155,13 +175,9 @@ export async function POST(request: Request) {
     return Response.json(
       {
         id: String(result.insertId),
-
         name: value.name,
-
         email: workEmail,
-
-        role: value.role,
-
+        role: persistedRole,
         avatar: value.avatar ?? null,
       },
       {
@@ -173,7 +189,6 @@ export async function POST(request: Request) {
       return Response.json(
         {
           error: "Invalid user",
-
           details: error.flatten(),
         },
         {

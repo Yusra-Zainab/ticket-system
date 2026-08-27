@@ -469,7 +469,15 @@ export default function ResourceTicketDetail({
                 {tab === "chat" ? (
                   <div className="resource-admin-ticket-chat-area">
                     <div className="resource-admin-ticket-chat-messages">
-                      {ticket.comments?.map((item, index) => (
+                      {ticket.comments?.map((item, index) => {
+                        const fallback = item.user
+                          .split(/\s+/)
+                          .filter(Boolean)
+                          .slice(0, 2)
+                          .map((part) => part[0]?.toUpperCase())
+                          .join("") || "U";
+
+                        return (
                         <div
                           key={item.id}
                           className={
@@ -478,6 +486,9 @@ export default function ResourceTicketDetail({
                               : "resource-admin-ticket-chat-row"
                           }
                         >
+                          <span className="resource-admin-ticket-chat-avatar">
+                            {item.avatar ? <img src={item.avatar} alt="" /> : fallback}
+                          </span>
                           <div className="resource-admin-ticket-chat-bubble">
                             <div>
                               <strong>{item.user}</strong>
@@ -486,7 +497,8 @@ export default function ResourceTicketDetail({
                             <p>{item.content}</p>
                           </div>
                         </div>
-                      ))}
+                        );
+                      })}
 
                       {!ticket.comments?.length ? (
                         <div className="resource-admin-ticket-chat-empty">
@@ -1484,7 +1496,29 @@ function TicketDetailStyles() {
 
       .resource-admin-ticket-chat-row {
         display: flex;
+        align-items: flex-start;
+        gap: 10px;
         margin-bottom: 20px;
+      }
+
+      .resource-admin-ticket-chat-avatar {
+        display: grid;
+        width: 36px;
+        height: 36px;
+        flex: 0 0 36px;
+        place-items: center;
+        overflow: hidden;
+        border-radius: 9999px;
+        background: rgba(2, 132, 199, 0.12);
+        color: #0284c7;
+        font-size: 11px;
+        font-weight: 700;
+      }
+
+      .resource-admin-ticket-chat-avatar img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
       }
 
       .resource-admin-ticket-chat-row:last-child {

@@ -10,18 +10,23 @@ import type {
   ClientLifecycle,
   ClientListRow,
   ClientListStatus,
+  Notification,
   Project,
   ProjectFormData,
   ProjectTeamMember,
   ResourceListRow,
   Ticket,
   TicketAttachment,
+  TicketCommentRecord,
   TicketFormData,
   User,
   RoleFormRecord,
   RoleRecord,
   RoleType,
 } from "@/types";
+
+import { allPermissions } from "@/lib/rolePermissions";
+import { formatUserRole, isAdminRole, isResourceRole, normalizeUserRole } from "@/lib/userRoles";
 
 /* =========================================================
    DATABASE
@@ -89,11 +94,26 @@ function json<T>(value: string | T | null, fallback: T): T {
   }
 }
 
+function stringArray(value: unknown) {
+  return Array.isArray(value)
+    ? value.filter(
+        (item): item is string =>
+          typeof item === "string" && item.trim().length > 0,
+      )
+    : [];
+}
+
+function ticketTitleHistory(formData: TicketFormData) {
+  return stringArray(formData.titleHistory);
+}
+
 /* =========================================================
    TICKETS
    ========================================================= */
 
 type TicketRow = RowDataPacket & {
+  id: number;
+
   ticket_id: string;
 
   title: string;
@@ -109,6 +129,8 @@ type TicketRow = RowDataPacket & {
   project_name: string | null;
 
   creator_name: string | null;
+
+  created_by: number | null;
 
   assignee_name: string | null;
 
@@ -241,6 +263,8 @@ function mapTicket(
   return {
     id: row.ticket_id,
 
+    createdById: row.created_by ?? null,
+
     title: row.title,
 
     project: row.project_name ?? "",
@@ -270,6 +294,7 @@ function mapTicket(
     formData: {
       ...formData,
       attachments,
+      titleHistory: ticketTitleHistory(formData),
     },
   };
 }
@@ -295,6 +320,69 @@ export async function listTickets(lifecycle: "DRAFT" | "OPEN") {
   return rows.map((row) => mapTicket(row, groups.get(row.ticket_id) ?? []));
 }
 
+type TicketCommentRow = RowDataPacket & {
+  id: number;
+  user_id: number | null;
+  content: string;
+  created_at: string;
+  user_name: string | null;
+  avatar: string | null;
+};
+
+type TicketActivityRow = RowDataPacket & {
+  id: number;
+  action: string;
+  status: string | null;
+  created_at: string;
+  user_name: string | null;
+};
+
+async function listTicketComments(
+  databaseTicketId: number,
+): Promise<TicketCommentRecord[]> {
+  const [rows] = await db.query<TicketCommentRow[]>(
+    `
+      SELECT c.id, c.user_id, c.content, c.created_at, u.name AS user_name, u.avatar
+      FROM comments c
+      LEFT JOIN users u ON u.id = c.user_id
+      WHERE c.ticket_id = ?
+      ORDER BY c.created_at ASC
+    `,
+    [databaseTicketId],
+  );
+
+  return rows.map((row) => ({
+    id: String(row.id),
+    userId: row.user_id,
+    user: row.user_name || "System",
+    avatar: row.avatar,
+    time: row.created_at,
+    text: row.content,
+  }));
+}
+
+async function listTicketActivities(
+  databaseTicketId: number,
+): Promise<string[]> {
+  const [rows] = await db.query<TicketActivityRow[]>(
+    `
+      SELECT a.id, a.action, a.status, a.created_at, u.name AS user_name
+      FROM activities a
+      LEFT JOIN users u ON u.id = a.user_id
+      WHERE a.ticket_id = ?
+      ORDER BY a.created_at DESC
+      LIMIT 50
+    `,
+    [databaseTicketId],
+  );
+
+  return rows.map((row) =>
+    row.status
+      ? `${row.created_at} - ${row.user_name || "System"}: ${row.action} (${row.status})`
+      : `${row.created_at} - ${row.user_name || "System"}: ${row.action}`,
+  );
+}
+
 export async function findTicket(id: string) {
   const [rows] = await db.query<TicketRow[]>(
     `
@@ -315,8 +403,19 @@ export async function findTicket(id: string) {
   }
 
   const groups = await listAttachmentsForTickets([row.ticket_id]);
+  const ticket = mapTicket(row, groups.get(row.ticket_id) ?? []);
+  const [comments, activity] = await Promise.all([
+    listTicketComments(Number(row.id ?? 0)),
+    listTicketActivities(Number(row.id ?? 0)),
+  ]);
 
-  return mapTicket(row, groups.get(row.ticket_id) ?? []);
+  ticket.formData = {
+    ...(ticket.formData ?? {}),
+    comments,
+    activity,
+  };
+
+  return ticket;
 }
 
 /* =========================================================
@@ -1222,16 +1321,6 @@ export async function listResourceRows(
         WHERE
           u.lifecycle = ?
 
-          AND LOWER(
-            COALESCE(
-              u.role,
-              ''
-            )
-          ) NOT IN (
-            'admin',
-            'super_admin'
-          )
-
         ORDER BY
           u.updated_at DESC,
           u.id DESC
@@ -1239,7 +1328,27 @@ export async function listResourceRows(
     [lifecycle],
   );
 
-  return rows.map((row): ResourceListRow => {
+  /*
+   * Role classification must come from lib/userRoles.ts.
+   *
+   * Admin / Super Admin -> NOT a Resource
+   * Client / Client Team -> NOT a Resource
+   * Every other non-empty role -> Resource
+   *
+   * This also handles legacy aliases such as:
+   * superadmin, Super Admin, super-admin,
+   * client_user and client_team_member.
+   */
+  const repairedRows = await Promise.all(
+    rows.map(async (row) => ({
+      ...row,
+      role: await persistRepairedUserRole(row),
+    })),
+  );
+
+  const resourceRows = repairedRows.filter((row) => isResourceRole(row.role));
+
+  return resourceRows.map((row): ResourceListRow => {
     const form = parseResourceFormData(row.form_data);
 
     const storedName = [form.firstName, form.lastName]
@@ -1331,6 +1440,12 @@ export async function findResource(id: string) {
     return undefined;
   }
 
+  const role = await persistRepairedUserRole(row);
+
+  if (!isResourceRole(role)) {
+    return undefined;
+  }
+
   return {
     id: String(row.id),
 
@@ -1340,7 +1455,7 @@ export async function findResource(id: string) {
 
     email: row.email,
 
-    role: row.role,
+    role,
 
     avatar: row.avatar,
 
@@ -1725,30 +1840,59 @@ export async function getEmailSettings(): Promise<EmailSettings> {
 
 type RoleDbRow = RowDataPacket & {
   id: number;
-
   name: string;
-
   description: string | null;
-
   role_type: string | null;
-
   type: RoleType;
-
-  permissions: string | null;
-
+  permissions: string | unknown[] | null;   // was: string | null
   updated_at: string;
-
   user_count: number;
 };
 
-function parseRolePermissions(value: string | null): string[] {
+type StoredUserRoleRow = {
+  id: number;
+  role: string;
+  form_data: string | Record<string, unknown> | null;
+};
+
+function repairStoredUserRole(row: StoredUserRoleRow) {
+  const formData = json<Record<string, unknown>>(row.form_data, {});
+  const persistedRole = normalizeUserRole(row.role);
+  const fallbackRole = normalizeUserRole(String(formData.role ?? formData.jobTitle ?? ""));
+  const repaired = fallbackRole && (!persistedRole || persistedRole === "resource")
+    ? fallbackRole
+    : persistedRole || fallbackRole;
+
+  return {
+    persistedRole,
+    repaired,
+  };
+}
+
+async function persistRepairedUserRole(row: StoredUserRoleRow) {
+  const { persistedRole, repaired } = repairStoredUserRole(row);
+
+  if (repaired && repaired !== persistedRole) {
+    await db.execute(
+      "UPDATE users SET role = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+      [repaired, row.id],
+    );
+  }
+
+  return repaired || persistedRole;
+}
+
+function parseRolePermissions(value: string | unknown[] | null): string[] {
   if (!value) {
     return [];
   }
 
-  try {
-    const parsed = JSON.parse(value);
+  if (Array.isArray(value)) {
+    return value.filter((item): item is string => typeof item === "string");
+  }
 
+  try {
+    const parsed = JSON.parse(value as string);
     return Array.isArray(parsed)
       ? parsed.filter((item): item is string => typeof item === "string")
       : [];
@@ -1870,6 +2014,84 @@ export async function findRole(
   };
 }
 
+function normalizeRoleLookup(value: string | null | undefined) {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_")
+    .replace(/_+/g, "_");
+}
+
+function normalizePermissionLookup(value: string) {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_")
+    .replace(/_+/g, "_");
+}
+
+function permissionLabelFromLookup(value: string) {
+  return normalizePermissionLookup(value)
+    .replace(/_/g, " ")
+    .replace(/\b[a-z]/g, (letter) => letter.toUpperCase());
+}
+
+function expandPermissionAliases(permissions: string[]) {
+  const aliases = new Set<string>();
+
+  for (const permission of permissions) {
+    const trimmed = String(permission ?? "").trim();
+    if (!trimmed) continue;
+
+    const normalized = normalizePermissionLookup(trimmed);
+    const label = permissionLabelFromLookup(trimmed);
+
+    aliases.add(trimmed);
+    aliases.add(normalized);
+    aliases.add(normalized.replace(/_/g, "-"));
+    aliases.add(normalized.replace(/_/g, " "));
+    aliases.add(label);
+  }
+
+  return Array.from(aliases);
+}
+
+export async function getRolePermissions(roleName: string): Promise<string[]> {
+  const normalizedRole = normalizeRoleLookup(roleName);
+
+  if (!normalizedRole) {
+    return [];
+  }
+
+  if (isAdminRole(normalizedRole)) {
+    return expandPermissionAliases([...allPermissions]);
+  }
+
+  const [rows] = await db.query<RoleDbRow[]>(
+    `
+      SELECT
+        r.name,
+        r.role_type,
+        r.permissions
+
+      FROM roles r
+
+      ORDER BY
+        r.updated_at DESC,
+        r.id DESC
+    `,
+  );
+
+  const match = rows.find(
+    (row) =>
+      normalizeRoleLookup(row.name) === normalizedRole ||
+      normalizeRoleLookup(row.role_type ?? row.name) === normalizedRole,
+  );
+
+  return expandPermissionAliases(parseRolePermissions(match?.permissions ?? null));
+}
+
+
 type AdminUserListDbRow = RowDataPacket & {
   id: number;
 
@@ -1886,6 +2108,8 @@ type AdminUserListDbRow = RowDataPacket & {
   created_at: string | null;
 
   updated_at: string | null;
+
+  form_data: string | Record<string, unknown> | null;
 };
 
 export async function listAdminUserRows(): Promise<
@@ -1901,20 +2125,10 @@ export async function listAdminUserRows(): Promise<
         avatar,
         lifecycle,
         created_at,
-        updated_at
+        updated_at,
+        form_data
 
       FROM users
-
-      WHERE
-        LOWER(
-          COALESCE(
-            role,
-            ''
-          )
-        ) NOT IN (
-          'resource',
-          'client'
-        )
 
       ORDER BY
         updated_at DESC,
@@ -1922,30 +2136,32 @@ export async function listAdminUserRows(): Promise<
     `,
   );
 
-  return rows.map((row): import("@/types").AdminUserListRow => ({
-    id: String(row.id),
+  const repairedRows = await Promise.all(
+    rows.map(async (row) => ({
+      ...row,
+      role: await persistRepairedUserRole(row),
+    })),
+  );
 
-    name: row.name || "Unnamed User",
+  return repairedRows
+    .filter((row) => isAdminRole(row.role))
+    .map((row): import("@/types").AdminUserListRow => ({
+      id: String(row.id),
 
-    avatar: row.avatar,
+      name: row.name || "Unnamed User",
 
-    role: String(row.role ?? "")
-      .replaceAll("_", " ")
-      .replace(/\b\w/g, (letter) => letter.toUpperCase()),
+      avatar: row.avatar,
 
-    email: row.email,
+      role: formatUserRole(row.role),
 
-    addedOn: row.created_at ?? "",
+      email: row.email,
 
-    /*
-     * OPEN = registered/active.
-     * DRAFT/non-open = inactive for
-     * the management view.
-     */
-    status: row.lifecycle === "OPEN" ? "Active" : "Inactive",
+      addedOn: row.created_at ?? "",
 
-    lastActive: row.updated_at ?? row.created_at ?? "",
-  }));
+      status: row.lifecycle === "OPEN" ? "Active" : "Inactive",
+
+      lastActive: row.updated_at ?? row.created_at ?? "",
+    }));
 }
 
 type AdminEditorDbRow = RowDataPacket & {
@@ -2002,9 +2218,7 @@ function parseAdminFormData(
     timeZone: typeof form.timeZone === "string" ? form.timeZone : "",
 
     twoFactorEnabled:
-      typeof form.twoFactorEnabled === "boolean"
-        ? form.twoFactorEnabled
-        : true,
+      typeof form.twoFactorEnabled === "boolean" ? form.twoFactorEnabled : true,
 
     skills: Array.isArray(form.skills)
       ? form.skills.filter(
@@ -2023,10 +2237,19 @@ function parseAdminFormData(
 }
 
 export async function findAdminUser(
-  id: string,
-): Promise<import("@/types").AdminEditorRecord | undefined> {
-  const [rows] = await db.query<AdminEditorDbRow[]>(
-    `
+  id:
+    string,
+): Promise<
+  import("@/types").AdminEditorRecord
+  | undefined
+> {
+  const [
+    rows,
+  ] =
+    await db.query<
+      AdminEditorDbRow[]
+    >(
+      `
         SELECT
           id,
           name,
@@ -2036,48 +2259,122 @@ export async function findAdminUser(
           lifecycle,
           form_data
 
-        FROM users
+        FROM
+          users
 
-        WHERE id = ?
+        WHERE
+          id = ?
 
         LIMIT 1
       `,
-    [id],
-  );
+      [
+        id,
+      ],
+    );
 
-  const row = rows[0];
+  const row =
+    rows[0];
 
-  if (!row) {
+  if (
+    !row
+  ) {
     return undefined;
   }
 
-  const formData = parseAdminFormData(row.form_data);
+  const role =
+    await persistRepairedUserRole(
+      row,
+    );
 
-  const [firstName = "", ...remaining] = String(row.name ?? "")
-    .trim()
-    .split(/\s+/);
+  if (
+    !isAdminRole(
+      role,
+    )
+  ) {
+    return undefined;
+  }
+
+  const formData =
+    parseAdminFormData(
+      row.form_data,
+    );
+
+  const [
+    firstName = "",
+    ...remaining
+  ] =
+    String(
+      row.name ??
+        "",
+    )
+      .trim()
+      .split(/\s+/);
+
+  const roleJobTitle =
+    String(
+      row.role ??
+        "",
+    )
+      .trim()
+      .toLowerCase()
+      .replace(/[\s-]+/g, "_")
+      .replace(/_+/g, "_")
+      .replaceAll(
+        "_",
+        " ",
+      )
+      .replace(
+        /\b\w/g,
+        (
+          character,
+        ) =>
+          character.toUpperCase(),
+      );
 
   return {
-    id: String(row.id),
+    id:
+      String(
+        row.id,
+      ),
 
-    name: row.name,
+    name:
+      row.name,
 
-    email: row.email,
+    email:
+      row.email,
 
-    role: row.role,
+    role:
+      role,
 
-    avatar: row.avatar,
+    avatar:
+      row.avatar,
 
-    lifecycle: row.lifecycle,
+    lifecycle:
+      row.lifecycle,
 
     formData: {
       ...formData,
 
-      firstName: formData.firstName || firstName,
+      firstName:
+        formData.firstName ||
+        firstName,
 
-      lastName: formData.lastName || remaining.join(" "),
+      lastName:
+        formData.lastName ||
+        remaining.join(
+          " ",
+        ),
 
-      email: formData.email || row.email,
+      email:
+        formData.email ||
+        row.email,
+
+      /*
+       * Critical legacy fallback.
+       */
+      jobTitle:
+        formData.jobTitle ||
+        roleJobTitle,
     },
   };
 }
@@ -2095,3 +2392,144 @@ export async function countActiveSessionsForUser(userId: number | string) {
 
   return Number(rows[0]?.count ?? 0);
 }
+
+/* =========================================================
+   ADMIN NOTIFICATIONS
+   ========================================================= */
+
+type AdminNotificationDbRow = RowDataPacket & {
+  ticket_id: string;
+
+  title: string;
+
+  status: string;
+
+  priority_type: string | null;
+
+  deadline: string | null;
+
+  created_date: string | null;
+
+  updated_at: string | null;
+};
+
+function adminNotificationTime(value: string | null) {
+  if (!value) {
+    return "now";
+  }
+
+  const timestamp = new Date(value).getTime();
+
+  if (!Number.isFinite(timestamp)) {
+    return "now";
+  }
+
+  const difference = Math.max(0, Date.now() - timestamp);
+
+  const minutes = Math.floor(difference / 60_000);
+
+  if (minutes < 1) {
+    return "now";
+  }
+
+  if (minutes < 60) {
+    return `${minutes} min`;
+  }
+
+  const hours = Math.floor(minutes / 60);
+
+  if (hours < 24) {
+    return `${hours} hr`;
+  }
+
+  const days = Math.floor(hours / 24);
+
+  return `${days} day${days === 1 ? "" : "s"}`;
+}
+
+export async function listAdminNotifications(): Promise<Notification[]> {
+  const [rows] = await db.query<AdminNotificationDbRow[]>(
+    `
+        SELECT
+          ticket_id,
+          title,
+          status,
+          priority_type,
+          deadline,
+          created_date,
+          updated_at
+
+        FROM
+          tickets
+
+        WHERE
+          lifecycle =
+            'OPEN'
+
+        ORDER BY
+          COALESCE(
+            updated_at,
+            created_date
+          ) DESC
+
+        LIMIT 20
+      `,
+  );
+
+  const now = Date.now();
+
+  const threeDays = 3 * 24 * 60 * 60 * 1000;
+
+  return rows.map((row): Notification => {
+    const eventTime = row.updated_at ?? row.created_date;
+
+    const deadlineTime = row.deadline
+      ? new Date(`${row.deadline}T23:59:59`).getTime()
+      : Number.NaN;
+
+    const deadlineSoon =
+      Number.isFinite(deadlineTime) &&
+      deadlineTime >= now &&
+      deadlineTime <= now + threeDays;
+
+    if (deadlineSoon) {
+      return {
+        id: `deadline:${row.ticket_id}`,
+
+        category: "Deadlines",
+
+        title: "Ticket deadline approaching",
+
+        body: `${row.ticket_id} — ${row.title}`,
+
+        href: `/tickets/${encodeURIComponent(row.ticket_id)}`,
+
+        time: adminNotificationTime(eventTime),
+
+        unread: true,
+      };
+    }
+
+    return {
+      id: `ticket:${row.ticket_id}`,
+
+      category: "Tickets",
+
+      title:
+        row.priority_type === "Critical" ? "Critical ticket" : "Ticket updated",
+
+      body: `${row.ticket_id} — ${row.title} · ${row.status}`,
+
+      href: `/tickets/${encodeURIComponent(row.ticket_id)}`,
+
+      time: adminNotificationTime(eventTime),
+
+      unread: true,
+    };
+  });
+}
+
+
+
+
+

@@ -6,6 +6,8 @@ import {
   CircleHelp,
   Code2,
   Loader2,
+  Mail,
+  MessageCircle,
   X,
   Phone,
   Send,
@@ -13,6 +15,8 @@ import {
   UploadCloud,
   UserRound,
 } from "lucide-react";
+
+import { roleFromJobTitle } from "@/lib/userRoles";
 
 import { type ReactNode, useMemo, useEffect, useRef, useState } from "react";
 
@@ -73,20 +77,7 @@ const initialValues: AdminFormData = {
   status: "Active",
 };
 
-const jobTitles = [
-  "Super Admin",
-  "Admin",
-  "Project Manager",
-  "Project Coordinator",
-  "Technical Lead",
-  "Engineering Manager",
-  "Operations Manager",
-  "Support Manager",
-  "Product Manager",
-  "Business Analyst",
-  "Senior Developer",
-  "Developer",
-];
+const jobTitles = ["Super Admin", "Admin"];
 
 const experienceLevels = [
   "Junior",
@@ -102,14 +93,54 @@ const employmentTypes = ["Full Time", "Part Time", "Contract", "Freelance"];
 
 const communicationChannels = ["Email", "Slack", "WhatsApp", "Viber"];
 
+function renderCommunicationChannelOption(value: string, label: string) {
+  const icon =
+    value === "Email" ? (
+      <Mail size={16} className="text-[#475467]" />
+    ) : value === "WhatsApp" ? (
+      <MessageCircle size={16} className="text-[#22C55E]" />
+    ) : value === "Viber" ? (
+      <MessageCircle size={16} className="text-[#7360F2]" />
+    ) : (
+      <span className="grid size-4 place-items-center rounded bg-[#4A154B] text-[9px] font-bold text-white">
+        S
+      </span>
+    );
+
+  return (
+    <span className="inline-flex min-w-0 items-center gap-3">
+      {icon}
+      <span className="truncate">{label}</span>
+    </span>
+  );
+}
+
+function displayRole(role: string) {
+  return String(role ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_")
+    .replace(/_+/g, "_")
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
 function valuesFromAdmin(admin?: AdminEditorRecord): AdminFormData {
   if (!admin) {
-    return initialValues;
+    return {
+      ...initialValues,
+    };
   }
 
   return {
     ...initialValues,
     ...admin.formData,
+
+    /*
+     * If legacy form_data lost jobTitle,
+     * restore it from users.role.
+     */
+    jobTitle: admin.formData.jobTitle || displayRole(admin.role),
 
     email: admin.formData.email || admin.email,
   };
@@ -247,45 +278,98 @@ export default function NewAdminForm({
       return;
     }
 
+    if (saving) {
+      return;
+    }
+
     setSaving(true);
+
     setError("");
+
     setSavedMessage("");
 
     try {
+      const avatar = photoPreview.trim() ? photoPreview : null;
+
+      const firstName = values.firstName.trim();
+
+      const lastName = values.lastName.trim();
+
+      const jobTitle = values.jobTitle.trim();
+
+      const email = values.email.trim().toLowerCase();
+
       /*
-       * The upload photo behavior is
-       * intentionally the same simple
-       * FileReader/data URL approach
-       * used by the resource form.
+       * =====================================================
+       * CRITICAL FIX
        *
-       * If you later move avatars to
-       * your attachment API, only this
-       * value needs to change.
+       * Job Title:
+       *   Super Admin
+       *
+       * becomes:
+       *   superadmin
+       *
+       * and that value is explicitly sent in payload.role.
+       * =====================================================
        */
-      const avatar = photoPreview || null;
+
+      const role = roleFromJobTitle(jobTitle);
+
+      if (!role) {
+        throw new Error("Unable to determine the account role.");
+      }
+
+      const lifecycle = saveOnly
+        ? "DRAFT"
+        : values.status === "Inactive"
+          ? "DRAFT"
+          : "OPEN";
 
       const payload = {
-        name: [values.firstName, values.lastName]
-          .filter(Boolean)
-          .join(" ")
-          .trim(),
+        name: [firstName, lastName].filter(Boolean).join(" "),
 
-        email: values.email.trim(),
+        email,
 
-        role: values.jobTitle,
+        /*
+         * THIS WAS THE MISSING VALUE.
+         *
+         * Super Admin -> superadmin
+         */
+        role,
 
         avatar,
 
-        lifecycle: values.status === "Active" ? "OPEN" : "DRAFT",
+        lifecycle,
 
         formData: {
           ...values,
+
+          firstName,
+
+          lastName,
+
+          /*
+           * Keep human readable value:
+           * Super Admin
+           */
+          jobTitle,
+
+          email,
+
+          workEmail: email,
+
+          /*
+           * Store it in form_data too
+           * so there is no ambiguity when debugging.
+           */
+          role,
         },
       };
 
-      const endpoint = editing
-        ? `/api/users/${initialAdmin!.id}`
-        : "/api/users";
+      const endpoint =
+        editing && initialAdmin?.id
+          ? `/api/users/${encodeURIComponent(initialAdmin.id)}`
+          : "/api/users";
 
       const response = await fetch(endpoint, {
         method: editing ? "PATCH" : "POST",
@@ -297,7 +381,15 @@ export default function NewAdminForm({
         body: JSON.stringify(payload),
       });
 
-      const body = await response.json().catch(() => ({}));
+      const body = (await response.json().catch(() => ({}))) as {
+        id?: string;
+
+        role?: string;
+
+        error?: string;
+
+        warning?: string;
+      };
 
       if (!response.ok) {
         throw new Error(
@@ -305,12 +397,31 @@ export default function NewAdminForm({
         );
       }
 
+      /*
+       * Important debugging guard.
+       *
+       * If a Super Admin somehow comes back without
+       * role=superadmin, immediately expose the problem
+       * instead of silently redirecting.
+       */
+      if (jobTitle === "Super Admin" && body.role !== "superadmin") {
+        throw new Error(
+          `Super Admin was saved with invalid role "${body.role ?? ""}". Expected "superadmin".`,
+        );
+      }
+
       if (saveOnly) {
         setSavedMessage(
-          editing ? "Changes saved." : "Admin information saved.",
+          editing
+            ? "Admin changes saved successfully."
+            : "Admin draft saved successfully.",
         );
 
-        router.refresh();
+        if (!editing && body.id) {
+          router.replace(`/admin/users/${body.id}/edit`);
+
+          router.refresh();
+        }
 
         return;
       }
@@ -806,7 +917,7 @@ function SkillInput({
 
       <input
         value={input}
-        placeholder="Skills from CoreHR."
+        placeholder="Skillset goes here"
         onChange={(event) => setInput(event.target.value)}
         onKeyDown={(event) => {
           if (event.key === "Enter") {

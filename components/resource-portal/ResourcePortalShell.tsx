@@ -124,10 +124,12 @@ function buildResourceCrumbs(pathname: string): ResourceCrumb[] {
 export default function ResourcePortalShell({
   children,
   notifications,
+  permissions,
   notificationReadStorageKey,
 }: {
   children: React.ReactNode;
   notifications: ResourcePortalNotification[];
+  permissions: string[];
   notificationReadStorageKey: string;
 }) {
   const pathname = usePathname();
@@ -229,7 +231,7 @@ export default function ResourcePortalShell({
           </main>
         </div>
 
-          <ResourceFloatingActionBar />
+          <ResourceFloatingActionBar permissions={permissions} />
         </div>
       </ResourceNotificationsProvider>
     </PageSearchProvider>

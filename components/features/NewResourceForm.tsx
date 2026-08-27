@@ -26,6 +26,7 @@ import {
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 
 import StickyToast from "@/components/ui/StickyToast";
+import { findProjectModule, normalizeProjectModules } from "@/lib/projectModules";
 import { cn } from "@/lib/utils";
 
 export type SectionId =
@@ -41,6 +42,15 @@ type Option = {
   label: string;
   detail?: string;
   icon?: ReactNode;
+};
+
+type ProjectOptionRecord = {
+  id: string;
+  name: string;
+  client?: string;
+  formData?: unknown;
+  moduleName?: string;
+  subModule?: string;
 };
 
 export type ResourceLifecycle = "DRAFT" | "OPEN";
@@ -372,9 +382,11 @@ function createResourceId() {
 export default function NewResourceForm({
   initialResource,
   initialSection = "basic",
+  roleOptions = [],
 }: {
   initialResource?: ResourceDraft;
   initialSection?: SectionId;
+  roleOptions?: string[];
 }) {
   const router = useRouter();
 
@@ -420,13 +432,24 @@ export default function NewResourceForm({
 
   const [noticeKind, setNoticeKind] = useState<"success" | "error">("success");
 
-  const [projects, setProjects] = useState<Option[]>([]);
+  const [rawProjects, setRawProjects] = useState<ProjectOptionRecord[]>([]);
 
   const [users, setUsers] = useState<Option[]>([]);
 
   const [resourceId] = useState(
     () => initialResource?.id ?? createResourceId(),
   );
+
+  const jobTitleOptions = useMemo(() => {
+    const source = roleOptions.length ? roleOptions : Array.from(jobTitles);
+    const unique = Array.from(new Set(source.filter(Boolean)));
+
+    if (values.jobTitle && !unique.includes(values.jobTitle)) {
+      unique.unshift(values.jobTitle);
+    }
+
+    return unique;
+  }, [roleOptions, values.jobTitle]);
 
   const showNotice = (
     message: string,
@@ -459,16 +482,15 @@ export default function NewResourceForm({
           const data = await projectResponse.json();
 
           if (!cancelled && Array.isArray(data)) {
-            setProjects(
-              data.map(
-                (project: { id: string; name: string; client?: string }) => ({
-                  value: String(project.id),
-
-                  label: project.name,
-
-                  detail: project.client,
-                }),
-              ),
+            setRawProjects(
+              data.map((project) => ({
+                id: String(project.id ?? ""),
+                name: typeof project.name === "string" ? project.name : "",
+                client: typeof project.client === "string" ? project.client : undefined,
+                formData: project.formData,
+                moduleName: typeof project.moduleName === "string" ? project.moduleName : undefined,
+                subModule: typeof project.subModule === "string" ? project.subModule : undefined,
+              })),
             );
           }
         }
@@ -503,6 +525,30 @@ export default function NewResourceForm({
     };
   }, []);
 
+  const projectOptions = useMemo<Option[]>(
+    () =>
+      rawProjects.map((project) => ({
+        value: project.id,
+        label: project.name,
+        detail: project.client,
+      })),
+    [rawProjects],
+  );
+  const selectedProject = useMemo(
+    () => rawProjects.find((project) => project.id === values.projectId),
+    [rawProjects, values.projectId],
+  );
+  const availableModules = useMemo(
+    () => normalizeProjectModules(selectedProject as never),
+    [selectedProject],
+  );
+  const availableSubModules = useMemo(() => {
+    const module = findProjectModule(availableModules, values.module);
+    return module?.subModules ?? [];
+  }, [availableModules, values.module]);
+  const resourceReturnTo = initialResource
+    ? `/resources/${initialResource.id}/edit`
+    : "/resources/new";
   const setField = <K extends keyof ResourceFormValues>(
     field: K,
     value: ResourceFormValues[K],
@@ -627,7 +673,6 @@ export default function NewResourceForm({
       if (validationError) {
         setError(validationError);
         showNotice(validationError, "error");
-
         return;
       }
     }
@@ -649,7 +694,7 @@ export default function NewResourceForm({
         },
 
         body: JSON.stringify({
-          id: resourceId,
+          id: initialResource?.id,
 
           lifecycle: targetLifecycle,
 
@@ -659,7 +704,7 @@ export default function NewResourceForm({
 
           email: values.email.trim(),
 
-          role: normalizeApiRole(values.jobTitle),
+          role: values.jobTitle.trim(),
 
           /*
            * Profile photo remains the
@@ -855,11 +900,13 @@ export default function NewResourceForm({
                 onChange={(value) => setField("jobTitle", value)}
                 placeholder="Select job title."
                 searchPlaceholder="Search job titles..."
-                options={jobTitles.map((title) => ({
+                options={jobTitleOptions.map((title) => ({
                   value: title,
 
                   label: title,
                 }))}
+                actionLabel="New Role"
+                onAction={() => router.push("/admin/roles/new")}
               />
             </div>
 
@@ -958,7 +1005,6 @@ export default function NewResourceForm({
                 placeholder="Preferred contact method."
                 searchPlaceholder="Search preferred contact method"
                 options={communicationChannels}
-                actionLabel="New Method"
               />
             </div>
           </ResourceSection>
@@ -1066,13 +1112,19 @@ export default function NewResourceForm({
               <SearchDropdown
                 label="Assigned Projects"
                 value={values.projectId}
-                onChange={(value) => setField("projectId", value)}
+                onChange={(value) => {
+                  setField("projectId", value);
+                  setField("module", "");
+                  setField("subModule", "");
+                }}
                 placeholder="Select related project."
                 searchPlaceholder="Search Project"
-                options={projects}
+                options={projectOptions}
                 actionLabel="New Project"
                 onAction={() =>
-                  router.push("/projects/new?returnTo=/resources/new")
+                  router.push(
+                    "/projects/new?returnTo=" + encodeURIComponent(resourceReturnTo),
+                  )
                 }
               />
 
@@ -1087,8 +1139,6 @@ export default function NewResourceForm({
 
                   label: role,
                 }))}
-                actionLabel="New Role"
-                onAction={() => router.push("/admin/roles/new")}
               />
             </div>
           </ResourceSection>
@@ -1105,44 +1155,48 @@ export default function NewResourceForm({
               <SearchDropdown
                 label="Module"
                 value={values.module}
-                onChange={(value) => setField("module", value)}
-                placeholder="Select project module."
+                onChange={(value) => {
+                  setField("module", value);
+                  setField("subModule", "");
+                }}
+                placeholder={
+                  values.projectId ? "Select project module." : "Select a project first."
+                }
                 searchPlaceholder="Search module"
-                options={[
-                  "Authentication",
-                  "Dashboard",
-                  "Payments",
-                  "Reporting",
-                  "Notifications",
-                  "Administration",
-                  "User Management",
-                  "API",
-                ].map((item) => ({
-                  value: item,
-
-                  label: item,
+                options={availableModules.map((item) => ({
+                  value: item.name,
+                  label: item.name,
                 }))}
+                actionLabel={values.projectId ? "Edit Project" : "New Project"}
+                onAction={() =>
+                  router.push(
+                    values.projectId
+                      ? "/projects/" + values.projectId + "/edit?section=modules-setup&returnTo=" + encodeURIComponent(resourceReturnTo)
+                      : "/projects/new?returnTo=" + encodeURIComponent(resourceReturnTo),
+                  )
+                }
               />
 
               <SearchDropdown
                 label="Sub Module"
                 value={values.subModule}
                 onChange={(value) => setField("subModule", value)}
-                placeholder="Select sub-module."
+                placeholder={
+                  values.module ? "Select sub-module." : "Select a module first."
+                }
                 searchPlaceholder="Search sub-module"
-                options={[
-                  "Frontend",
-                  "Backend",
-                  "API",
-                  "Database",
-                  "UI",
-                  "Testing",
-                  "Integration",
-                ].map((item) => ({
-                  value: item,
-
-                  label: item,
+                options={availableSubModules.map((item) => ({
+                  value: item.name,
+                  label: item.name,
                 }))}
+                actionLabel={values.projectId ? "Edit Project" : "New Project"}
+                onAction={() =>
+                  router.push(
+                    values.projectId
+                      ? "/projects/" + values.projectId + "/edit?section=modules-setup&returnTo=" + encodeURIComponent(resourceReturnTo)
+                      : "/projects/new?returnTo=" + encodeURIComponent(resourceReturnTo),
+                  )
+                }
               />
 
               <SearchDropdown
@@ -1572,38 +1626,4 @@ function MultiSelectDropdown({
       )}
     </div>
   );
-}
-
-function normalizeApiRole(jobTitle: string) {
-  const value = jobTitle.toLowerCase();
-
-  if (
-    value.includes("project manager") ||
-    value.includes("project coordinator")
-  ) {
-    return "project_manager";
-  }
-
-  if (value.includes("designer")) {
-    return "designer";
-  }
-
-  if (value.includes("qa") || value.includes("tester")) {
-    return "qa";
-  }
-
-  if (value.includes("support")) {
-    return "support";
-  }
-
-  if (
-    value.includes("developer") ||
-    value.includes("engineer") ||
-    value.includes("architect") ||
-    value.includes("analyst")
-  ) {
-    return "developer";
-  }
-
-  return "resource";
 }

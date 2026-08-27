@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+
 import { useRouter } from "next/navigation";
 
 import {
@@ -22,13 +23,20 @@ import {
 import { type ReactNode, useMemo, useState } from "react";
 
 import { Avatar } from "@/components/ui/Avatar";
+
 import ClientsTable from "@/components/features/ClientsTable";
+
 import ResourcesTable from "@/components/features/ResourcesTable";
 
 import { adminStatusDescriptions } from "@/lib/statusOptions";
+
 import { cn } from "@/lib/utils";
 
 import type { AdminUserListRow, ClientListRow, ResourceListRow } from "@/types";
+
+/* =========================================================
+   TYPES
+   ========================================================= */
 
 type UserTab = "Admins" | "Resources" | "Clients";
 
@@ -38,44 +46,96 @@ type SortKey = "name" | "role" | "email" | "addedOn" | "status" | "lastActive";
 
 type SortDirection = "asc" | "desc";
 
+/* =========================================================
+   CONSTANTS
+   ========================================================= */
+
 const pageSizes = [10, 20, 50] as const;
 
 const tabs: Array<{
   id: UserTab;
+
   label: string;
+
   icon: typeof Shield;
 }> = [
   {
     id: "Admins",
+
     label: "Admins",
+
     icon: Shield,
   },
+
   {
     id: "Resources",
+
     label: "Resources",
+
     icon: UserSquare2,
   },
+
   {
     id: "Clients",
+
     label: "Clients",
+
     icon: Building2,
   },
 ];
 
+/* =========================================================
+   COMPONENT
+   ========================================================= */
+
 export default function AdminUsers({
   admins: initialAdmins,
+
   resources,
+
   clients,
 }: {
   admins: AdminUserListRow[];
+
   resources: ResourceListRow[];
+
   clients: ClientListRow[];
 }) {
   const router = useRouter();
 
+  /* =======================================================
+     TAB
+     ======================================================= */
+
   const [tab, setTab] = useState<UserTab>("Admins");
 
-  const [admins, setAdmins] = useState<AdminUserListRow[]>(initialAdmins);
+  /* =======================================================
+     ADMINS
+
+     IMPORTANT:
+
+     Do NOT copy initialAdmins into:
+
+       useState(initialAdmins)
+
+     That was the stale-data bug.
+
+     initialAdmins remains the authoritative server list.
+
+     Local state contains ONLY IDs that we optimistically
+     deleted before router.refresh() finishes.
+     ======================================================= */
+
+  const [deletedAdminIds, setDeletedAdminIds] = useState<string[]>([]);
+
+  const admins = useMemo(
+    () => initialAdmins.filter((admin) => !deletedAdminIds.includes(admin.id)),
+    [initialAdmins, deletedAdminIds],
+  );
+
+  /* =======================================================
+     SEARCH / FILTER
+     ======================================================= */
 
   const [query, setQuery] = useState("");
 
@@ -85,17 +145,31 @@ export default function AdminUsers({
 
   const [status, setStatus] = useState<"All" | AdminStatus>("All");
 
+  /* =======================================================
+     SORT
+     ======================================================= */
+
   const [sort, setSort] = useState<{
     key: SortKey;
+
     direction: SortDirection;
   }>({
     key: "lastActive",
+
     direction: "desc",
   });
+
+  /* =======================================================
+     PAGINATION
+     ======================================================= */
 
   const [page, setPage] = useState(1);
 
   const [pageSize, setPageSize] = useState(10);
+
+  /* =======================================================
+     DELETE
+     ======================================================= */
 
   const [deleteTarget, setDeleteTarget] = useState<
     AdminUserListRow | undefined
@@ -103,40 +177,51 @@ export default function AdminUsers({
 
   const [deleting, setDeleting] = useState(false);
 
+  /* =======================================================
+     TOAST
+     ======================================================= */
+
   const [toast, setToast] = useState<
     | {
         kind: "success" | "error";
+
         message: string;
       }
     | undefined
   >();
 
-  /* =====================================================
-     DYNAMIC PAGE HEADER
-     ===================================================== */
+  /* =======================================================
+     PAGE CONFIG
+     ======================================================= */
 
   const pageConfig =
     tab === "Admins"
       ? {
           title: "Users List",
+
           action: "New Admin",
+
           href: "/admin/users/new",
         }
       : tab === "Resources"
         ? {
             title: "Resources List",
+
             action: "New Resource",
+
             href: "/resources/new",
           }
         : {
             title: "Clients List",
+
             action: "New Client",
+
             href: "/clients/new",
           };
 
-  /* =====================================================
-     FILTER OPTIONS
-     ===================================================== */
+  /* =======================================================
+     ROLE FILTER VALUES
+     ======================================================= */
 
   const roles = useMemo(
     () =>
@@ -146,9 +231,9 @@ export default function AdminUsers({
     [admins],
   );
 
-  /* =====================================================
+  /* =======================================================
      FILTER + SORT
-     ===================================================== */
+     ======================================================= */
 
   const filteredAdmins = useMemo(() => {
     const search = query.trim().toLowerCase();
@@ -188,6 +273,7 @@ export default function AdminUsers({
           ? a - b
           : String(a).localeCompare(String(b), undefined, {
               numeric: true,
+
               sensitivity: "base",
             });
 
@@ -195,9 +281,9 @@ export default function AdminUsers({
     });
   }, [admins, query, role, status, sort]);
 
-  /* =====================================================
+  /* =======================================================
      PAGINATION
-     ===================================================== */
+     ======================================================= */
 
   const pageCount = Math.max(1, Math.ceil(filteredAdmins.length / pageSize));
 
@@ -213,15 +299,26 @@ export default function AdminUsers({
 
   const hasFilters = role !== "All" || status !== "All";
 
+  /* =======================================================
+     FILTER ACTIONS
+     ======================================================= */
+
   function clearFilters() {
     setRole("All");
+
     setStatus("All");
+
     setPage(1);
   }
+
+  /* =======================================================
+     SORT ACTION
+     ======================================================= */
 
   function toggleSort(key: SortKey) {
     setSort((current) => ({
       key,
+
       direction:
         current.key === key && current.direction === "asc" ? "desc" : "asc",
     }));
@@ -229,41 +326,50 @@ export default function AdminUsers({
     setPage(1);
   }
 
-  /* =====================================================
-     TAB CHANGE
-     ===================================================== */
+  /* =======================================================
+     TAB ACTION
+     ======================================================= */
 
   function changeTab(nextTab: UserTab) {
     setTab(nextTab);
 
     setQuery("");
+
     setRole("All");
+
     setStatus("All");
+
     setFiltersOpen(false);
+
     setPage(1);
   }
 
-  /* =====================================================
+  /* =======================================================
      DELETE
-     ===================================================== */
+     ======================================================= */
 
   async function deleteAdmin() {
     if (!deleteTarget || deleting) {
       return;
     }
 
+    const target = deleteTarget;
+
     setDeleting(true);
+
     setToast(undefined);
 
     try {
       const response = await fetch(
-        `/api/users/${encodeURIComponent(deleteTarget.id)}`,
+        `/api/users/${encodeURIComponent(target.id)}`,
         {
           method: "DELETE",
         },
       );
 
-      const body = await response.json().catch(() => ({}));
+      const body = (await response.json().catch(() => ({}))) as {
+        error?: string;
+      };
 
       if (!response.ok) {
         throw new Error(
@@ -273,13 +379,20 @@ export default function AdminUsers({
         );
       }
 
-      setAdmins((current) =>
-        current.filter((user) => user.id !== deleteTarget.id),
+      /*
+       * Do not mutate/copy the authoritative admins array.
+       *
+       * Hide this one row while refresh obtains the
+       * new DB-backed list.
+       */
+      setDeletedAdminIds((current) =>
+        current.includes(target.id) ? current : [...current, target.id],
       );
 
       setToast({
         kind: "success",
-        message: `${deleteTarget.name} was deleted successfully.`,
+
+        message: `${target.name} was deleted successfully.`,
       });
 
       setDeleteTarget(undefined);
@@ -288,6 +401,7 @@ export default function AdminUsers({
     } catch (reason) {
       setToast({
         kind: "error",
+
         message:
           reason instanceof Error ? reason.message : "Unable to delete user.",
       });
@@ -296,10 +410,14 @@ export default function AdminUsers({
     }
   }
 
+  /* =======================================================
+     RENDER
+     ======================================================= */
+
   return (
     <div className="admin-users-page">
       {/* =================================================
-          TITLE + ACTION
+          HEADING
          ================================================= */}
 
       <div className="admin-users-heading-row">
@@ -307,40 +425,13 @@ export default function AdminUsers({
 
         <Link href={pageConfig.href} className="admin-users-new-button">
           <Plus size={20} />
+
           {pageConfig.action}
         </Link>
       </div>
 
       {/* =================================================
-          TABS
-         ================================================= */}
-
-      <nav aria-label="User categories" className="admin-users-tabs">
-        {tabs.map((item) => {
-          const Icon = item.icon;
-
-          const active = tab === item.id;
-
-          return (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => changeTab(item.id)}
-              className={cn(
-                "admin-users-tab",
-                active && "admin-users-tab-active",
-              )}
-            >
-              <Icon size={20} />
-              {item.label}
-            </button>
-          );
-        })}
-      </nav>
-
-      {/* =================================================
-          ADMINS TOOLBAR
-          Now sits BELOW tabs
+          ADMIN TOOLBAR
          ================================================= */}
 
       {tab === "Admins" && (
@@ -351,6 +442,7 @@ export default function AdminUsers({
               onClick={() => setFiltersOpen((current) => !current)}
               className={cn(
                 "admin-users-filter-button",
+
                 filtersOpen && "border-[#0284C7] text-[#0284C7]",
               )}
             >
@@ -387,6 +479,7 @@ export default function AdminUsers({
                   options={["All", ...roles]}
                   onChange={(value) => {
                     setRole(value);
+
                     setPage(1);
                   }}
                 />
@@ -408,6 +501,7 @@ export default function AdminUsers({
                     ) : (
                       <span className="inline-flex min-w-0 items-center gap-3">
                         <AdminStatusBadge status={value as AdminStatus} />
+
                         <span className="truncate text-sm text-[#667085]">
                           {adminStatusDescriptions[value as AdminStatus]}
                         </span>
@@ -431,7 +525,36 @@ export default function AdminUsers({
       )}
 
       {/* =================================================
-          ADMINS TABLE
+          TABS
+         ================================================= */}
+
+      <nav aria-label="User categories" className="admin-users-tabs">
+        {tabs.map((item) => {
+          const Icon = item.icon;
+
+          const active = tab === item.id;
+
+          return (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => changeTab(item.id)}
+              className={cn(
+                "admin-users-tab",
+
+                active && "admin-users-tab-active",
+              )}
+            >
+              <Icon size={20} />
+
+              {item.label}
+            </button>
+          );
+        })}
+      </nav>
+
+      {/* =================================================
+          ADMIN TABLE
          ================================================= */}
 
       {tab === "Admins" && (
@@ -496,12 +619,7 @@ export default function AdminUsers({
                     <td className="admin-users-name-cell">
                       <UserAvatar name={admin.name} src={admin.avatar} />
 
-                      <Link
-                        href={`/admin/users/${admin.id}/edit`}
-                        className="admin-users-name-link"
-                      >
-                        {admin.name}
-                      </Link>
+                      <span>{admin.name}</span>
                     </td>
 
                     <td>{admin.role}</td>
@@ -552,9 +670,9 @@ export default function AdminUsers({
             </table>
           </div>
 
-          {/* =================================================
+          {/* =============================================
               PAGINATION
-             ================================================= */}
+             ============================================= */}
 
           <footer className="admin-users-pagination">
             <span>
@@ -624,7 +742,7 @@ export default function AdminUsers({
       {tab === "Clients" && <ClientsTable initialClients={clients} />}
 
       {/* =================================================
-          DELETE CONFIRMATION
+          DELETE MODAL
          ================================================= */}
 
       {deleteTarget && (
@@ -684,6 +802,7 @@ export default function AdminUsers({
           role={toast.kind === "error" ? "alert" : "status"}
           className={cn(
             "ticket-toast",
+
             toast.kind === "success"
               ? "ticket-toast-success"
               : "ticket-toast-error",
@@ -705,23 +824,32 @@ export default function AdminUsers({
 }
 
 /* =========================================================
-   TABLE HEADER
+   HEADER
    ========================================================= */
 
 function AdminHeader({
   label,
+
   sortKey,
+
   sort,
+
   onSort,
+
   align = "center",
 }: {
   label: string;
+
   sortKey: SortKey;
+
   sort: {
     key: SortKey;
+
     direction: SortDirection;
   };
+
   onSort: (key: SortKey) => void;
+
   align?: "left" | "center";
 }) {
   const active = sort.key === sortKey;
@@ -733,6 +861,7 @@ function AdminHeader({
         onClick={() => onSort(sortKey)}
         className={cn(
           "admin-users-sort",
+
           align === "left" ? "justify-start" : "justify-center",
         )}
       >
@@ -743,6 +872,7 @@ function AdminHeader({
             size={12}
             className={cn(
               "rotate-180",
+
               active && sort.direction === "asc"
                 ? "text-[#0284C7]"
                 : "text-[#98A2B3]",
@@ -753,6 +883,7 @@ function AdminHeader({
             size={12}
             className={cn(
               "-mt-[5px]",
+
               active && sort.direction === "desc"
                 ? "text-[#0284C7]"
                 : "text-[#98A2B3]",
@@ -773,6 +904,7 @@ function AdminStatusBadge({ status }: { status: AdminStatus }) {
     <span
       className={cn(
         "admin-user-status",
+
         status === "Active"
           ? "admin-user-status-active"
           : "admin-user-status-inactive",
@@ -787,7 +919,15 @@ function AdminStatusBadge({ status }: { status: AdminStatus }) {
    AVATAR
    ========================================================= */
 
-function UserAvatar({ name, src }: { name: string; src?: string | null }) {
+function UserAvatar({
+  name,
+
+  src,
+}: {
+  name: string;
+
+  src?: string | null;
+}) {
   if (src?.trim()) {
     return (
       <span className="relative size-10 shrink-0 overflow-hidden rounded-full">
@@ -808,19 +948,31 @@ function UserAvatar({ name, src }: { name: string; src?: string | null }) {
 
 function AdminFilterDropdown({
   label,
+
   value,
+
   placeholder,
+
   searchPlaceholder,
+
   options,
+
   onChange,
+
   renderOption,
 }: {
   label: string;
+
   value: string;
+
   placeholder: string;
+
   searchPlaceholder: string;
+
   options: string[];
+
   onChange: (value: string) => void;
+
   renderOption?: (value: string) => ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -851,6 +1003,7 @@ function AdminFilterDropdown({
         onClick={() => setOpen((current) => !current)}
         className={cn(
           "flex h-11 w-full items-center justify-between gap-3 rounded-lg border bg-white px-3.5 text-left shadow-[0_1px_2px_rgba(16,24,40,0.05)]",
+
           open
             ? "border-[#0284C7] ring-[3px] ring-[#0284C7]/10"
             : "border-[#D0D5DD]",
@@ -859,6 +1012,7 @@ function AdminFilterDropdown({
         <span
           className={cn(
             "min-w-0 flex-1 truncate text-sm",
+
             value === "All" ? "text-[#98A2B3]" : "text-[#344054]",
           )}
         >
@@ -873,6 +1027,7 @@ function AdminFilterDropdown({
           size={17}
           className={cn(
             "shrink-0 text-[#667085] transition-transform",
+
             open && "rotate-180",
           )}
         />
@@ -925,6 +1080,7 @@ function AdminFilterDropdown({
                     }}
                     className={cn(
                       "flex min-h-11 w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-sm",
+
                       selected ? "bg-[#F0F9FF]" : "hover:bg-[#F9FAFB]",
                     )}
                   >
@@ -967,7 +1123,9 @@ function formatAdminDate(value: string) {
 
   return new Intl.DateTimeFormat("en-GB", {
     day: "2-digit",
+
     month: "short",
+
     year: "numeric",
   }).format(date);
 }

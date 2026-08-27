@@ -923,11 +923,26 @@ function ChatArea({
   return (
     <div className="chat-area">
       <div className="max-h-[430px] space-y-5 overflow-y-auto p-5">
-        {comments.map((comment, index) => (
+        {comments.map((comment, index) => {
+          const fallback = comment.user
+            .split(/\s+/)
+            .filter(Boolean)
+            .slice(0, 2)
+            .map((part) => part[0]?.toUpperCase())
+            .join("") || "U";
+
+          return (
           <div
             key={comment.id}
-            className={cn("flex", index % 2 && "justify-end")}
+            className={cn("flex items-start gap-3", index % 2 && "justify-end")}
           >
+            <span className="mt-1 grid size-9 shrink-0 place-items-center overflow-hidden rounded-full bg-[#0284C7]/10 text-[11px] font-semibold text-[#0284C7]">
+              {comment.avatar ? (
+                <img src={comment.avatar} alt="" className="h-full w-full object-cover" />
+              ) : (
+                fallback
+              )}
+            </span>
             <div
               className={cn(
                 "max-w-[78%] rounded-2xl px-4 py-3",
@@ -944,11 +959,20 @@ function ChatArea({
                   {formatDateTime(comment.createdAt)}
                 </time>
               </div>
-
               <p className="detail-body !text-sm">{comment.content}</p>
+              {comment.attachments?.map((file) => (
+                <span
+                  key={file}
+                  className="mt-2 flex items-center gap-2 rounded-lg bg-white/80 px-3 py-2 text-xs text-sky-700"
+                >
+                  <Paperclip size={14} />
+                  {file}
+                </span>
+              ))}
             </div>
           </div>
-        ))}
+          );
+        })}
 
         {!comments.length ? (
           <p className="py-8 text-center text-sm text-slate-400">

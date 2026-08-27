@@ -1,6 +1,7 @@
-import { findResource } from "@/lib/db";
-
 import NewResourceForm from "@/components/features/NewResourceForm";
+
+import { findResource, listRoles } from "@/lib/db";
+import { isResourceRole } from "@/lib/userRoles";
 
 export default async function NewResourcePage({
   searchParams,
@@ -9,9 +10,14 @@ export default async function NewResourcePage({
 }) {
   const { draft } = await searchParams;
   const resource = draft ? await findResource(draft) : undefined;
+  const roles = await listRoles();
+  const roleOptions = roles
+    .map((role) => role.name)
+    .filter((role) => isResourceRole(role));
 
   return (
     <NewResourceForm
+      roleOptions={roleOptions}
       initialResource={
         resource
           ? {

@@ -1,13 +1,20 @@
 import ResourcePageHeader from "@/components/resource-portal/ResourcePageHeader";
 import ResourceTicketList from "@/components/resource-portal/ResourceTicketList";
 import { requireResourcePageSession } from "@/lib/auth";
+import { getRolePermissions } from "@/lib/db";
 import { listResourceTickets } from "@/lib/resourcePortal";
 
 export const dynamic = "force-dynamic";
 
 export default async function ResourceTicketDraftsPage() {
   const user = await requireResourcePageSession();
-  const tickets = await listResourceTickets(user, "DRAFT");
+  const [tickets, permissions] = await Promise.all([
+    listResourceTickets(user, "DRAFT"),
+    getRolePermissions(user.role),
+  ]);
+
+  const canViewTickets = permissions.includes("View Tickets");
+  const canCreateTickets = permissions.includes("Create Tickets");
 
   return (
     <div className="resource-admin-ticket-page">
@@ -18,10 +25,12 @@ export default async function ResourceTicketDraftsPage() {
           { label: "Tickets", href: "/resource-portal/tickets" },
           { label: "Drafts" },
         ]}
-        actionLabel="Create a New Ticket"
-        actionHref="/resource-portal/tickets/new"
+        actionLabel={canCreateTickets ? "Create a New Ticket" : undefined}
+        actionHref={canCreateTickets ? "/resource-portal/tickets/new" : undefined}
       />
-      <ResourceTicketList tickets={tickets} drafts />
+      {canViewTickets ? (
+        <ResourceTicketList tickets={tickets} drafts currentUserId={user.id} />
+      ) : null}
     </div>
   );
 }

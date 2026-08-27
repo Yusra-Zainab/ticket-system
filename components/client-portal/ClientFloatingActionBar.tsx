@@ -219,7 +219,7 @@ export default function ClientFloatingActionBar() {
           aria-label="Logout"
           title="Logout"
           onClick={() => void logout()}
-          className="dock-action"
+          className="dock-action-logout"
         >
           <LogOut size={22} />
         </button>

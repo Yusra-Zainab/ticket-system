@@ -6,9 +6,13 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  Clock3,
   FilePenLine,
   Filter,
+  History,
   Search,
+  Undo2,
+  X,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 
@@ -92,12 +96,20 @@ function initials(name: string) {
 export default function ResourceTicketList({
   tickets,
   drafts = false,
+  currentUserId,
 }: {
   tickets: ResourcePortalTicket[];
   drafts?: boolean;
+  currentUserId: number;
 }) {
   const { query, setQuery } = usePageSearch();
+  const [rows, setRows] = useState(tickets);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [renameId, setRenameId] = useState<string>();
+  const [renameValue, setRenameValue] = useState("");
+  const [renameConfirmationOpen, setRenameConfirmationOpen] = useState(false);
+  const [historyId, setHistoryId] = useState<string>();
+  const [toast, setToast] = useState("");
   const [status, setStatus] = useState<"All" | ResourceTicketStatus>("All");
   const [type, setType] = useState<"All" | ResourceTicketType>("All");
   const [priority, setPriority] = useState<"All" | ResourceTicketPriority>("All");
@@ -106,22 +118,22 @@ export default function ResourceTicketList({
   const [sort, setSort] = useState<SortState>();
 
   const statuses = useMemo(
-    () => Array.from(new Set(tickets.map((ticket) => ticket.status))),
+    () => Array.from(new Set(rows.map((ticket) => ticket.status))),
     [tickets],
   );
   const types = useMemo(
-    () => Array.from(new Set(tickets.map((ticket) => ticket.type))),
+    () => Array.from(new Set(rows.map((ticket) => ticket.type))),
     [tickets],
   );
   const priorities = useMemo(
-    () => Array.from(new Set(tickets.map((ticket) => ticket.priority))),
+    () => Array.from(new Set(rows.map((ticket) => ticket.priority))),
     [tickets],
   );
 
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
 
-    const rows = tickets.filter((ticket) => {
+    const filteredRows = rows.filter((ticket) => {
       const matchesSearch =
         !normalized ||
         `${ticket.id} ${ticket.title} ${ticket.project} ${ticket.assignee} ${ticket.reporter} ${ticket.type}`
@@ -136,9 +148,9 @@ export default function ResourceTicketList({
       );
     });
 
-    if (!sort) return rows;
+    if (!sort) return filteredRows;
 
-    return [...rows].sort((a, b) => {
+    return [...filteredRows].sort((a, b) => {
       let aValue: string | number = a[sort.key] ?? "";
       let bValue: string | number = b[sort.key] ?? "";
 
@@ -164,7 +176,7 @@ export default function ResourceTicketList({
 
       return sort.direction === "asc" ? result : -result;
     });
-  }, [tickets, query, status, type, priority, sort]);
+  }, [rows, query, status, type, priority, sort]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
   const currentPage = Math.min(page, pageCount);
@@ -193,6 +205,52 @@ export default function ResourceTicketList({
     setPriority("All");
     setQuery("");
     setPage(1);
+  }
+
+  async function patchTicket(id: string, body: Record<string, unknown>) {
+    const response = await fetch(`/api/resource-portal/tickets/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) throw new Error(payload?.error || "Unable to update ticket.");
+    return payload as ResourcePortalTicket;
+  }
+
+  function requestRename(id: string, title: string) {
+    setRenameId(id);
+    setRenameValue(title);
+    setRenameConfirmationOpen(false);
+  }
+
+  async function confirmRename() {
+    const id = renameId;
+    const value = renameValue.trim();
+    const row = rows.find((ticket) => ticket.id === id);
+    if (!id || !row || !value) return;
+    try {
+      const updated = await patchTicket(id, { action: "rename", title: value });
+      setRows((current) => current.map((ticket) => (ticket.id === id ? updated : ticket)));
+      setRenameId(undefined);
+      setRenameValue("");
+      setRenameConfirmationOpen(false);
+      setToast("Ticket name updated successfully");
+      window.setTimeout(() => setToast(""), 2200);
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : "Unable to update ticket.");
+    }
+  }
+
+  async function undoRename(id: string) {
+    try {
+      const updated = await patchTicket(id, { action: "undoTitle" });
+      setRows((current) => current.map((ticket) => (ticket.id === id ? updated : ticket)));
+      setToast("Previous ticket name restored");
+      window.setTimeout(() => setToast(""), 2200);
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : "Unable to update ticket.");
+    }
   }
 
   return (
@@ -380,16 +438,27 @@ export default function ResourceTicketList({
                     ? `/resource-portal/tickets/new?draft=${encodeURIComponent(ticket.id)}`
                     : `/resource-portal/tickets/${encodeURIComponent(ticket.id)}`;
 
+                  const canRename = !drafts && ticket.createdById != null && ticket.createdById === currentUserId;
+
                   return (
                     <tr key={ticket.id} className={index % 2 ? "is-striped" : ""}>
                       <td>
-                        <div className="resource-admin-ticket-title-wrap">
-                          <Link href={href} title={ticket.title}>
-                            {ticket.title || "Untitled ticket"}
-                          </Link>
-                          <span>
-                            {ticket.id} · {ticket.type}
-                          </span>
+                        <div className="resource-admin-ticket-title-wrap resource-admin-ticket-title-group">
+                          <div className="resource-admin-ticket-title-main">
+                            <Link href={href} title={ticket.title}>
+                              {ticket.title || "Untitled ticket"}
+                            </Link>
+                            <span>
+                              {ticket.id} · {ticket.type}
+                            </span>
+                          </div>
+                          {canRename ? (
+                            <div className="resource-admin-ticket-title-actions">
+                              <button type="button" className="resource-admin-ticket-row-icon" title="Rename ticket" onClick={() => requestRename(ticket.id, ticket.title)}><FilePenLine size={16} /></button>
+                              <button type="button" className="resource-admin-ticket-row-icon" title="View title history" onClick={() => setHistoryId(ticket.id)}><History size={16} /></button>
+                              <button type="button" disabled={!ticket.titleHistory.length} className="resource-admin-ticket-row-icon" title="Undo title change" onClick={() => void undoRename(ticket.id)}><Undo2 size={16} /></button>
+                            </div>
+                          ) : null}
                         </div>
                       </td>
 
@@ -509,6 +578,70 @@ export default function ResourceTicketList({
           </footer>
         </div>
       </section>
+
+      {renameId && !renameConfirmationOpen ? (
+        <div className="modal-backdrop">
+          <div role="dialog" aria-modal="true" className="ticket-modal !w-[675px]">
+            <h2 className="text-[1.65rem] font-bold text-slate-700">Rename</h2>
+            <div className="mt-5">
+              <span className="mb-2 block text-base font-semibold text-slate-700">Previous Title</span>
+              <div className="rounded-lg border border-slate-300 bg-white px-4 py-3 text-base font-medium text-slate-900 shadow-sm">
+                {rows.find((ticket) => ticket.id === renameId)?.title}
+              </div>
+            </div>
+            <label className="mt-4 block">
+              <span className="mb-2 block text-base font-semibold text-slate-700">New Title</span>
+              <input autoFocus maxLength={255} className="field !min-h-14 !px-4 !text-base" value={renameValue} onChange={(event) => setRenameValue(event.target.value)} onKeyDown={(event) => event.key === "Enter" && setRenameConfirmationOpen(true)} placeholder="Write new title" />
+            </label>
+            <div className="mt-5 flex justify-end gap-2">
+              <button className="rounded-xl border border-cyan-500 px-5 py-3 text-sm font-bold text-[#0284C7] hover:bg-[#E6F8FB]" onClick={() => { setRenameId(undefined); setRenameValue(""); }}>Cancel</button>
+              <button className="button-primary !px-6 !py-3" onClick={() => setRenameConfirmationOpen(true)}>Rename</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {renameId && renameConfirmationOpen ? (
+        <div className="modal-backdrop">
+          <div role="alertdialog" aria-modal="true" className="ticket-modal !w-[390px] !p-5">
+            <h2 className="text-[1.65rem] font-bold text-slate-700">Confirmation</h2>
+            <p className="mt-5 text-base font-semibold text-slate-700">Do you want to rename the title?</p>
+            <div className="mt-5 flex items-center justify-between">
+              <button className="rounded-xl border border-cyan-500 px-7 py-3 text-sm font-bold text-[#0284C7] hover:bg-[#E6F8FB]" onClick={() => setRenameConfirmationOpen(false)}>No</button>
+              <button className="button-primary !px-7 !py-3" onClick={() => void confirmRename()}>Yes</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {historyId ? (
+        <div className="modal-backdrop">
+          <div role="dialog" aria-modal="true" className="ticket-modal">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold">Previous Ticket Names</h2>
+              <button type="button" onClick={() => setHistoryId(undefined)}><X /></button>
+            </div>
+            <div className="mt-5 space-y-2">
+              {rows.find((item) => item.id === historyId)?.titleHistory.map((name, index) => (
+                <div key={`${name}-${index}`} className="flex items-center gap-3 rounded-lg bg-slate-50 p-3 text-sm">
+                  <Clock3 size={16} className="text-sky-600" />
+                  {name}
+                </div>
+              ))}
+              {!rows.find((item) => item.id === historyId)?.titleHistory.length ? (
+                <p className="text-sm text-slate-500">No previous name changes.</p>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {toast ? (
+        <div role="status" className="ticket-toast ticket-toast-success">
+          <p className="text-sm">{toast}</p>
+          <button className="ml-auto" aria-label="Dismiss notification" onClick={() => setToast("")}><X size={17} /></button>
+        </div>
+      ) : null}
 
       <TicketListStyles />
     </>
@@ -833,6 +966,30 @@ function TicketListStyles() {
 
       .resource-admin-ticket-title-wrap {
         min-width: 0;
+      }
+
+      .resource-admin-ticket-title-group {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      .resource-admin-ticket-title-main {
+        min-width: 0;
+        flex: 1 1 auto;
+      }
+
+      .resource-admin-ticket-title-actions {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        opacity: 0;
+        transition: opacity 0.15s ease;
+      }
+
+      .resource-admin-ticket-table tbody tr:hover .resource-admin-ticket-title-actions {
+        opacity: 1;
       }
 
       .resource-admin-ticket-title-wrap > a {

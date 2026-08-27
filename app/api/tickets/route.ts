@@ -4,7 +4,7 @@ import { db, listTickets } from "@/lib/db";
 
 const ticketSchema = z.object({
   id: z.string().min(1).max(64),
-  title: z.string().min(1).max(255),
+  title: z.string().max(255).default(""),
   project: z.string(),
   status: z.string(),
   priority: z.number().int().min(1).max(4),
@@ -60,28 +60,11 @@ export async function POST(request: Request) {
     const assignedTo = await foreignId("users", "name", ticket.assignedTo);
     const createdBy = await foreignId("users", "name", ticket.reporter);
     const lifecycle = state === "draft" ? "DRAFT" : "OPEN";
-    if (lifecycle === "OPEN" && !projectId) {
-      return Response.json(
-        { error: `Unknown project "${ticket.project}"` },
-        { status: 400 },
-      );
-    }
-    if (lifecycle === "OPEN" && !createdBy) {
-      return Response.json(
-        { error: `Unknown reporter "${ticket.reporter}"` },
-        { status: 400 },
-      );
-    }
-    if (lifecycle === "OPEN" && !assignedTo) {
-      return Response.json(
-        { error: `Unknown assignee "${ticket.assignedTo}"` },
-        { status: 400 },
-      );
-    }
     const status = lifecycle === "OPEN" ? "Open" : ticket.status;
     const createdDate = ticket.created ? ticket.created.slice(0, 10) : null;
     const deadline = ticket.dueDate ? ticket.dueDate.slice(0, 10) : null;
     const ticketType = String(ticket.formData?.type ?? "Task") || "Task";
+    const selectedPriorityNumber = Math.min(999, Math.max(1, Number(formData.priorityNumber ?? ticket.priority) || 1));
     const storedFormData = {
       id: ticket.id,
       ...formData,
@@ -94,15 +77,15 @@ export async function POST(request: Request) {
       [
         ticket.id,
         lifecycle,
-        ticket.title,
+        ticket.title.trim() || "Untitled ticket",
         ticket.description,
         JSON.stringify(storedFormData),
         priorityName[ticket.priority] ?? "Not Assigned",
-        ticket.priority,
+        selectedPriorityNumber,
         ticketType,
-        lifecycle === "OPEN" ? projectId : (projectId ?? null),
-        lifecycle === "OPEN" ? createdBy : (createdBy ?? null),
-        lifecycle === "OPEN" ? assignedTo : (assignedTo ?? null),
+        projectId ?? null,
+        createdBy ?? null,
+        assignedTo ?? null,
         status,
         createdDate,
         deadline,
