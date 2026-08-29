@@ -135,7 +135,6 @@ export default async function ClientTicketsPage() {
         )}
         portal="client"
         detailBaseHref="/client-portal/tickets"
-        now={Date.now()}
       />
     </div>
   );

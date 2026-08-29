@@ -14,8 +14,10 @@ import type { ClientDraftRow } from "@/types";
 
 export default function ClientDraftsTable({
   initialDrafts,
+  detailBaseHref = "/clients",
 }: {
   initialDrafts: ClientDraftRow[];
+  detailBaseHref?: string;
 }) {
   const router = useRouter();
 
@@ -124,7 +126,7 @@ export default function ClientDraftsTable({
                 >
                   <td className="px-8">
                     <Link
-                      href={`/clients/${draft.id}/edit?draft=1`}
+                      href={`${detailBaseHref}/${draft.id}/edit?draft=1`}
                       className="text-sm font-semibold text-[#101828] transition hover:text-[#0284C7]"
                     >
                       {draft.clientName}

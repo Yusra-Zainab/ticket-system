@@ -9,7 +9,7 @@ export default async function EditResourceProfilePage() {
   const profile = await getResourceProfile(user);
 
   return (
-    <div className="mx-auto max-w-7xl">
+    <div /*className="mx-auto max-w-7xl"*/>
       <ResourceProfileForm profile={profile} />;
     </div>
   );

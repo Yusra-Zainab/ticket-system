@@ -1,7 +1,8 @@
 import { z } from "zod";
-import type { PoolConnection, ResultSetHeader } from "mysql2/promise";
+import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 
-import { db, findProject, hasProjectPriorityColumn } from "@/lib/db";
+import { requireApiPermission } from "@/lib/apiPermissions";
+import { db, findProject, getRolePermissionScope, hasProjectPriorityColumn } from "@/lib/db";
 
 const statusSchema = z.enum([
   "Planning",
@@ -73,6 +74,12 @@ export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const auth = await requireApiPermission("View Projects");
+
+  if ("response" in auth) {
+    return auth.response;
+  }
+
   const { id } = await params;
 
   try {
@@ -93,6 +100,12 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const auth = await requireApiPermission("Edit Projects");
+
+  if ("response" in auth) {
+    return auth.response;
+  }
+
   const { id } = await params;
   const projectId = Number(id);
 
@@ -110,6 +123,18 @@ export async function PATCH(
 
     if (!current) {
       return Response.json({ error: "Project not found" }, { status: 404 });
+    }
+
+    const scope = await getRolePermissionScope(auth.user.role, "Edit Projects");
+    if (scope === "ASSIGNED_ONLY") {
+      const [assignedRows] = await connection.query<RowDataPacket[]>(
+        `SELECT project_id FROM project_resources WHERE project_id = ? AND user_id = ? LIMIT 1`,
+        [projectId, auth.user.id],
+      );
+      if (!assignedRows[0]) {
+        await connection.rollback();
+        return Response.json({ error: "Permission denied." }, { status: 403 });
+      }
     }
 
     const currentForm = current.formData ?? {};
@@ -236,6 +261,12 @@ export async function DELETE(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const auth = await requireApiPermission("Delete Projects");
+
+  if ("response" in auth) {
+    return auth.response;
+  }
+
   const { id } = await params;
   const projectId = Number(id);
 
@@ -244,6 +275,17 @@ export async function DELETE(
   }
 
   try {
+    const scope = await getRolePermissionScope(auth.user.role, "Delete Projects");
+    if (scope === "ASSIGNED_ONLY") {
+      const [assignedRows] = await db.query<RowDataPacket[]>(
+        `SELECT project_id FROM project_resources WHERE project_id = ? AND user_id = ? LIMIT 1`,
+        [projectId, auth.user.id],
+      );
+      if (!assignedRows[0]) {
+        return Response.json({ error: "Permission denied." }, { status: 403 });
+      }
+    }
+
     const [result] = await db.execute<ResultSetHeader>(
       "DELETE FROM projects WHERE id=?",
       [projectId],

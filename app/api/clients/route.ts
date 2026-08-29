@@ -10,6 +10,8 @@ import {
   z,
 } from "zod";
 
+import { requireApiPermission } from "@/lib/apiPermissions";
+
 import {
   db,
   listClients,
@@ -85,6 +87,12 @@ function projectIdsFromForm(
 }
 
 export async function GET() {
+  const auth = await requireApiPermission("View Clients");
+
+  if ("response" in auth) {
+    return auth.response;
+  }
+
   try {
     return Response.json(
       await listClients(),
@@ -112,6 +120,12 @@ export async function GET() {
 export async function POST(
   request: Request,
 ) {
+  const auth = await requireApiPermission("Create Clients");
+
+  if ("response" in auth) {
+    return auth.response;
+  }
+
   const connection =
     await db.getConnection();
 

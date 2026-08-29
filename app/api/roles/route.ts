@@ -2,6 +2,7 @@ import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 
 import { z } from "zod";
 
+import { requireApiPermission } from "@/lib/apiPermissions";
 import { db } from "@/lib/db";
 import { allPermissions } from "@/lib/rolePermissions";
 import { normalizeUserRole } from "@/lib/userRoles";
@@ -16,6 +17,8 @@ const schema = z.object({
   roleType: z.string().trim().min(1).max(100),
 
   permissions: z.array(z.string()).min(1),
+
+  permissionScopes: z.record(z.string(), z.enum(["ALL", "ASSIGNED_ONLY"])).default({}),
 });
 
 function cleanPermissions(permissions: string[]) {
@@ -26,14 +29,39 @@ function cleanPermissions(permissions: string[]) {
   );
 }
 
+function cleanPermissionScopes(
+  scopes: Record<string, "ALL" | "ASSIGNED_ONLY">,
+  permissions: string[],
+) {
+  const allowed = new Set(permissions);
+  const cleaned: Record<string, "ALL" | "ASSIGNED_ONLY"> = {};
+
+  for (const [permission, scope] of Object.entries(scopes)) {
+    if (!allowed.has(permission)) continue;
+    cleaned[permission] = scope;
+  }
+
+  return cleaned;
+}
+
 /*
  * CREATE ROLE
  */
 export async function POST(request: Request) {
+  const auth = await requireApiPermission("Create Roles");
+
+  if ("response" in auth) {
+    return auth.response;
+  }
+
   try {
     const values = schema.parse(await request.json());
 
     const permissions = cleanPermissions(values.permissions);
+    const permissionScopes = cleanPermissionScopes(
+      values.permissionScopes,
+      permissions,
+    );
 
     /*
      * It is possible for the incoming array to satisfy Zod's
@@ -63,7 +91,8 @@ export async function POST(request: Request) {
           description,
           role_type,
           type,
-          permissions
+          permissions,
+          permission_scopes
         )
 
         VALUES (
@@ -71,6 +100,7 @@ export async function POST(request: Request) {
           ?,
           ?,
           'CUSTOM',
+          ?,
           ?
         )
       `,
@@ -79,6 +109,7 @@ export async function POST(request: Request) {
         values.description,
         values.roleType,
         JSON.stringify(permissions),
+        JSON.stringify(permissionScopes),
       ],
     );
 
@@ -140,6 +171,12 @@ export async function POST(request: Request) {
  * UPDATE ROLE
  */
 export async function PATCH(request: Request) {
+  const auth = await requireApiPermission("Edit Roles");
+
+  if ("response" in auth) {
+    return auth.response;
+  }
+
   try {
     const values = schema.parse(await request.json());
 
@@ -197,6 +234,10 @@ export async function PATCH(request: Request) {
     }
 
     const permissions = cleanPermissions(values.permissions);
+    const permissionScopes = cleanPermissionScopes(
+      values.permissionScopes,
+      permissions,
+    );
 
     /*
      * As with POST, reject an update if every submitted
@@ -243,6 +284,7 @@ export async function PATCH(request: Request) {
           description = ?,
           role_type = ?,
           permissions = ?,
+          permission_scopes = ?,
           updated_at = CURRENT_TIMESTAMP
 
         WHERE id = ?
@@ -252,6 +294,7 @@ export async function PATCH(request: Request) {
         values.description,
         values.roleType,
         JSON.stringify(permissions),
+        JSON.stringify(permissionScopes),
         id,
       ],
     );

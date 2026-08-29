@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 import {
   ArrowRight,
@@ -342,10 +342,6 @@ function ticketApiHref(
     return `/api/client-portal/tickets/${encoded}`;
   }
 
-  if (portal === "resource") {
-    return `/api/resource-portal/tickets/${encoded}`;
-  }
-
   return `/api/tickets/${encoded}`;
 }
 
@@ -355,6 +351,7 @@ function editTicketHref(
   id: string,
 
   detailBaseHref: string,
+  draftBaseHref?: string,
 ) {
   const encoded = encodeURIComponent(id);
 
@@ -364,6 +361,10 @@ function editTicketHref(
 
   if (portal === "client") {
     return `/client-portal/tickets/new?draft=${encoded}`;
+  }
+
+  if (draftBaseHref) {
+    return `${draftBaseHref}?draft=${encoded}`;
   }
 
   /*
@@ -975,7 +976,7 @@ export default function TicketsTable({
   currentUserId,
   portal,
   detailBaseHref,
-  now: _now,
+  draftsBaseHref,
 }: {
   initialTickets: TicketListRow[];
 
@@ -985,7 +986,7 @@ export default function TicketsTable({
 
   detailBaseHref: string;
 
-  now: number;
+  draftsBaseHref?: string;
 }) {
   const [tickets, setTickets] = useState<SafeTicketRow[]>(() =>
     normalizeRows(initialTickets),
@@ -1033,9 +1034,6 @@ export default function TicketsTable({
 
   const [toast, setToast] = useState<ToastState | undefined>();
 
-  useEffect(() => {
-    setTickets(normalizeRows(initialTickets));
-  }, [initialTickets]);
 
   /* =======================================================
      FILTER + SORT
@@ -2035,6 +2033,7 @@ export default function TicketsTable({
                   portal,
                   ticket.id,
                   detailBaseHref,
+                  draftsBaseHref,
                 );
 
                 return (
@@ -2618,3 +2617,8 @@ function timeRemainingLabel(dueDate: string) {
 
   return `${diffDays} day${diffDays === 1 ? "" : "s"} remaining`;
 }
+
+
+
+
+

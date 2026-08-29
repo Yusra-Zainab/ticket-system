@@ -55,8 +55,12 @@ type ToastState = {
 
 export default function ClientsTable({
   initialClients,
+  detailBaseHref = "/clients",
+  allowDelete = true,
 }: {
   initialClients: ClientListRow[];
+  detailBaseHref?: string;
+  allowDelete?: boolean;
 }) {
   const router = useRouter();
 
@@ -115,7 +119,7 @@ export default function ClientsTable({
     const projectMap = new Map<string, string>();
 
     for (const client of clients) {
-      for (const project of client.assignedProjects) {
+      for (const project of client.assignedProjects ?? []) {
         projectMap.set(project.id, project.name);
       }
     }
@@ -143,9 +147,9 @@ export default function ClientsTable({
           client.primaryContact,
           client.contactMethod,
 
-          client.assignedProjects.map((project) => project.name).join(" "),
+          (client.assignedProjects ?? []).map((project) => project.name).join(" "),
 
-          client.clientTeam.map((member) => member.name).join(" "),
+          (client.clientTeam ?? []).map((member) => member.name).join(" "),
 
           client.status,
         ]
@@ -158,7 +162,7 @@ export default function ClientsTable({
 
       const matchesProject =
         assignedProject === "All" ||
-        client.assignedProjects.some(
+        (client.assignedProjects ?? []).some(
           (project) => project.id === assignedProject,
         );
 
@@ -181,9 +185,9 @@ export default function ClientsTable({
           break;
 
         case "assignedProjects":
-          left = a.assignedProjects.length;
+          left = (a.assignedProjects ?? []).length;
 
-          right = b.assignedProjects.length;
+          right = (b.assignedProjects ?? []).length;
 
           break;
 
@@ -551,7 +555,7 @@ export default function ClientsTable({
                   {/* Client Name */}
                   <td className="px-6 pl-8 text-left">
                     <Link
-                      href={`/clients/${client.id}`}
+                      href={`${detailBaseHref}/${client.id}`}
                       className="text-[14px] font-medium leading-5 text-[#101828] transition hover:text-[#0284C7]"
                     >
                       {client.clientName}
@@ -570,7 +574,7 @@ export default function ClientsTable({
 
                   {/* Assigned Projects */}
                   <td className="px-2 text-center">
-                    <AssignedProjects projects={client.assignedProjects} />
+                    <AssignedProjects projects={client.assignedProjects ?? []} />
                   </td>
 
                   {/* Open Tickets */}
@@ -580,7 +584,7 @@ export default function ClientsTable({
 
                   {/* Client Team */}
                   <td className="px-2">
-                    <ClientTeam members={client.clientTeam} />
+                    <ClientTeam members={client.clientTeam ?? []} />
                   </td>
 
                   {/* Status */}
@@ -595,6 +599,7 @@ export default function ClientsTable({
 
                   {/* Delete */}
                   <td className="px-3 text-center">
+                    {allowDelete ? (
                     <button
                       type="button"
                       aria-label={`Delete ${client.clientName}`}
@@ -604,6 +609,7 @@ export default function ClientsTable({
                     >
                       <Trash2 size={19} />
                     </button>
+                    ) : null}
                   </td>
                 </tr>
               ))}
@@ -1242,3 +1248,4 @@ function ClientFilterDropdown({
     </div>
   );
 }
+

@@ -1,5 +1,7 @@
 import { z } from "zod";
 import type { RowDataPacket } from "mysql2/promise";
+
+import { requireApiPermission } from "@/lib/apiPermissions";
 import { db, listTickets } from "@/lib/db";
 
 const ticketSchema = z.object({
@@ -16,12 +18,16 @@ const ticketSchema = z.object({
   tags: z.array(z.string()),
   formData: z.record(z.string(), z.unknown()).optional(),
 });
+
 const bodySchema = z.object({
   ticket: ticketSchema,
   state: z.enum(["draft", "open"]),
 });
+
 const priorityName = ["Not Assigned", "Critical", "High", "Medium", "Low"];
+
 type IdRow = RowDataPacket & { id: number };
+
 async function foreignId(
   table: "projects" | "users",
   column: "name",
@@ -36,7 +42,11 @@ async function foreignId(
   );
   return rows[0]?.id ?? null;
 }
+
 export async function GET(request: Request) {
+  const auth = await requireApiPermission("View Tickets");
+  if ("response" in auth) return auth.response;
+
   try {
     const state =
       new URL(request.url).searchParams.get("state") === "draft"
@@ -48,7 +58,11 @@ export async function GET(request: Request) {
     return Response.json({ error: "Unable to load tickets" }, { status: 503 });
   }
 }
+
 export async function POST(request: Request) {
+  const auth = await requireApiPermission("Create Tickets");
+  if ("response" in auth) return auth.response;
+
   try {
     const { ticket, state } = bodySchema.parse(await request.json());
     const formData = ticket.formData ?? {};
@@ -64,7 +78,10 @@ export async function POST(request: Request) {
     const createdDate = ticket.created ? ticket.created.slice(0, 10) : null;
     const deadline = ticket.dueDate ? ticket.dueDate.slice(0, 10) : null;
     const ticketType = String(ticket.formData?.type ?? "Task") || "Task";
-    const selectedPriorityNumber = Math.min(999, Math.max(1, Number(formData.priorityNumber ?? ticket.priority) || 1));
+    const selectedPriorityNumber = Math.min(
+      999,
+      Math.max(1, Number(formData.priorityNumber ?? ticket.priority) || 1),
+    );
     const storedFormData = {
       id: ticket.id,
       ...formData,

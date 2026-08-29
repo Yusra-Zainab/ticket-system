@@ -51,7 +51,7 @@ export default async function TicketDraftsPage() {
   return (
     <div className="space-y-7">
       <PageHeader title="Ticket Drafts" />
-      <TicketsTable initialTickets={drafts} currentUserId={String(user.id)} portal="admin" detailBaseHref="/tickets" now={Date.now()} />
+      <TicketsTable initialTickets={drafts} currentUserId={String(user.id)} portal="admin" detailBaseHref="/tickets" />
     </div>
   );
 }

@@ -1,95 +1,53 @@
-import PortalProjectsTable, {
-  type PortalProjectListItem,
-} from "@/components/features/PortalProjectsTable";
+import { Plus } from "lucide-react";
+import { notFound } from "next/navigation";
+
+import ProjectsTable from "@/components/features/ProjectsTable";
 import PageHeader from "@/components/ui/PageHeader";
 import { requireResourcePageSession } from "@/lib/auth";
-import { getRolePermissions } from "@/lib/db";
-import { getProjectListTicketMetrics } from "@/lib/projectListMetrics";
-import { listResourceProjects } from "@/lib/resourcePortal";
+import {
+  getRolePermissionScope,
+  getRolePermissions,
+  listProjects,
+} from "@/lib/db";
+import { listAssignedProjectIds } from "@/lib/resourcePortal";
 
-export const dynamic =
-  "force-dynamic";
+export const dynamic = "force-dynamic";
 
 export default async function ResourceProjectsPage() {
-  const user =
-    await requireResourcePageSession();
-
+  const user = await requireResourcePageSession();
   const permissions = await getRolePermissions(user.role);
-  const canViewProjects = permissions.includes("View Projects");
 
-  /*
-   * Existing DB authorization stays intact.
-   *
-   * listResourceProjects() starts from project_resources and therefore only
-   * returns projects assigned to the logged-in resource.
-   */
-  const projects = canViewProjects
-    ? await listResourceProjects(
-        user,
-      )
-    : [];
+  if (!permissions.includes("View Projects")) {
+    notFound();
+  }
 
-  /*
-   * Match the Admin project's Open Tickets / Critical calculations.
-   *
-   * Only IDs already returned by listResourceProjects() are supplied here.
-   */
-  const ticketMetrics =
-    await getProjectListTicketMetrics(
-      projects.map(
-        (project) =>
-          project.id,
-      ),
-    );
+  const canCreateProjects = permissions.includes("Create Projects");
 
-  const rows: PortalProjectListItem[] =
-    projects.map(
-      (project) => {
-        const metrics =
-          ticketMetrics.get(
-            project.id,
-          );
+  const [allProjects, scope] = await Promise.all([
+    listProjects("OPEN"),
+    getRolePermissionScope(user.role, "View Projects"),
+  ]);
 
-        return {
-          id: project.id,
+  let projects = allProjects;
 
-          name:
-            project.name,
-
-          client:
-            project.client ||
-            "Unassigned",
-
-          status:
-            project.status,
-
-          openTickets:
-            metrics?.openTickets ??
-            project.openTickets,
-
-          criticalTickets:
-            metrics?.criticalTickets ??
-            0,
-
-          teamMembers:
-            project.team,
-
-          lastUpdated:
-            project.updatedAt,
-        };
-      },
-    );
+  if (scope === "ASSIGNED_ONLY") {
+    const assigned = await listAssignedProjectIds(user.id);
+    projects = allProjects.filter((project) => assigned.has(project.id));
+  }
 
   return (
-    <div className="mt-7 space-y-6 px-5 sm:px-8 lg:px-12 xl:px-16">
-      <PageHeader title="Projects List" />
+    <div className="space-y-6">
+      <PageHeader
+        title="Projects List"
+        action={canCreateProjects ? "New Project" : undefined}
+        actionHref={canCreateProjects ? "/resource-portal/projects/new" : undefined}
+        actionIcon={Plus}
+      />
 
-      {canViewProjects ? (
-        <PortalProjectsTable
-          projects={rows}
-          projectHrefBase="/resource-portal/projects"
-        />
-      ) : null}
+      <ProjectsTable
+        initialProjects={projects}
+        projectHrefBase="/resource-portal/projects"
+      />
     </div>
   );
 }

@@ -16,6 +16,8 @@ import {
   sendMail,
 } from "@/lib/auth";
 
+import { requireApiPermission } from "@/lib/apiPermissions";
+
 import {
   db,
   findResource,
@@ -137,6 +139,12 @@ async function syncProjectAssignments(
 export async function GET(
   request: Request,
 ) {
+  const auth = await requireApiPermission("View Resources");
+
+  if ("response" in auth) {
+    return auth.response;
+  }
+
   try {
     const state =
       new URL(
@@ -182,6 +190,22 @@ export async function POST(
       schema.parse(
         await request.json(),
       );
+
+    const auth = await requireApiPermission(
+      value.id ? "Edit Resources" : "Create Resources",
+    );
+
+    if ("response" in auth) {
+      return auth.response;
+    }
+
+    if (String(value.formData.projectId ?? "").trim()) {
+      const assignAuth = await requireApiPermission("Assign Resources");
+
+      if ("response" in assignAuth) {
+        return assignAuth.response;
+      }
+    }
 
     const storedRole = (() => {
       const explicitRole = String(value.role ?? "").trim();

@@ -5,6 +5,7 @@ import { z } from "zod";
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 
 import { hashPassword, sendMail } from "@/lib/auth";
+import { requireApiPermission } from "@/lib/apiPermissions";
 import { db, listUsers } from "@/lib/db";
 import { isAdminRole, normalizeUserRole } from "@/lib/userRoles";
 
@@ -37,6 +38,12 @@ type ExistingUserRow = RowDataPacket & {
 };
 
 export async function GET() {
+  const auth = await requireApiPermission("View Users");
+
+  if ("response" in auth) {
+    return auth.response;
+  }
+
   try {
     return Response.json(await listUsers());
   } catch {
@@ -52,6 +59,12 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const auth = await requireApiPermission("Create Users");
+
+  if ("response" in auth) {
+    return auth.response;
+  }
+
   try {
     const value = schema.parse(await request.json());
     const persistedRole = (() => {
@@ -60,7 +73,9 @@ export async function POST(request: Request) {
         return explicitRole;
       }
 
-      const fallbackRole = persistedRoleFromInput(String(value.formData.jobTitle ?? ""));
+      const fallbackRole = persistedRoleFromInput(
+        String(value.formData.jobTitle ?? ""),
+      );
       return fallbackRole || explicitRole;
     })();
     const workEmail =
@@ -68,7 +83,11 @@ export async function POST(request: Request) {
       value.formData.workEmail.trim()
         ? value.formData.workEmail.trim()
         : value.email.trim();
-    const password = value.password ?? (isAdminRole(value.role) ? DEFAULT_ADMIN_PASSWORD : randomBytes(18).toString("base64url"));
+    const password =
+      value.password ??
+      (isAdminRole(value.role)
+        ? DEFAULT_ADMIN_PASSWORD
+        : randomBytes(18).toString("base64url"));
     const formData = {
       ...value.formData,
       email: workEmail,

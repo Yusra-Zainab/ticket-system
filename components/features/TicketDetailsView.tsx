@@ -283,9 +283,9 @@ function endpoints(portal: TicketDetailsPortal, ticketId: string) {
   }
   if (portal === "resource") {
     return {
-      update: `/api/resource-portal/tickets/${id}`,
-      upload: `/api/resource-portal/tickets/${id}/attachments`,
-      create: "/resource/tickets/new",
+      update: `/api/tickets/${id}`,
+      upload: `/api/tickets/${id}/attachments`,
+      create: "/resource-portal/tickets/new",
     };
   }
   return {

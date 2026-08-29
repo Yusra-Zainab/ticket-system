@@ -2,7 +2,7 @@ import "server-only";
 
 import type { RowDataPacket } from "mysql2/promise";
 
-import { db } from "@/lib/db";
+import { db, getRolePermissionScope, getRolePermissions } from "@/lib/db";
 import { normalizeProjectModules } from "@/lib/projectModules";
 import type {
   ResourcePortalActivity,
@@ -211,8 +211,11 @@ function safeProjectData(data: Record<string, unknown>) {
 
 export async function listResourceProjects(user: ResourcePortalSessionUser) {
   const formDataSelect = await projectFormDataSelect();
+  const assignedOnly =
+    (await getRolePermissionScope(user.role, 'View Projects')) === 'ASSIGNED_ONLY';
   const [rows] = await db.query<ProjectRow[]>(
-    `
+    assignedOnly
+      ? `
       SELECT
         p.id, p.name, p.description, p.status, p.priority_type, p.progress,
         p.due_date, p.start_date, p.updated_at, ${formDataSelect} AS form_data,
@@ -225,8 +228,21 @@ export async function listResourceProjects(user: ResourcePortalSessionUser) {
       WHERE pr.user_id = ? AND p.lifecycle = 'OPEN'
       GROUP BY p.id
       ORDER BY p.updated_at DESC
+    `
+      : `
+      SELECT
+        p.id, p.name, p.description, p.status, p.priority_type, p.progress,
+        p.due_date, p.start_date, p.updated_at, ${formDataSelect} AS form_data,
+        c.name AS client_name, c.company,
+        SUM(CASE WHEN t.lifecycle = 'OPEN' AND t.status NOT IN ('Closed','Cancelled') THEN 1 ELSE 0 END) AS open_tickets
+      FROM projects p
+      LEFT JOIN clients c ON c.id = p.client_id
+      LEFT JOIN tickets t ON t.project_id = p.id
+      WHERE p.lifecycle = 'OPEN'
+      GROUP BY p.id
+      ORDER BY p.updated_at DESC
     `,
-    [user.id],
+    assignedOnly ? [user.id] : [],
   );
 
   const [filesByProject, membersById, assignedMembers] = await Promise.all([
@@ -269,6 +285,22 @@ export async function listResourceProjects(user: ResourcePortalSessionUser) {
 export async function findResourceProject(user: ResourcePortalSessionUser, projectId: string) {
   const projects = await listResourceProjects(user);
   return projects.find((project) => project.id === projectId);
+}
+
+/*
+ * Project ids the resource is assigned to via `project_resources`
+ * (the canonical assigned relation — NOT form_data.teamIds). Used to
+ * apply the ASSIGNED_ONLY scope of "View Projects" on list pages that
+ * reuse the admin `listProjects()` fetcher.
+ */
+export async function listAssignedProjectIds(
+  userId: number,
+): Promise<Set<string>> {
+  const [rows] = await db.query<(RowDataPacket & { project_id: number })[]>(
+    `SELECT DISTINCT project_id FROM project_resources WHERE user_id = ?`,
+    [userId],
+  );
+  return new Set(rows.map((row) => String(row.project_id)));
 }
 
 export async function resourceHasProject(userId: number, projectId: number | string) {
@@ -374,13 +406,13 @@ export async function listResourceTickets(
   user: ResourcePortalSessionUser,
   lifecycle: ResourceTicketLifecycle,
 ) {
-  const scope = lifecycle === "DRAFT" ? "t.created_by = ?" : "(pr.user_id = ? OR t.created_by = ?)";
-  const joins = "LEFT JOIN project_resources pr ON pr.project_id = t.project_id AND pr.user_id = ?";
   const projectFormData = await projectFormDataSelect();
-
+  const assignedOnly =
+    (await getRolePermissionScope(user.role, 'View Tickets')) === 'ASSIGNED_ONLY';
 
   const [rows] = await db.query<TicketRow[]>(
-    `
+    lifecycle === 'DRAFT'
+      ? `
       SELECT
         t.id AS database_id, t.ticket_id, t.lifecycle, t.title, t.description,
         t.priority_type, t.type, t.project_id, p.name AS project_name,
@@ -389,14 +421,48 @@ export async function listResourceTickets(
         t.deadline, t.form_data, ${projectFormData} AS project_form_data
       FROM tickets t
       LEFT JOIN projects p ON p.id = t.project_id
-      ${joins}
       LEFT JOIN users creator ON creator.id = t.created_by
       LEFT JOIN users assignee ON assignee.id = t.assigned_to
-      WHERE t.lifecycle = ? AND (${scope}) ${lifecycle === "OPEN" ? "AND (p.lifecycle = 'OPEN' OR t.project_id IS NULL)" : ""}
+      WHERE t.lifecycle = ? AND t.created_by = ?
+      GROUP BY t.id
+      ORDER BY t.updated_at DESC
+    `
+      : assignedOnly
+        ? `
+      SELECT
+        t.id AS database_id, t.ticket_id, t.lifecycle, t.title, t.description,
+        t.priority_type, t.type, t.project_id, p.name AS project_name,
+        t.created_by, t.assigned_to, creator.name AS creator_name,
+        assignee.name AS assignee_name, t.status, t.created_at, t.updated_at,
+        t.deadline, t.form_data, ${projectFormData} AS project_form_data
+      FROM tickets t
+      LEFT JOIN projects p ON p.id = t.project_id
+      LEFT JOIN users creator ON creator.id = t.created_by
+      LEFT JOIN users assignee ON assignee.id = t.assigned_to
+      WHERE t.lifecycle = ? AND (t.created_by = ? OR t.assigned_to = ?)
+      GROUP BY t.id
+      ORDER BY t.updated_at DESC
+    `
+        : `
+      SELECT
+        t.id AS database_id, t.ticket_id, t.lifecycle, t.title, t.description,
+        t.priority_type, t.type, t.project_id, p.name AS project_name,
+        t.created_by, t.assigned_to, creator.name AS creator_name,
+        assignee.name AS assignee_name, t.status, t.created_at, t.updated_at,
+        t.deadline, t.form_data, ${projectFormData} AS project_form_data
+      FROM tickets t
+      LEFT JOIN projects p ON p.id = t.project_id
+      LEFT JOIN users creator ON creator.id = t.created_by
+      LEFT JOIN users assignee ON assignee.id = t.assigned_to
+      WHERE t.lifecycle = ?
       GROUP BY t.id
       ORDER BY t.updated_at DESC
     `,
-    lifecycle === "DRAFT" ? [user.id, lifecycle, user.id] : [user.id, lifecycle, user.id, user.id],
+    lifecycle === 'DRAFT'
+      ? [lifecycle, user.id]
+      : assignedOnly
+        ? [lifecycle, user.id, user.id]
+        : [lifecycle],
   );
 
   const attachments = await ticketAttachments(rows.map((row) => row.ticket_id));
@@ -408,6 +474,8 @@ export async function getResourceTicketAccess(
   ticketId: string,
 ): Promise<ResourceTicketAccess | null> {
   const projectFormData = await projectFormDataSelect();
+  const assignedOnly =
+    (await getRolePermissionScope(user.role, 'View Tickets')) === 'ASSIGNED_ONLY';
   const [rows] = await db.query<
     (RowDataPacket & {
       database_id: number;
@@ -419,27 +487,22 @@ export async function getResourceTicketAccess(
       status: ResourceTicketStatus;
       form_data: string | Record<string, unknown> | null;
       project_form_data: string | Record<string, unknown> | null;
-      assigned_project: number | null;
-      project_lifecycle: string | null;
     })[]
   >(
     `
       SELECT t.id AS database_id, t.ticket_id, t.lifecycle, t.created_by, t.assigned_to,
-             t.project_id, t.status, t.form_data, ${projectFormData} AS project_form_data,
-             pr.project_id AS assigned_project, p.lifecycle AS project_lifecycle
+             t.project_id, t.status, t.form_data, ${projectFormData} AS project_form_data
       FROM tickets t
-      LEFT JOIN projects p ON p.id = t.project_id
-      LEFT JOIN project_resources pr ON pr.project_id = t.project_id AND pr.user_id = ?
       WHERE t.ticket_id = ?
       LIMIT 1
     `,
-    [user.id, ticketId],
+    [ticketId],
   );
   const row = rows[0];
   if (!row) return null;
   const allowed =
     (row.lifecycle === "DRAFT" && row.created_by === user.id) ||
-    (row.lifecycle === "OPEN" && Boolean(row.assigned_project) && row.project_lifecycle === "OPEN");
+    (row.lifecycle === "OPEN" && (!assignedOnly || row.created_by === user.id || row.assigned_to === user.id));
   if (!allowed) return null;
   const projectData = parseJson<Record<string, unknown>>(row.project_form_data, {});
   return {
@@ -595,15 +658,18 @@ export async function findResourceTicket(user: ResourcePortalSessionUser, ticket
     : [];
   const ticketComments = mergePortalComments(tableComments, storedComments);
   const ownsOrAssigned = access.createdBy === user.id || access.assignedTo === user.id;
+  const permissions = await getRolePermissions(user.role);
+  const editScope = await getRolePermissionScope(user.role, 'Edit Tickets');
+  const statusScope = await getRolePermissionScope(user.role, 'Change Ticket Status');
   ticket.comments = ticketComments;
   ticket.activities = activities;
   ticket.permissions = {
-    canEditDetails: ownsOrAssigned,
-    canChangeStatus: ownsOrAssigned,
+    canEditDetails: permissions.includes('Edit Tickets') && (editScope === 'ALL' || ownsOrAssigned),
+    canChangeStatus: permissions.includes('Change Ticket Status') && (statusScope === 'ALL' || ownsOrAssigned),
     canSelfAssign: access.allowSelfAssign && access.assignedTo == null,
-    canComment: access.lifecycle === "OPEN",
-    canUpload: access.lifecycle === "OPEN",
-    canAddLink: access.lifecycle === "OPEN",
+    canComment: permissions.includes('View Tickets') && access.lifecycle === 'OPEN',
+    canUpload: permissions.includes('View Tickets') && access.lifecycle === 'OPEN',
+    canAddLink: permissions.includes('View Tickets') && access.lifecycle === 'OPEN',
   };
   return ticket;
 }
@@ -624,13 +690,26 @@ export async function canResourceAccessProjectAttachment(
     `
       SELECT pa.attachment_id, pa.file_name, pa.mime_type, pa.size_bytes, pa.file_data
       FROM project_attachments pa
-      JOIN project_resources pr ON pr.project_id = pa.project_id
       JOIN projects p ON p.id = pa.project_id
-      WHERE pa.attachment_id = ? AND pr.user_id = ? AND p.lifecycle = 'OPEN'
+      WHERE pa.attachment_id = ? AND p.lifecycle = 'OPEN'
       LIMIT 1
     `,
-    [attachmentId, user.id],
+    [attachmentId],
   );
+  const row = rows[0];
+  if (!row) return null;
+  const assignedOnly =
+    (await getRolePermissionScope(user.role, 'View Projects')) === 'ASSIGNED_ONLY';
+  if (!assignedOnly) {
+    return row;
+  }
+  const [accessRows] = await db.query<
+    (RowDataPacket & { project_id: number })[]
+  >(
+    `SELECT project_id FROM project_resources WHERE project_id = ? AND user_id = ? LIMIT 1`,
+    [row.project_id, user.id],
+  );
+  return accessRows[0] ? row : null;
   return rows[0] ?? null;
 }
 
@@ -646,29 +725,27 @@ export async function canResourceAccessTicketAttachment(
       size_bytes: number;
       content: Buffer;
       created_by: number | null;
+      assigned_to: number | null;
       lifecycle: ResourceTicketLifecycle;
-      assigned_project: number | null;
-      project_lifecycle: string | null;
     })[]
   >(
     `
       SELECT ta.attachment_id, ta.file_name, ta.mime_type, ta.size_bytes, ta.content,
-             t.created_by, t.lifecycle, pr.project_id AS assigned_project,
-             p.lifecycle AS project_lifecycle
+             t.created_by, t.assigned_to, t.lifecycle
       FROM ticket_attachments ta
       JOIN tickets t ON t.ticket_id = ta.ticket_id
-      LEFT JOIN projects p ON p.id = t.project_id
-      LEFT JOIN project_resources pr ON pr.project_id = t.project_id AND pr.user_id = ?
       WHERE ta.attachment_id = ?
       LIMIT 1
     `,
-    [user.id, attachmentId],
+    [attachmentId],
   );
   const row = rows[0];
   if (!row) return null;
+  const assignedOnly =
+    (await getRolePermissionScope(user.role, 'View Tickets')) === 'ASSIGNED_ONLY';
   const allowed =
-    (row.lifecycle === "DRAFT" && row.created_by === user.id) ||
-    (row.lifecycle === "OPEN" && Boolean(row.assigned_project) && row.project_lifecycle === "OPEN");
+    (row.lifecycle === 'DRAFT' && row.created_by === user.id) ||
+    (row.lifecycle === 'OPEN' && (!assignedOnly || row.created_by === user.id || row.assigned_to === user.id));
   return allowed ? row : null;
 }
 

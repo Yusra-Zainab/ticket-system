@@ -1,5 +1,6 @@
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 
+import { requireApiPermission } from "@/lib/apiPermissions";
 import { db } from "@/lib/db";
 
 type AttachmentRow = RowDataPacket & {
@@ -12,6 +13,12 @@ export async function GET(
   _request: Request,
   { params }: { params: Promise<{ attachmentId: string }> },
 ) {
+  const auth = await requireApiPermission("View Projects");
+
+  if ("response" in auth) {
+    return auth.response;
+  }
+
   const { attachmentId } = await params;
 
   try {
@@ -46,6 +53,12 @@ export async function DELETE(
   _request: Request,
   { params }: { params: Promise<{ attachmentId: string }> },
 ) {
+  const auth = await requireApiPermission("Manage Project Files");
+
+  if ("response" in auth) {
+    return auth.response;
+  }
+
   const { attachmentId } = await params;
 
   try {

@@ -2,6 +2,7 @@ import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 
 import { z } from "zod";
 
+import { requireApiPermission } from "@/lib/apiPermissions";
 import { db } from "@/lib/db";
 
 const schema = z.object({
@@ -31,6 +32,12 @@ type CurrentSettings = RowDataPacket & {
 };
 
 export async function PATCH(request: Request) {
+  const auth = await requireApiPermission("Configure Email");
+
+  if ("response" in auth) {
+    return auth.response;
+  }
+
   try {
     const values = schema.parse(await request.json());
 

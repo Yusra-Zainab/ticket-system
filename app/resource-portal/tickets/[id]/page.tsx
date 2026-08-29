@@ -18,13 +18,11 @@ export default async function ResourceTicketDetailsPage({
   if (!ticket) notFound();
 
   return (
-    <div className="px-5 pb-8 sm:px-8 lg:px-12 xl:px-16">
-      <PortalTicketDetailsView
-        portal="resource"
-        ticket={ticket}
-        currentUserId={String(user.id)}
-        currentUserName={user.name}
-      />
-    </div>
+    <PortalTicketDetailsView
+      portal="resource"
+      ticket={ticket}
+      currentUserId={String(user.id)}
+      currentUserName={user.name}
+    />
   );
 }

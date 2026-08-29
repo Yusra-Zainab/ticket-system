@@ -8,12 +8,14 @@ import StickyToast from "@/components/ui/StickyToast";
 import { allPermissions, permissionGroups } from "@/lib/rolePermissions";
 import { cn } from "@/lib/utils";
 
-import type { RoleFormRecord } from "@/types";
+import type { RoleFormRecord, RolePermissionScope } from "@/types";
 
 export default function RoleForm({
   initialRole,
+  rolesListHref = "/admin/roles",
 }: {
   initialRole?: RoleFormRecord;
+  rolesListHref?: string;
 }) {
   const router = useRouter();
 
@@ -29,6 +31,10 @@ export default function RoleForm({
   const [selectedPermissions, setSelectedPermissions] = useState<string[]>(
     initialRole?.permissions ?? [],
   );
+
+  const [permissionScopes, setPermissionScopes] = useState<
+    Record<string, RolePermissionScope>
+  >(initialRole?.permissionScopes ?? {});
 
   const [activeGroup, setActiveGroup] = useState(permissionGroups[0].name);
 
@@ -46,6 +52,28 @@ export default function RoleForm({
   const activeGroupSelected = activePermissionGroup.permissions.every(
     (permission) => selectedPermissions.includes(permission),
   );
+
+  /*
+   * Scope (ALL vs ASSIGNED_ONLY) is only meaningful for the "View"
+   * permission of a scoped group — that is what the resource-portal
+   * data fetchers read (`getRolePermissionScope`). The toggle reflects
+   * and drives that key permission; `setGroupScope` still applies the
+   * choice across the whole group so the sub-scopes stay consistent.
+   */
+  const scopeKeyPermission =
+    activePermissionGroup.name === "Projects"
+      ? "View Projects"
+      : activePermissionGroup.name === "Tickets"
+        ? "View Tickets"
+        : null;
+
+  const scopedGroup = scopeKeyPermission !== null;
+
+  const activeGroupScope: RolePermissionScope =
+    scopeKeyPermission &&
+    permissionScopes[scopeKeyPermission] === "ASSIGNED_ONLY"
+      ? "ASSIGNED_ONLY"
+      : "ALL";
 
   function togglePermission(permission: string) {
     setSelectedPermissions((current) =>
@@ -79,11 +107,24 @@ export default function RoleForm({
     setSelectedPermissions([]);
   }
 
+  function setGroupScope(scope: RolePermissionScope) {
+    setPermissionScopes((current) => {
+      const next = { ...current };
+
+      for (const permission of activePermissionGroup.permissions) {
+        next[permission] = scope;
+      }
+
+      return next;
+    });
+  }
+
   function reset() {
     setName(initialRole?.name ?? "");
     setDescription(initialRole?.description ?? "");
     setRoleType(initialRole?.roleType ?? "");
     setSelectedPermissions(initialRole?.permissions ?? []);
+    setPermissionScopes(initialRole?.permissionScopes ?? {});
     setActiveGroup(permissionGroups[0].name);
     setError("");
     setNotice("");
@@ -132,6 +173,7 @@ export default function RoleForm({
           description: description.trim(),
           roleType: roleType.trim(),
           permissions: selectedPermissions,
+          permissionScopes,
         }),
       });
 
@@ -143,7 +185,7 @@ export default function RoleForm({
         );
       }
 
-      router.push("/admin/roles");
+      router.push(rolesListHref);
       router.refresh();
     } catch (reason) {
       const message =
@@ -285,14 +327,54 @@ export default function RoleForm({
 
         {activePermissionGroup && (
           <div className="role-permission-tree">
-            <label className="role-permission-group-row">
-              <PermissionCheckbox
-                checked={activeGroupSelected}
-                onChange={toggleGroup}
-              />
+            <div className="flex items-center justify-between gap-4">
+              <label className="role-permission-group-row">
+                <PermissionCheckbox
+                  checked={activeGroupSelected}
+                  onChange={toggleGroup}
+                />
 
-              <span>{activePermissionGroup.name}</span>
-            </label>
+                <span>{activePermissionGroup.name}</span>
+              </label>
+
+              {scopedGroup && (
+                <div
+                  role="radiogroup"
+                  aria-label={`${activePermissionGroup.name} data access scope`}
+                  className="inline-flex shrink-0 overflow-hidden rounded-lg border border-[#06B6D4]"
+                >
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={activeGroupScope === "ALL"}
+                    onClick={() => setGroupScope("ALL")}
+                    className={cn(
+                      "h-8 px-3.5 text-xs font-semibold transition-colors",
+                      activeGroupScope === "ALL"
+                        ? "bg-[#0284C7] text-white"
+                        : "bg-white text-[#0284C7] hover:bg-[#F0F9FF]",
+                    )}
+                  >
+                    All
+                  </button>
+
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={activeGroupScope === "ASSIGNED_ONLY"}
+                    onClick={() => setGroupScope("ASSIGNED_ONLY")}
+                    className={cn(
+                      "h-8 border-l border-[#06B6D4] px-3.5 text-xs font-semibold transition-colors",
+                      activeGroupScope === "ASSIGNED_ONLY"
+                        ? "bg-[#0284C7] text-white"
+                        : "bg-white text-[#0284C7] hover:bg-[#F0F9FF]",
+                    )}
+                  >
+                    Assigned only
+                  </button>
+                </div>
+              )}
+            </div>
 
             <div className="role-permission-items">
               {activePermissionGroup.permissions.map((permission) => (

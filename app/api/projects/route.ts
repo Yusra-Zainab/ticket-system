@@ -5,6 +5,7 @@ import type {
   RowDataPacket,
 } from "mysql2/promise";
 
+import { requireApiPermission } from "@/lib/apiPermissions";
 import { db, hasProjectPriorityColumn, listProjects } from "@/lib/db";
 
 const projectStatus = z.enum([
@@ -96,6 +97,12 @@ async function resolveClientId(
 }
 
 export async function GET(request: Request) {
+  const auth = await requireApiPermission("View Projects");
+
+  if ("response" in auth) {
+    return auth.response;
+  }
+
   try {
     const state = new URL(request.url).searchParams.get("state");
     const lifecycle = state === "draft" ? "DRAFT" : "OPEN";
@@ -109,6 +116,12 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   let connection: PoolConnection | undefined;
   let transactionStarted = false;
+
+  const auth = await requireApiPermission("Create Projects");
+
+  if ("response" in auth) {
+    return auth.response;
+  }
 
   try {
     connection = await db.getConnection();

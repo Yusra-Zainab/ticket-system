@@ -23,6 +23,7 @@ import type {
   RoleFormRecord,
   RoleRecord,
   RoleType,
+  RolePermissionScope,
 } from "@/types";
 
 import { allPermissions } from "@/lib/rolePermissions";
@@ -1845,6 +1846,7 @@ type RoleDbRow = RowDataPacket & {
   role_type: string | null;
   type: RoleType;
   permissions: string | unknown[] | null;   // was: string | null
+  permission_scopes: string | Record<string, unknown> | null;
   updated_at: string;
   user_count: number;
 };
@@ -1901,6 +1903,82 @@ function parseRolePermissions(value: string | unknown[] | null): string[] {
   }
 }
 
+function parseRolePermissionScopes(
+  value: string | Record<string, unknown> | null,
+): Record<string, RolePermissionScope> {
+  if (!value) {
+    return {};
+  }
+
+  const parsed =
+    typeof value === "string"
+      ? (() => {
+          try {
+            return JSON.parse(value) as Record<string, unknown>;
+          } catch {
+            return {};
+          }
+        })()
+      : value;
+
+  if (!parsed || Array.isArray(parsed) || typeof parsed !== "object") {
+    return {};
+  }
+
+  const scopes: Record<string, RolePermissionScope> = {};
+
+  for (const [permission, scope] of Object.entries(parsed)) {
+    if (scope === "ALL" || scope === "ASSIGNED_ONLY") {
+      scopes[permission] = scope;
+    }
+  }
+
+  return scopes;
+}
+
+async function loadRoleRows() {
+  const [rows] = await db.query<RoleDbRow[]>(
+    `
+      SELECT
+        r.name,
+        r.role_type,
+        r.permissions,
+        r.permission_scopes
+      FROM roles r
+      ORDER BY
+        r.updated_at DESC,
+        r.id DESC
+    `,
+  );
+
+  return rows;
+}
+
+export async function getRolePermissionScope(
+  roleName: string,
+  permission: string,
+): Promise<RolePermissionScope> {
+  const normalizedRole = normalizeRoleLookup(roleName);
+  const normalizedPermission = String(permission ?? "").trim();
+
+  if (!normalizedRole || !normalizedPermission) {
+    return "ALL";
+  }
+
+  if (isAdminRole(normalizedRole)) {
+    return "ALL";
+  }
+
+  const rows = await loadRoleRows();
+  const match = rows.find(
+    (row) =>
+      normalizeRoleLookup(row.name) === normalizedRole ||
+      normalizeRoleLookup(row.role_type ?? row.name) === normalizedRole,
+  );
+
+  return parseRolePermissionScopes(match?.permission_scopes ?? null)[normalizedPermission] ?? "ALL";
+}
+
 export async function listRoles(): Promise<RoleRecord[]> {
   const [rows] = await db.query<RoleDbRow[]>(
     `
@@ -1911,6 +1989,7 @@ export async function listRoles(): Promise<RoleRecord[]> {
           r.role_type,
           r.type,
           r.permissions,
+          r.permission_scopes,
           r.updated_at,
           COUNT(u.id) AS user_count
 
@@ -1930,6 +2009,7 @@ export async function listRoles(): Promise<RoleRecord[]> {
           r.role_type,
           r.type,
           r.permissions,
+          r.permission_scopes,
           r.updated_at
 
         ORDER BY
@@ -1958,6 +2038,8 @@ export async function listRoles(): Promise<RoleRecord[]> {
 
       permissions: parseRolePermissions(row.permissions),
 
+      permissionScopes: parseRolePermissionScopes(row.permission_scopes),
+
       updatedAt: String(row.updated_at),
     }),
   );
@@ -1981,6 +2063,7 @@ export async function findRole(
           r.role_type,
           r.type,
           r.permissions,
+          r.permission_scopes,
           r.updated_at,
           0 AS user_count
 
@@ -2011,6 +2094,8 @@ export async function findRole(
     type: row.type,
 
     permissions: parseRolePermissions(row.permissions),
+
+    permissionScopes: parseRolePermissionScopes(row.permission_scopes),
   };
 }
 
@@ -2067,20 +2152,7 @@ export async function getRolePermissions(roleName: string): Promise<string[]> {
     return expandPermissionAliases([...allPermissions]);
   }
 
-  const [rows] = await db.query<RoleDbRow[]>(
-    `
-      SELECT
-        r.name,
-        r.role_type,
-        r.permissions
-
-      FROM roles r
-
-      ORDER BY
-        r.updated_at DESC,
-        r.id DESC
-    `,
-  );
+  const rows = await loadRoleRows();
 
   const match = rows.find(
     (row) =>

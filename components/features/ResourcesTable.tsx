@@ -8,7 +8,6 @@ import {
   ChevronRight,
   Filter,
   Search,
-  X,
 } from "lucide-react";
 import { type ReactNode, useMemo, useState } from "react";
 
@@ -116,9 +115,11 @@ type SortDirection = "asc" | "desc";
 export default function ResourcesTable({
   initialResources,
   variant = "list",
+  detailBaseHref = "/resources",
 }: {
   initialResources: ResourceListRow[];
   variant?: ResourceTableVariant;
+  detailBaseHref?: string;
 }) {
   const isDrafts = variant === "drafts";
 
@@ -431,8 +432,8 @@ export default function ResourcesTable({
                     <Link
                       href={
                         isDrafts
-                          ? `/resources/new?draft=${encodeURIComponent(resource.id)}`
-                          : `/resources/${encodeURIComponent(resource.id)}`
+                          ? `${detailBaseHref}/new?draft=${encodeURIComponent(resource.id)}`
+                          : `${detailBaseHref}/${encodeURIComponent(resource.id)}`
                       }
                       className="resource-name-link"
                     >

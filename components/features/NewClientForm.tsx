@@ -246,11 +246,15 @@ export default function NewClientForm({
   projects = [],
   initialRecord,
   initialSection = "client-information",
+  clientBaseHref = "/clients",
+  projectBaseHref = "/projects",
 }: {
   users?: User[];
   projects?: Project[];
   initialRecord?: ClientEditorRecord;
   initialSection?: SectionId;
+  clientBaseHref?: string;
+  projectBaseHref?: string;
 }) {
   const router = useRouter();
 
@@ -461,7 +465,7 @@ export default function NewClientForm({
         }
 
         if (initialRecord?.lifecycle === "DRAFT") {
-          router.push("/clients");
+          router.push(clientBaseHref);
           router.refresh();
           return;
         }
@@ -475,7 +479,7 @@ export default function NewClientForm({
         showNotice("Client draft saved successfully.");
 
         if (clientId) {
-          router.replace(`/clients/${clientId}/edit?draft=1`);
+          router.replace(`${clientBaseHref}/${clientId}/edit?draft=1`);
 
           router.refresh();
         }
@@ -488,7 +492,7 @@ export default function NewClientForm({
        * it into OPEN and returns to
        * Clients List.
        */
-      router.push("/clients");
+      router.push(clientBaseHref);
 
       router.refresh();
     } catch (reason) {
@@ -571,7 +575,7 @@ export default function NewClientForm({
 
           <div className="flex flex-wrap items-center gap-3">
             <Link
-              href="/clients/drafts"
+              href={`${clientBaseHref}/drafts`}
               className="inline-flex h-10 items-center justify-center rounded-lg border border-[#D0D5DD] bg-white px-[14px] text-sm font-semibold text-[#344054] shadow-[0_1px_2px_rgba(16,24,40,0.05)] transition hover:bg-[#F9FAFB]"
             >
               Drafts
@@ -1152,10 +1156,10 @@ export default function NewClientForm({
                   projects={projects ?? []}
                   onNewProject={() =>
                     router.push(
-                      `/projects/new?returnTo=${encodeURIComponent(
+                      `${projectBaseHref}/new?returnTo=${encodeURIComponent(
                         initialRecord
-                          ? `/clients/${initialRecord.id}/edit`
-                          : "/clients/new",
+                          ? `${clientBaseHref}/${initialRecord.id}/edit`
+                          : `${clientBaseHref}/new`,
                       )}`,
                     )
                   }

@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { RowDataPacket, ResultSetHeader } from "mysql2/promise";
+
+import { requireApiPermission } from "@/lib/apiPermissions";
 import { db } from "@/lib/db";
 
 type TicketRow = RowDataPacket & { ticket_id: string };
@@ -20,6 +22,9 @@ async function ticketExists(ticketId: string) {
 }
 
 export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
+  const auth = await requireApiPermission("View Tickets");
+  if ("response" in auth) return auth.response;
+
   try {
     const { id } = await context.params;
     const [rows] = await db.query<AttachmentRow[]>(
@@ -43,6 +48,9 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
 }
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
+  const auth = await requireApiPermission("View Tickets");
+  if ("response" in auth) return auth.response;
+
   try {
     const { id } = await context.params;
     if (!(await ticketExists(id))) {
@@ -79,3 +87,5 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     return Response.json({ error: "Unable to upload attachments" }, { status: 500 });
   }
 }
+
+

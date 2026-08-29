@@ -7,7 +7,6 @@ import {
   Check,
   ChevronDown,
   Code2,
-  FileText,
   HelpCircle,
   Layers3,
   Mail,
@@ -383,10 +382,16 @@ export default function NewResourceForm({
   initialResource,
   initialSection = "basic",
   roleOptions = [],
+  resourceBaseHref = "/resources",
+  projectBaseHref = "/projects",
+  rolesNewHref = "/admin/roles/new",
 }: {
   initialResource?: ResourceDraft;
   initialSection?: SectionId;
   roleOptions?: string[];
+  resourceBaseHref?: string;
+  projectBaseHref?: string;
+  rolesNewHref?: string;
 }) {
   const router = useRouter();
 
@@ -543,12 +548,12 @@ export default function NewResourceForm({
     [selectedProject],
   );
   const availableSubModules = useMemo(() => {
-    const module = findProjectModule(availableModules, values.module);
-    return module?.subModules ?? [];
+    const matchedModule = findProjectModule(availableModules, values.module);
+    return matchedModule?.subModules ?? [];
   }, [availableModules, values.module]);
   const resourceReturnTo = initialResource
-    ? `/resources/${initialResource.id}/edit`
-    : "/resources/new";
+    ? `${resourceBaseHref}/${initialResource.id}/edit`
+    : `${resourceBaseHref}/new`;
   const setField = <K extends keyof ResourceFormValues>(
     field: K,
     value: ResourceFormValues[K],
@@ -741,14 +746,14 @@ export default function NewResourceForm({
       }
 
       if (targetLifecycle === "DRAFT") {
-        router.push("/resources/drafts");
+        router.push(`${resourceBaseHref}/drafts`);
 
         router.refresh();
 
         return;
       }
 
-      router.push(`/resources/${body.id ?? resourceId}`);
+      router.push(`${resourceBaseHref}/${body.id ?? resourceId}`);
 
       router.refresh();
     } catch (reason) {
@@ -780,7 +785,7 @@ export default function NewResourceForm({
           <div className="new-resource-actions">
             {/* Drafts */}
             <Link
-              href="/resources/drafts"
+              href={`${resourceBaseHref}/drafts`}
               className="new-resource-button-secondary"
             >
               Drafts
@@ -906,7 +911,7 @@ export default function NewResourceForm({
                   label: title,
                 }))}
                 actionLabel="New Role"
-                onAction={() => router.push("/admin/roles/new")}
+                onAction={() => router.push(rolesNewHref)}
               />
             </div>
 
@@ -1123,7 +1128,7 @@ export default function NewResourceForm({
                 actionLabel="New Project"
                 onAction={() =>
                   router.push(
-                    "/projects/new?returnTo=" + encodeURIComponent(resourceReturnTo),
+                    projectBaseHref + "/new?returnTo=" + encodeURIComponent(resourceReturnTo),
                   )
                 }
               />
@@ -1171,8 +1176,8 @@ export default function NewResourceForm({
                 onAction={() =>
                   router.push(
                     values.projectId
-                      ? "/projects/" + values.projectId + "/edit?section=modules-setup&returnTo=" + encodeURIComponent(resourceReturnTo)
-                      : "/projects/new?returnTo=" + encodeURIComponent(resourceReturnTo),
+                      ? projectBaseHref + "/" + values.projectId + "/edit?section=modules-setup&returnTo=" + encodeURIComponent(resourceReturnTo)
+                      : projectBaseHref + "/new?returnTo=" + encodeURIComponent(resourceReturnTo),
                   )
                 }
               />
@@ -1193,8 +1198,8 @@ export default function NewResourceForm({
                 onAction={() =>
                   router.push(
                     values.projectId
-                      ? "/projects/" + values.projectId + "/edit?section=modules-setup&returnTo=" + encodeURIComponent(resourceReturnTo)
-                      : "/projects/new?returnTo=" + encodeURIComponent(resourceReturnTo),
+                      ? projectBaseHref + "/" + values.projectId + "/edit?section=modules-setup&returnTo=" + encodeURIComponent(resourceReturnTo)
+                      : projectBaseHref + "/new?returnTo=" + encodeURIComponent(resourceReturnTo),
                   )
                 }
               />

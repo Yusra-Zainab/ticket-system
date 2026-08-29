@@ -113,16 +113,17 @@ function permissionsFor(
   }
 
   const permissions = record(source.permissions);
-  if (!Object.keys(permissions).length) {
-    return ["Change Status", "Upload File", "Add Comment"];
+  if (Object.keys(permissions).length) {
+    const actions: TicketDetailAction[] = [];
+    if (permissions.canChangeStatus === true) actions.push("Change Status");
+    if (permissions.canUpload === true) actions.push("Upload File");
+    if (permissions.canComment === true) actions.push("Add Comment");
+    if (permissions.canEditDetails === true) actions.push("Edit Ticket Details");
+    if (permissions.canSelfAssign === true) actions.push("Assign Resource");
+    return actions;
   }
 
-  const actions: TicketDetailAction[] = [];
-  if (permissions.canChangeStatus === true) actions.push("Change Status");
-  if (permissions.canUpload === true) actions.push("Upload File");
-  if (permissions.canComment === true) actions.push("Add Comment");
-  if (permissions.canEditDetails === true) actions.push("Edit Ticket Details");
-  return actions;
+  return ["Change Status", "Upload File", "Add Comment"];
 }
 
 export default function PortalTicketDetailsView({
@@ -198,4 +199,5 @@ export default function PortalTicketDetailsView({
     />
   );
 }
+
 

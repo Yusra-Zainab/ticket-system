@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { ResultSetHeader } from "mysql2/promise";
 
+import { requireApiPermission } from "@/lib/apiPermissions";
 import { db } from "@/lib/db";
 import type { TicketAttachment } from "@/types";
 
@@ -11,6 +12,12 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const auth = await requireApiPermission("Manage Project Files");
+
+  if ("response" in auth) {
+    return auth.response;
+  }
+
   const { id } = await params;
   const projectId = Number(id);
 

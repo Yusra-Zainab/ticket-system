@@ -62,7 +62,6 @@ export default async function TicketsPage() {
         currentUserId={String(user.id)}
         portal="admin"
         detailBaseHref="/tickets"
-        now={Date.now()}
       />
     </div>
   );

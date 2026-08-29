@@ -131,6 +131,10 @@ export default function ResourceDetailsView({
   projects,
   tickets,
   initialTab,
+  allowResourceEdit = true,
+  allowResourceAssign = true,
+  resourceBaseHref = "/resources",
+  ticketBaseHref = "/tickets",
 }: {
   resource: ResourceRecord;
 
@@ -139,6 +143,14 @@ export default function ResourceDetailsView({
   tickets: Ticket[];
 
   initialTab?: string;
+
+  allowResourceEdit?: boolean;
+
+  allowResourceAssign?: boolean;
+
+  resourceBaseHref?: string;
+
+  ticketBaseHref?: string;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -437,28 +449,34 @@ export default function ResourceDetailsView({
           <h1>Resource Details</h1>
 
           <div className="resource-detail-actions">
-            <Link
-              href={`/resources/${resource.id}/edit`}
-              className="resource-detail-action"
-            >
-              Edit Resource
-            </Link>
+            {allowResourceEdit && (
+              <Link
+                href={`${resourceBaseHref}/${resource.id}/edit`}
+                className="resource-detail-action"
+              >
+                Edit Resource
+              </Link>
+            )}
 
-            <Link
-              href={`/resources/${resource.id}/edit?section=projects`}
-              className="resource-detail-action"
-            >
-              Assign Project
-            </Link>
+            {allowResourceAssign && (
+              <Link
+                href={`${resourceBaseHref}/${resource.id}/edit?section=projects`}
+                className="resource-detail-action"
+              >
+                Assign Project
+              </Link>
+            )}
 
-            <Link
-              href={`/tickets/new?assignedTo=${encodeURIComponent(
-                resourceName,
-              )}&returnTo=${encodeURIComponent(`/resources/${resource.id}`)}`}
-              className="resource-detail-action"
-            >
-              Assign Ticket
-            </Link>
+            {allowResourceAssign && (
+              <Link
+                href={`${ticketBaseHref}/new?assignedTo=${encodeURIComponent(
+                  resourceName,
+                )}&returnTo=${encodeURIComponent(`${resourceBaseHref}/${resource.id}`)}`}
+                className="resource-detail-action"
+              >
+                Assign Ticket
+              </Link>
+            )}
 
             <div className="relative">
               <button
@@ -479,12 +497,14 @@ export default function ResourceDetailsView({
                   />
 
                   <div className="resource-detail-more-menu">
-                    <Link
-                      href={`/resources/${resource.id}/edit`}
-                      onClick={() => setMoreOpen(false)}
-                    >
-                      Edit Resource
-                    </Link>
+                    {allowResourceEdit && (
+                      <Link
+                        href={`${resourceBaseHref}/${resource.id}/edit`}
+                        onClick={() => setMoreOpen(false)}
+                      >
+                        Edit Resource
+                      </Link>
+                    )}
 
                     <button
                       type="button"

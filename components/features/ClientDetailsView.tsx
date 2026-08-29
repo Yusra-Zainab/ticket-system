@@ -8,10 +8,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ExternalLink,
-  FileText,
   Filter,
-  MoreHorizontal,
-  RefreshCcw,
   Search,
 } from "lucide-react";
 
@@ -47,19 +44,33 @@ export default function ClientDetailsView({
   tickets,
   users,
   initialTab,
+  allowClientEdit = true,
+  allowAssignClientProjects = true,
+  allowManageClientTeam = true,
+  clientBaseHref = "/clients",
+  ticketBaseHref = "/tickets",
 }: {
   client: ClientEditorRecord;
   projects: Project[];
   tickets: Ticket[];
   users: User[];
   initialTab?: string;
+  allowClientEdit?: boolean;
+  allowAssignClientProjects?: boolean;
+  allowManageClientTeam?: boolean;
+  clientBaseHref?: string;
+  ticketBaseHref?: string;
 }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const form = client.formData;
+  const visibleTabs = allowManageClientTeam
+    ? tabs
+    : (tabs.filter((tab) => tab !== "Team") as readonly ClientTab[]);
+
   const normalizeTab = (value?: string): ClientTab =>
-    tabs.find((tab) => tab.toLowerCase() === String(value ?? "").trim().toLowerCase()) ?? "Overview";
+    visibleTabs.find((tab) => tab.toLowerCase() === String(value ?? "").trim().toLowerCase()) ?? "Overview";
 
   /*
    * Overview is intentionally the
@@ -229,22 +240,26 @@ export default function ClientDetailsView({
           <h1>Client Details</h1>
 
           <div className="client-details-actions">
-            <Link
-              href={`/clients/${client.id}/edit`}
-              className="client-detail-action"
-            >
-              Edit Client
-            </Link>
+            {allowClientEdit && (
+              <Link
+                href={`${clientBaseHref}/${client.id}/edit`}
+                className="client-detail-action"
+              >
+                Edit Client
+              </Link>
+            )}
+
+            {allowAssignClientProjects && (
+              <Link
+                href={`${clientBaseHref}/${client.id}/edit?section=projects`}
+                className="client-detail-action"
+              >
+                Assign Project
+              </Link>
+            )}
 
             <Link
-              href={`/clients/${client.id}/edit?section=projects`}
-              className="client-detail-action"
-            >
-              Assign Project
-            </Link>
-
-            <Link
-              href={`/tickets/new?clientId=${encodeURIComponent(client.id)}`}
+              href={`${ticketBaseHref}/new?clientId=${encodeURIComponent(client.id)}`}
               className="client-detail-action"
             >
               Create Ticket
@@ -277,9 +292,11 @@ export default function ClientDetailsView({
                       </a>
                     )}
 
-                    <Link href={`/clients/${client.id}/edit`}>
-                      Client Settings
-                    </Link>
+                    {allowClientEdit && (
+                      <Link href={`${clientBaseHref}/${client.id}/edit`}>
+                        Client Settings
+                      </Link>
+                    )}
                   </div>
                 </>
               )}
@@ -313,7 +330,7 @@ export default function ClientDetailsView({
 
       <div className="client-detail-tabs-shell">
         <nav aria-label="Client details tabs" className="client-detail-tabs">
-          {tabs.map((tab) => (
+          {visibleTabs.map((tab) => (
             <button
               key={tab}
               type="button"
@@ -400,7 +417,13 @@ export default function ClientDetailsView({
           <ActivityTab projects={clientProjects} tickets={clientTickets} />
         )}
 
-        {activeTab === "Settings" && <SettingsTab clientId={client.id} />}
+        {activeTab === "Settings" && (
+          <SettingsTab
+            clientId={client.id}
+            clientBaseHref={clientBaseHref}
+            allowClientEdit={allowClientEdit}
+          />
+        )}
       </div>
     </div>
   );
@@ -844,7 +867,15 @@ function ActivityTab({
    SETTINGS
    ========================================================= */
 
-function SettingsTab({ clientId }: { clientId: string }) {
+function SettingsTab({
+  clientId,
+  clientBaseHref,
+  allowClientEdit,
+}: {
+  clientId: string;
+  clientBaseHref: string;
+  allowClientEdit: boolean;
+}) {
   return (
     <div className="client-settings-card">
       <div>
@@ -856,9 +887,14 @@ function SettingsTab({ clientId }: { clientId: string }) {
         </p>
       </div>
 
-      <Link href={`/clients/${clientId}/edit`} className="client-detail-action">
-        Edit Client
-      </Link>
+      {allowClientEdit && (
+        <Link
+          href={`${clientBaseHref}/${clientId}/edit`}
+          className="client-detail-action"
+        >
+          Edit Client
+        </Link>
+      )}
     </div>
   );
 }
@@ -1078,24 +1114,3 @@ function TeamAvatars({ project }: { project: Project }) {
   );
 }
 
-function EmptyTab({
-  icon: Icon,
-  title,
-  text,
-}: {
-  icon: typeof FileText;
-  title: string;
-  text: string;
-}) {
-  return (
-    <div className="client-detail-empty">
-      <span>
-        <Icon size={24} />
-      </span>
-
-      <h3>{title}</h3>
-
-      <p>{text}</p>
-    </div>
-  );
-}

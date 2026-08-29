@@ -11,8 +11,10 @@ import type { Project } from "@/types";
 
 export default function ProjectsDraftsTable({
   initialProjects,
+  projectHrefBase = "/projects",
 }: {
   initialProjects: Project[];
+  projectHrefBase?: string;
 }) {
   const router = useRouter();
   const [projects, setProjects] = useState(initialProjects);
@@ -63,7 +65,7 @@ export default function ProjectsDraftsTable({
               >
                 <td className="px-5">
                   <Link
-                    href={`/projects/${project.id}`}
+                    href={`${projectHrefBase}/${project.id}`}
                     className="font-semibold text-[#101828] hover:text-[#0284C7]"
                   >
                     {project.name}
@@ -93,7 +95,7 @@ export default function ProjectsDraftsTable({
                 <td className="px-5">
                   <div className="flex justify-end gap-1">
                     <Link
-                      href={`/projects/${project.id}/edit`}
+                      href={`${projectHrefBase}/${project.id}/edit`}
                       aria-label={`Edit ${project.name}`}
                       className="row-icon"
                     >

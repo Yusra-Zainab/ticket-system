@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-
 import { useRouter } from "next/navigation";
 
 import {
@@ -54,34 +53,12 @@ const pageSizes = [10, 20, 50] as const;
 
 const tabs: Array<{
   id: UserTab;
-
   label: string;
-
   icon: typeof Shield;
 }> = [
-  {
-    id: "Admins",
-
-    label: "Admins",
-
-    icon: Shield,
-  },
-
-  {
-    id: "Resources",
-
-    label: "Resources",
-
-    icon: UserSquare2,
-  },
-
-  {
-    id: "Clients",
-
-    label: "Clients",
-
-    icon: Building2,
-  },
+  { id: "Admins", label: "Admins", icon: Shield },
+  { id: "Resources", label: "Resources", icon: UserSquare2 },
+  { id: "Clients", label: "Clients", icon: Building2 },
 ];
 
 /* =========================================================
@@ -90,150 +67,88 @@ const tabs: Array<{
 
 export default function AdminUsers({
   admins: initialAdmins,
-
   resources,
-
   clients,
+  usersCreateHref = "/admin/users/new",
+  usersEditHrefBase = "/admin/users",
+  resourcesCreateHref = "/resources/new",
+  clientsCreateHref = "/clients/new",
+  resourcesDetailHref = "/resources",
+  clientsDetailHref = "/clients",
+  canCreateUsers = true,
+  canEditUsers = true,
+  canDisableUsers = true,
+  canDeleteUsers = true,
+  canCreateResources = true,
+  canCreateClients = true,
 }: {
   admins: AdminUserListRow[];
-
   resources: ResourceListRow[];
-
   clients: ClientListRow[];
+  usersCreateHref?: string;
+  usersEditHrefBase?: string;
+  resourcesCreateHref?: string;
+  clientsCreateHref?: string;
+  resourcesDetailHref?: string;
+  clientsDetailHref?: string;
+  canCreateUsers?: boolean;
+  canEditUsers?: boolean;
+  canDisableUsers?: boolean;
+  canDeleteUsers?: boolean;
+  canCreateResources?: boolean;
+  canCreateClients?: boolean;
 }) {
   const router = useRouter();
 
-  /* =======================================================
-     TAB
-     ======================================================= */
-
   const [tab, setTab] = useState<UserTab>("Admins");
-
-  /* =======================================================
-     ADMINS
-
-     IMPORTANT:
-
-     Do NOT copy initialAdmins into:
-
-       useState(initialAdmins)
-
-     That was the stale-data bug.
-
-     initialAdmins remains the authoritative server list.
-
-     Local state contains ONLY IDs that we optimistically
-     deleted before router.refresh() finishes.
-     ======================================================= */
-
   const [deletedAdminIds, setDeletedAdminIds] = useState<string[]>([]);
-
   const admins = useMemo(
     () => initialAdmins.filter((admin) => !deletedAdminIds.includes(admin.id)),
     [initialAdmins, deletedAdminIds],
   );
 
-  /* =======================================================
-     SEARCH / FILTER
-     ======================================================= */
-
   const [query, setQuery] = useState("");
-
   const [filtersOpen, setFiltersOpen] = useState(false);
-
   const [role, setRole] = useState("All");
-
   const [status, setStatus] = useState<"All" | AdminStatus>("All");
-
-  /* =======================================================
-     SORT
-     ======================================================= */
-
-  const [sort, setSort] = useState<{
-    key: SortKey;
-
-    direction: SortDirection;
-  }>({
+  const [sort, setSort] = useState<{ key: SortKey; direction: SortDirection }>({
     key: "lastActive",
-
     direction: "desc",
   });
-
-  /* =======================================================
-     PAGINATION
-     ======================================================= */
-
   const [page, setPage] = useState(1);
-
   const [pageSize, setPageSize] = useState(10);
-
-  /* =======================================================
-     DELETE
-     ======================================================= */
-
-  const [deleteTarget, setDeleteTarget] = useState<
-    AdminUserListRow | undefined
-  >();
-
+  const [deleteTarget, setDeleteTarget] = useState<AdminUserListRow | undefined>();
   const [deleting, setDeleting] = useState(false);
-
-  /* =======================================================
-     TOAST
-     ======================================================= */
-
-  const [toast, setToast] = useState<
-    | {
-        kind: "success" | "error";
-
-        message: string;
-      }
-    | undefined
-  >();
-
-  /* =======================================================
-     PAGE CONFIG
-     ======================================================= */
+  const [disableTarget, setDisableTarget] = useState<AdminUserListRow | undefined>();
+  const [disabling, setDisabling] = useState(false);
+  const [toast, setToast] = useState<{ kind: "success" | "error"; message: string } | undefined>();
 
   const pageConfig =
     tab === "Admins"
       ? {
           title: "Users List",
-
-          action: "New Admin",
-
-          href: "/admin/users/new",
+          action: canCreateUsers ? "New Admin" : undefined,
+          href: canCreateUsers ? usersCreateHref : undefined,
         }
       : tab === "Resources"
         ? {
             title: "Resources List",
-
-            action: "New Resource",
-
-            href: "/resources/new",
+            action: canCreateResources ? "New Resource" : undefined,
+            href: canCreateResources ? resourcesCreateHref : undefined,
           }
         : {
             title: "Clients List",
-
-            action: "New Client",
-
-            href: "/clients/new",
+            action: canCreateClients ? "New Client" : undefined,
+            href: canCreateClients ? clientsCreateHref : undefined,
           };
-
-  /* =======================================================
-     ROLE FILTER VALUES
-     ======================================================= */
 
   const roles = useMemo(
     () =>
-      Array.from(
-        new Set(admins.map((admin) => admin.role).filter(Boolean)),
-      ).sort((left, right) => left.localeCompare(right)),
+      Array.from(new Set(admins.map((admin) => admin.role).filter(Boolean))).sort((left, right) =>
+        left.localeCompare(right),
+      ),
     [admins],
   );
-
-  /* =======================================================
-     FILTER + SORT
-     ======================================================= */
 
   const filteredAdmins = useMemo(() => {
     const search = query.trim().toLowerCase();
@@ -241,13 +156,9 @@ export default function AdminUsers({
     const rows = admins.filter((admin) => {
       const matchesSearch =
         !search ||
-        [admin.name, admin.role, admin.email, admin.status]
-          .join(" ")
-          .toLowerCase()
-          .includes(search);
+        [admin.name, admin.role, admin.email, admin.status].join(" ").toLowerCase().includes(search);
 
       const matchesRole = role === "All" || admin.role === role;
-
       const matchesStatus = status === "All" || admin.status === status;
 
       return matchesSearch && matchesRole && matchesStatus;
@@ -255,16 +166,13 @@ export default function AdminUsers({
 
     return [...rows].sort((left, right) => {
       let a: string | number;
-
       let b: string | number;
 
       if (sort.key === "addedOn" || sort.key === "lastActive") {
         a = new Date(left[sort.key]).getTime() || 0;
-
         b = new Date(right[sort.key]).getTime() || 0;
       } else {
         a = String(left[sort.key] ?? "");
-
         b = String(right[sort.key] ?? "");
       }
 
@@ -273,7 +181,6 @@ export default function AdminUsers({
           ? a - b
           : String(a).localeCompare(String(b), undefined, {
               numeric: true,
-
               sensitivity: "base",
             });
 
@@ -281,72 +188,36 @@ export default function AdminUsers({
     });
   }, [admins, query, role, status, sort]);
 
-  /* =======================================================
-     PAGINATION
-     ======================================================= */
-
   const pageCount = Math.max(1, Math.ceil(filteredAdmins.length / pageSize));
-
   const currentPage = Math.min(page, pageCount);
-
   const pageStart = (currentPage - 1) * pageSize;
-
   const visibleAdmins = filteredAdmins.slice(pageStart, pageStart + pageSize);
-
   const firstItem = filteredAdmins.length ? pageStart + 1 : 0;
-
   const lastItem = Math.min(pageStart + pageSize, filteredAdmins.length);
-
   const hasFilters = role !== "All" || status !== "All";
-
-  /* =======================================================
-     FILTER ACTIONS
-     ======================================================= */
 
   function clearFilters() {
     setRole("All");
-
     setStatus("All");
-
     setPage(1);
   }
-
-  /* =======================================================
-     SORT ACTION
-     ======================================================= */
 
   function toggleSort(key: SortKey) {
     setSort((current) => ({
       key,
-
-      direction:
-        current.key === key && current.direction === "asc" ? "desc" : "asc",
+      direction: current.key === key && current.direction === "asc" ? "desc" : "asc",
     }));
-
     setPage(1);
   }
-
-  /* =======================================================
-     TAB ACTION
-     ======================================================= */
 
   function changeTab(nextTab: UserTab) {
     setTab(nextTab);
-
     setQuery("");
-
     setRole("All");
-
     setStatus("All");
-
     setFiltersOpen(false);
-
     setPage(1);
   }
-
-  /* =======================================================
-     DELETE
-     ======================================================= */
 
   async function deleteAdmin() {
     if (!deleteTarget || deleting) {
@@ -354,85 +225,103 @@ export default function AdminUsers({
     }
 
     const target = deleteTarget;
-
     setDeleting(true);
-
     setToast(undefined);
 
     try {
-      const response = await fetch(
-        `/api/users/${encodeURIComponent(target.id)}`,
-        {
-          method: "DELETE",
-        },
-      );
+      const response = await fetch(`/api/users/${encodeURIComponent(target.id)}`, {
+        method: "DELETE",
+      });
 
-      const body = (await response.json().catch(() => ({}))) as {
-        error?: string;
-      };
+      const body = (await response.json().catch(() => ({}))) as { error?: string };
 
       if (!response.ok) {
-        throw new Error(
-          typeof body.error === "string"
-            ? body.error
-            : "Unable to delete user.",
-        );
+        throw new Error(typeof body.error === "string" ? body.error : "Unable to delete user.");
       }
 
-      /*
-       * Do not mutate/copy the authoritative admins array.
-       *
-       * Hide this one row while refresh obtains the
-       * new DB-backed list.
-       */
       setDeletedAdminIds((current) =>
         current.includes(target.id) ? current : [...current, target.id],
       );
 
-      setToast({
-        kind: "success",
-
-        message: `${target.name} was deleted successfully.`,
-      });
-
+      setToast({ kind: "success", message: `${target.name} was deleted successfully.` });
       setDeleteTarget(undefined);
-
       router.refresh();
     } catch (reason) {
       setToast({
         kind: "error",
-
-        message:
-          reason instanceof Error ? reason.message : "Unable to delete user.",
+        message: reason instanceof Error ? reason.message : "Unable to delete user.",
       });
     } finally {
       setDeleting(false);
     }
   }
 
-  /* =======================================================
-     RENDER
-     ======================================================= */
+  async function disableAdmin() {
+    if (!disableTarget || disabling) {
+      return;
+    }
+
+    const target = disableTarget;
+    setDisabling(true);
+    setToast(undefined);
+
+    try {
+      const response = await fetch(`/api/users/${encodeURIComponent(target.id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lifecycle: "DRAFT" }),
+      });
+
+      const body = (await response.json().catch(() => ({}))) as { error?: string };
+
+      if (!response.ok) {
+        throw new Error(typeof body.error === "string" ? body.error : "Unable to disable user.");
+      }
+
+      setToast({ kind: "success", message: `${target.name} was disabled successfully.` });
+      setDisableTarget(undefined);
+      router.refresh();
+    } catch (reason) {
+      setToast({
+        kind: "error",
+        message: reason instanceof Error ? reason.message : "Unable to disable user.",
+      });
+    } finally {
+      setDisabling(false);
+    }
+  }
 
   return (
     <div className="admin-users-page">
-      {/* =================================================
-          HEADING
-         ================================================= */}
-
       <div className="admin-users-heading-row">
         <h1>{pageConfig.title}</h1>
 
-        <Link href={pageConfig.href} className="admin-users-new-button">
-          <Plus size={20} />
-
-          {pageConfig.action}
-        </Link>
+        {pageConfig.action && pageConfig.href ? (
+          <Link href={pageConfig.href} className="admin-users-new-button">
+            <Plus size={20} />
+            {pageConfig.action}
+          </Link>
+        ) : null}
       </div>
 
-      {/* =================================================
-          ADMIN TOOLBAR
-         ================================================= */}
+      <nav aria-label="User categories" className="admin-users-tabs">
+        {tabs.map((item) => {
+          const Icon = item.icon;
+          const active = tab === item.id;
+
+          return (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => changeTab(item.id)}
+              className={cn("admin-users-tab", active && "admin-users-tab-active")}
+            >
+              <Icon size={20} />
+              {item.label}
+            </button>
+          );
+        })}
+      </nav>
 
       {tab === "Admins" && (
         <>
@@ -442,7 +331,6 @@ export default function AdminUsers({
               onClick={() => setFiltersOpen((current) => !current)}
               className={cn(
                 "admin-users-filter-button",
-
                 filtersOpen && "border-[#0284C7] text-[#0284C7]",
               )}
             >
@@ -452,15 +340,12 @@ export default function AdminUsers({
 
             <label className="admin-users-search">
               <Search size={20} />
-
               <span className="sr-only">Search users</span>
-
               <input
                 type="search"
                 value={query}
                 onChange={(event) => {
                   setQuery(event.target.value);
-
                   setPage(1);
                 }}
                 placeholder="Search"
@@ -479,7 +364,6 @@ export default function AdminUsers({
                   options={["All", ...roles]}
                   onChange={(value) => {
                     setRole(value);
-
                     setPage(1);
                   }}
                 />
@@ -492,7 +376,6 @@ export default function AdminUsers({
                   options={["All", "Active", "Inactive"]}
                   onChange={(value) => {
                     setStatus(value as "All" | AdminStatus);
-
                     setPage(1);
                   }}
                   renderOption={(value) =>
@@ -501,7 +384,6 @@ export default function AdminUsers({
                     ) : (
                       <span className="inline-flex min-w-0 items-center gap-3">
                         <AdminStatusBadge status={value as AdminStatus} />
-
                         <span className="truncate text-sm text-[#667085]">
                           {adminStatusDescriptions[value as AdminStatus]}
                         </span>
@@ -524,135 +406,71 @@ export default function AdminUsers({
         </>
       )}
 
-      {/* =================================================
-          TABS
-         ================================================= */}
-
-      <nav aria-label="User categories" className="admin-users-tabs">
-        {tabs.map((item) => {
-          const Icon = item.icon;
-
-          const active = tab === item.id;
-
-          return (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => changeTab(item.id)}
-              className={cn(
-                "admin-users-tab",
-
-                active && "admin-users-tab-active",
-              )}
-            >
-              <Icon size={20} />
-
-              {item.label}
-            </button>
-          );
-        })}
-      </nav>
-
-      {/* =================================================
-          ADMIN TABLE
-         ================================================= */}
-
       {tab === "Admins" && (
         <div className="admin-users-table-frame">
           <div className="overflow-x-auto">
             <table className="admin-users-table">
               <thead>
                 <tr>
-                  <AdminHeader
-                    label="Name"
-                    sortKey="name"
-                    sort={sort}
-                    onSort={toggleSort}
-                    align="left"
-                  />
-
-                  <AdminHeader
-                    label="Role"
-                    sortKey="role"
-                    sort={sort}
-                    onSort={toggleSort}
-                  />
-
-                  <AdminHeader
-                    label="Email"
-                    sortKey="email"
-                    sort={sort}
-                    onSort={toggleSort}
-                  />
-
-                  <AdminHeader
-                    label="Added On"
-                    sortKey="addedOn"
-                    sort={sort}
-                    onSort={toggleSort}
-                  />
-
-                  <AdminHeader
-                    label="Status"
-                    sortKey="status"
-                    sort={sort}
-                    onSort={toggleSort}
-                  />
-
-                  <AdminHeader
-                    label="Last Active"
-                    sortKey="lastActive"
-                    sort={sort}
-                    onSort={toggleSort}
-                  />
-
+                  <AdminHeader label="Name" sortKey="name" sort={sort} onSort={toggleSort} align="left" />
+                  <AdminHeader label="Role" sortKey="role" sort={sort} onSort={toggleSort} />
+                  <AdminHeader label="Email" sortKey="email" sort={sort} onSort={toggleSort} />
+                  <AdminHeader label="Added On" sortKey="addedOn" sort={sort} onSort={toggleSort} />
+                  <AdminHeader label="Status" sortKey="status" sort={sort} onSort={toggleSort} />
+                  <AdminHeader label="Last Active" sortKey="lastActive" sort={sort} onSort={toggleSort} />
                   <th className="admin-users-actions-head" />
                 </tr>
               </thead>
 
               <tbody>
                 {visibleAdmins.map((admin, index) => (
-                  <tr
-                    key={admin.id}
-                    className={cn(index % 2 === 1 && "admin-users-row-alt")}
-                  >
+                  <tr key={admin.id} className={cn(index % 2 === 1 && "admin-users-row-alt")}>
                     <td className="admin-users-name-cell">
                       <UserAvatar name={admin.name} src={admin.avatar} />
-
                       <span>{admin.name}</span>
                     </td>
-
                     <td>{admin.role}</td>
-
                     <td>{admin.email}</td>
-
                     <td>{formatAdminDate(admin.addedOn)}</td>
-
                     <td>
                       <AdminStatusBadge status={admin.status} />
                     </td>
-
                     <td>{formatAdminDate(admin.lastActive)}</td>
-
                     <td className="admin-users-row-actions">
-                      <Link
-                        href={`/admin/users/${admin.id}/edit`}
-                        aria-label={`Edit ${admin.name}`}
-                        title="Edit user"
-                        className="admin-users-icon-action"
-                      >
-                        <Pencil size={20} />
-                      </Link>
+                      {canEditUsers && (
+                        <Link
+                          href={`${usersEditHrefBase}/${admin.id}/edit`}
+                          aria-label={`Edit ${admin.name}`}
+                          title="Edit user"
+                          className="admin-users-icon-action"
+                        >
+                          <Pencil size={20} />
+                        </Link>
+                      )}
 
-                      <button
-                        type="button"
-                        aria-label={`Delete ${admin.name}`}
-                        title="Delete user"
-                        onClick={() => setDeleteTarget(admin)}
-                        className="admin-users-icon-action admin-users-delete-action"
-                      >
-                        <Trash2 size={20} />
-                      </button>
+                      {canDisableUsers && admin.status === "Active" && (
+                        <button
+                          type="button"
+                          aria-label={`Disable ${admin.name}`}
+                          title="Disable user"
+                          onClick={() => setDisableTarget(admin)}
+                          className="admin-users-icon-action"
+                        >
+                          <X size={20} />
+                        </button>
+                      )}
+
+                      {canDeleteUsers && (
+                        <button
+                          type="button"
+                          aria-label={`Delete ${admin.name}`}
+                          title="Delete user"
+                          onClick={() => setDeleteTarget(admin)}
+                          className="admin-users-icon-action admin-users-delete-action"
+                        >
+                          <Trash2 size={20} />
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -661,7 +479,6 @@ export default function AdminUsers({
                   <tr>
                     <td colSpan={7} className="admin-users-empty">
                       <strong>No users found</strong>
-
                       <span>Try changing your search or filters.</span>
                     </td>
                   </tr>
@@ -669,10 +486,6 @@ export default function AdminUsers({
               </tbody>
             </table>
           </div>
-
-          {/* =============================================
-              PAGINATION
-             ============================================= */}
 
           <footer className="admin-users-pagination">
             <span>
@@ -689,7 +502,6 @@ export default function AdminUsers({
                 value={pageSize}
                 onChange={(event) => {
                   setPageSize(Number(event.target.value));
-
                   setPage(1);
                 }}
               >
@@ -729,21 +541,19 @@ export default function AdminUsers({
         </div>
       )}
 
-      {/* =================================================
-          RESOURCES
-         ================================================= */}
+      {tab === "Resources" && (
+        <ResourcesTable
+          initialResources={resources}
+          detailBaseHref={resourcesDetailHref}
+        />
+      )}
 
-      {tab === "Resources" && <ResourcesTable initialResources={resources} />}
-
-      {/* =================================================
-          CLIENTS
-         ================================================= */}
-
-      {tab === "Clients" && <ClientsTable initialClients={clients} />}
-
-      {/* =================================================
-          DELETE MODAL
-         ================================================= */}
+      {tab === "Clients" && (
+        <ClientsTable
+          initialClients={clients}
+          detailBaseHref={clientsDetailHref}
+        />
+      )}
 
       {deleteTarget && (
         <div
@@ -754,22 +564,14 @@ export default function AdminUsers({
             }
           }}
         >
-          <div
-            role="alertdialog"
-            aria-modal="true"
-            className="ticket-modal !w-[410px]"
-          >
+          <div role="alertdialog" aria-modal="true" className="ticket-modal !w-[410px]">
             <h2 className="text-2xl font-bold text-slate-700">Confirmation</h2>
-
             <p className="mt-5 font-semibold text-slate-700">
-              Are you sure you want to delete{" "}
-              <span className="font-bold">{deleteTarget.name}</span>?
+              Are you sure you want to delete <span className="font-bold">{deleteTarget.name}</span>?
             </p>
-
             <p className="mt-2 text-sm leading-6 text-slate-500">
               This user will be removed from the administration users list.
             </p>
-
             <div className="mt-6 flex justify-between gap-3">
               <button
                 type="button"
@@ -793,28 +595,56 @@ export default function AdminUsers({
         </div>
       )}
 
-      {/* =================================================
-          TOAST
-         ================================================= */}
+      {disableTarget && (
+        <div
+          className="modal-backdrop"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !disabling) {
+              setDisableTarget(undefined);
+            }
+          }}
+        >
+          <div role="alertdialog" aria-modal="true" className="ticket-modal !w-[410px]">
+            <h2 className="text-2xl font-bold text-slate-700">Confirmation</h2>
+            <p className="mt-5 font-semibold text-slate-700">
+              Are you sure you want to disable <span className="font-bold">{disableTarget.name}</span>?
+            </p>
+            <p className="mt-2 text-sm leading-6 text-slate-500">
+              This will mark the user as inactive.
+            </p>
+            <div className="mt-6 flex justify-between gap-3">
+              <button
+                type="button"
+                disabled={disabling}
+                onClick={() => setDisableTarget(undefined)}
+                className="button-secondary !border-cyan-500 !text-sky-600"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                disabled={disabling}
+                onClick={() => void disableAdmin()}
+                className="min-w-[110px] rounded-xl bg-[#0284C7] px-6 py-3 text-sm font-bold text-white hover:bg-[#0369a1] disabled:opacity-50"
+              >
+                {disabling ? "Disabling..." : "Disable"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {toast && (
         <div
           role={toast.kind === "error" ? "alert" : "status"}
           className={cn(
             "ticket-toast",
-
-            toast.kind === "success"
-              ? "ticket-toast-success"
-              : "ticket-toast-error",
+            toast.kind === "success" ? "ticket-toast-success" : "ticket-toast-error",
           )}
         >
           <span>{toast.message}</span>
-
-          <button
-            type="button"
-            aria-label="Dismiss"
-            onClick={() => setToast(undefined)}
-          >
+          <button type="button" aria-label="Dismiss" onClick={() => setToast(undefined)}>
             <X size={17} />
           </button>
         </div>
@@ -829,39 +659,26 @@ export default function AdminUsers({
 
 function AdminHeader({
   label,
-
   sortKey,
-
   sort,
-
   onSort,
-
   align = "center",
 }: {
   label: string;
-
   sortKey: SortKey;
-
-  sort: {
-    key: SortKey;
-
-    direction: SortDirection;
-  };
-
+  sort: { key: SortKey; direction: SortDirection };
   onSort: (key: SortKey) => void;
-
   align?: "left" | "center";
 }) {
   const active = sort.key === sortKey;
 
   return (
-    <th className={cn(align === "left" && "!text-left")}>
+    <th className={cn(align === "left" && "!text-left") }>
       <button
         type="button"
         onClick={() => onSort(sortKey)}
         className={cn(
           "admin-users-sort",
-
           align === "left" ? "justify-start" : "justify-center",
         )}
       >
@@ -872,10 +689,7 @@ function AdminHeader({
             size={12}
             className={cn(
               "rotate-180",
-
-              active && sort.direction === "asc"
-                ? "text-[#0284C7]"
-                : "text-[#98A2B3]",
+              active && sort.direction === "asc" ? "text-[#0284C7]" : "text-[#98A2B3]",
             )}
           />
 
@@ -883,10 +697,7 @@ function AdminHeader({
             size={12}
             className={cn(
               "-mt-[5px]",
-
-              active && sort.direction === "desc"
-                ? "text-[#0284C7]"
-                : "text-[#98A2B3]",
+              active && sort.direction === "desc" ? "text-[#0284C7]" : "text-[#98A2B3]",
             )}
           />
         </span>
@@ -904,10 +715,7 @@ function AdminStatusBadge({ status }: { status: AdminStatus }) {
     <span
       className={cn(
         "admin-user-status",
-
-        status === "Active"
-          ? "admin-user-status-active"
-          : "admin-user-status-inactive",
+        status === "Active" ? "admin-user-status-active" : "admin-user-status-inactive",
       )}
     >
       {status}
@@ -921,11 +729,9 @@ function AdminStatusBadge({ status }: { status: AdminStatus }) {
 
 function UserAvatar({
   name,
-
   src,
 }: {
   name: string;
-
   src?: string | null;
 }) {
   if (src?.trim()) {
@@ -933,7 +739,6 @@ function UserAvatar({
       <span className="relative size-10 shrink-0 overflow-hidden rounded-full">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={src} alt={name} className="size-full object-cover" />
-
         <span className="pointer-events-none absolute inset-0 rounded-full border border-black/[0.08]" />
       </span>
     );
@@ -948,54 +753,35 @@ function UserAvatar({
 
 function AdminFilterDropdown({
   label,
-
   value,
-
   placeholder,
-
   searchPlaceholder,
-
   options,
-
   onChange,
-
   renderOption,
 }: {
   label: string;
-
   value: string;
-
   placeholder: string;
-
   searchPlaceholder: string;
-
   options: string[];
-
   onChange: (value: string) => void;
-
   renderOption?: (value: string) => ReactNode;
 }) {
   const [open, setOpen] = useState(false);
-
   const [search, setSearch] = useState("");
 
   const visible = useMemo(() => {
     const normalized = search.trim().toLowerCase();
-
     if (!normalized) {
       return options;
     }
-
-    return options.filter((option) =>
-      option.toLowerCase().includes(normalized),
-    );
+    return options.filter((option) => option.toLowerCase().includes(normalized));
   }, [options, search]);
 
   return (
     <div className="relative min-w-0">
-      <span className="mb-1.5 block text-[13px] font-semibold text-[#344054]">
-        {label}
-      </span>
+      <span className="mb-1.5 block text-[13px] font-semibold text-[#344054]">{label}</span>
 
       <button
         type="button"
@@ -1003,34 +789,14 @@ function AdminFilterDropdown({
         onClick={() => setOpen((current) => !current)}
         className={cn(
           "flex h-11 w-full items-center justify-between gap-3 rounded-lg border bg-white px-3.5 text-left shadow-[0_1px_2px_rgba(16,24,40,0.05)]",
-
-          open
-            ? "border-[#0284C7] ring-[3px] ring-[#0284C7]/10"
-            : "border-[#D0D5DD]",
+          open ? "border-[#0284C7] ring-[3px] ring-[#0284C7]/10" : "border-[#D0D5DD]",
         )}
       >
-        <span
-          className={cn(
-            "min-w-0 flex-1 truncate text-sm",
-
-            value === "All" ? "text-[#98A2B3]" : "text-[#344054]",
-          )}
-        >
-          {value === "All"
-            ? placeholder
-            : renderOption
-              ? renderOption(value)
-              : value}
+        <span className={cn("min-w-0 flex-1 truncate text-sm", value === "All" ? "text-[#98A2B3]" : "text-[#344054]")}>
+          {value === "All" ? placeholder : renderOption ? renderOption(value) : value}
         </span>
 
-        <ChevronDown
-          size={17}
-          className={cn(
-            "shrink-0 text-[#667085] transition-transform",
-
-            open && "rotate-180",
-          )}
-        />
+        <ChevronDown size={17} className={cn("shrink-0 text-[#667085] transition-transform", open && "rotate-180")} />
       </button>
 
       {open && (
@@ -1041,18 +807,13 @@ function AdminFilterDropdown({
             aria-label={`Close ${label}`}
             onClick={() => {
               setOpen(false);
-
               setSearch("");
             }}
           />
 
           <div className="absolute left-0 top-[76px] z-40 w-full min-w-[260px] overflow-hidden rounded-[10px] border border-[#EAECF0] bg-white p-2 shadow-[0_12px_28px_rgba(16,24,40,0.14)]">
             <label className="relative mb-2 block">
-              <Search
-                size={16}
-                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#98A2B3]"
-              />
-
+              <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#98A2B3]" />
               <input
                 autoFocus
                 type="search"
@@ -1073,28 +834,19 @@ function AdminFilterDropdown({
                     type="button"
                     onClick={() => {
                       onChange(option);
-
                       setOpen(false);
-
                       setSearch("");
                     }}
                     className={cn(
                       "flex min-h-11 w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-sm",
-
                       selected ? "bg-[#F0F9FF]" : "hover:bg-[#F9FAFB]",
                     )}
                   >
                     <span className="min-w-0 truncate">
-                      {option === "All"
-                        ? placeholder
-                        : renderOption
-                          ? renderOption(option)
-                          : option}
+                      {option === "All" ? placeholder : renderOption ? renderOption(option) : option}
                     </span>
 
-                    {selected && (
-                      <Check size={17} className="shrink-0 text-[#0284C7]" />
-                    )}
+                    {selected && <Check size={17} className="shrink-0 text-[#0284C7]" />}
                   </button>
                 );
               })}
@@ -1116,16 +868,13 @@ function formatAdminDate(value: string) {
   }
 
   const date = new Date(value);
-
   if (Number.isNaN(date.getTime())) {
     return "-";
   }
 
   return new Intl.DateTimeFormat("en-GB", {
     day: "2-digit",
-
     month: "short",
-
     year: "numeric",
   }).format(date);
 }

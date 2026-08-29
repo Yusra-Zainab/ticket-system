@@ -5,7 +5,6 @@ import PageHeader from "@/components/ui/PageHeader";
 
 import { requireResourcePageSession } from "@/lib/auth";
 import { getRolePermissions } from "@/lib/db";
-
 import { listResourceTickets } from "@/lib/resourcePortal";
 
 import { getTicketListMeta } from "@/lib/ticketListMeta";
@@ -16,11 +15,6 @@ export const dynamic = "force-dynamic";
 
 export default async function ResourceTicketsPage() {
   const user = await requireResourcePageSession();
-
-  /*
-   * Keep the existing resource authorization
-   * and assigned-project scoping.
-   */
   const [tickets, permissions] = await Promise.all([
     listResourceTickets(user, "OPEN"),
     getRolePermissions(user.role),
@@ -36,38 +30,28 @@ export default async function ResourceTicketsPage() {
 
     return {
       id: ticket.id,
-
       title: ticket.title,
-
       type: ticket.type || "Task",
-
       priorityType: stored?.priorityType ?? ticket.priority,
-
       priorityNumber: stored?.priorityNumber ?? 1,
-
       project: ticket.project,
-
       createdBy: ticket.reporter,
-
       createdById: stored?.createdById ?? "",
-
       assignedTo: ticket.assignee || "Unassigned",
-
       createdAt: stored?.createdAt ?? ticket.createdAt,
-
       updatedAt: stored?.updatedAt ?? ticket.updatedAt,
-
       dueDate: stored?.dueDate ?? ticket.dueDate,
-
       status: ticket.status,
-
-          history:
-            ticket.titleHistory,
+      history: Array.isArray(ticket.titleHistory)
+        ? ticket.titleHistory.filter(
+            (item): item is string => typeof item === "string" && item.trim().length > 0,
+          )
+        : [],
     };
   });
 
   return (
-    <div className="space-y-7 px-14 pb-8 pt-4">
+    <div className="space-y-7">
       <PageHeader
         title="Tickets List"
         action={canCreateTickets ? "Create a New Ticket" : undefined}
@@ -81,9 +65,11 @@ export default async function ResourceTicketsPage() {
           currentUserId={String(user.id)}
           portal="resource"
           detailBaseHref="/resource-portal/tickets"
-          now={Date.now()}
         />
       ) : null}
     </div>
   );
 }
+
+
+

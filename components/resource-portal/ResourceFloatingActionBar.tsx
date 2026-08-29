@@ -4,16 +4,19 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Bell,
+  Building2,
   CheckSquare2,
   FolderKanban,
   LayoutDashboard,
   LogOut,
   Search,
   Settings,
+  ShieldCheck,
   Undo2,
   UserRound,
+  Users,
 } from "lucide-react";
-import { useState } from "react";
+import { type ComponentType, useState } from "react";
 
 import { usePageSearch } from "@/components/providers/PageSearchProvider";
 import { useResourceNotifications } from "@/components/providers/ResourceNotificationsProvider";
@@ -21,22 +24,30 @@ import ResourceNotificationPopover from "@/components/resource-portal/ResourceNo
 import { resourceNavSections } from "@/lib/resourcePortalNav";
 import { cn } from "@/lib/utils";
 
-type MiniBar = "tickets" | "projects" | "profile" | null;
+type MiniBar =
+  | "tickets"
+  | "projects"
+  | "resources"
+  | "clients"
+  | "users"
+  | "administration"
+  | "profile"
+  | null;
 
 type MainAction =
   | "search"
   | "dashboard"
   | "projects"
   | "tickets"
+  | "resources"
+  | "clients"
+  | "users"
+  | "administration"
   | "notifications"
   | "profile"
   | null;
 
-export default function ResourceFloatingActionBar({
-  permissions,
-}: {
-  permissions: string[];
-}) {
+export default function ResourceFloatingActionBar({ permissions }: { permissions: string[] }) {
   const pathname = usePathname();
   const router = useRouter();
 
@@ -46,55 +57,45 @@ export default function ResourceFloatingActionBar({
   const [notificationsOpen, setNotificationsOpen] = useState(false);
 
   const { unreadCount: notificationsCount } = useResourceNotifications();
+  const { query: searchValue, setQuery, clearQuery, matchState } = usePageSearch();
 
-  const {
-    query: searchValue,
-    setQuery,
-    clearQuery,
-    matchState,
-  } = usePageSearch();
-
-  /*
-   * Permission-driven portal navigation.
-   *
-   * The component no longer needs a separate permission
-   * boolean for every capability/action.
-   */
   const permissionSet = new Set(permissions);
-
-  const visibleSections = resourceNavSections.filter((section) =>
-    permissionSet.has(section.permission),
-  );
-
-  console.log("[action-bar]", { received: permissions, visibleSections: visibleSections.map(s => s.id) });
-  
-  const sectionById = new Map(
-    visibleSections.map((section) => [section.id, section]),
-  );
+  const visibleSections = resourceNavSections.filter((section) => permissionSet.has(section.permission));
+  const sectionById = new Map(visibleSections.map((section) => [section.id, section]));
 
   const dashboardSection = sectionById.get("dashboard");
   const projectsSection = sectionById.get("projects");
   const ticketsSection = sectionById.get("tickets");
+  const resourcesSection = sectionById.get("resources");
+  const clientsSection = sectionById.get("clients");
+  const usersSection = sectionById.get("users");
+  const administrationSection = sectionById.get("administration");
   const notificationsSection = sectionById.get("notifications");
 
   const canViewDashboard = Boolean(dashboardSection);
   const canViewProjects = Boolean(projectsSection);
   const canViewTickets = Boolean(ticketsSection);
+  const canViewResources = Boolean(resourcesSection);
+  const canViewClients = Boolean(clientsSection);
+  const canViewUsers = Boolean(usersSection);
+  const canViewAdministration = Boolean(administrationSection);
   const canViewNotifications = Boolean(notificationsSection);
 
   const dashboardActive = pathname === "/resource-portal/dashboard";
-  const ticketsActive = pathname.startsWith("/resource-portal/tickets");
   const projectsActive = pathname.startsWith("/resource-portal/projects");
-  const notificationsActive = pathname.startsWith(
-    "/resource-portal/notifications",
-  );
+  const ticketsActive = pathname.startsWith("/resource-portal/tickets");
+  const resourcesActive = pathname.startsWith("/resource-portal/resources");
+  const clientsActive = pathname.startsWith("/resource-portal/clients");
+  const usersActive = pathname.startsWith("/resource-portal/users");
+  const administrationActive =
+    pathname.startsWith("/resource-portal/roles") ||
+    pathname.startsWith("/resource-portal/settings");
+  const notificationsActive = pathname.startsWith("/resource-portal/notifications");
   const profileActive = pathname.startsWith("/resource-portal/profile");
 
   const notificationsLabel =
     notificationsCount > 0
-      ? `Notifications (${
-          notificationsCount > 99 ? "99+" : notificationsCount
-        } new)`
+      ? `Notifications (${notificationsCount > 99 ? "99+" : notificationsCount} new)`
       : "Notifications";
 
   function openSearch() {
@@ -116,28 +117,75 @@ export default function ResourceFloatingActionBar({
   }
 
   async function logout() {
-    await fetch("/api/auth/logout", {
-      method: "POST",
-    });
-
+    await fetch("/api/auth/logout", { method: "POST" });
     router.replace("/login");
     router.refresh();
   }
 
-  /*
-   * SEARCH MINI BAR
-   */
+  const renderFeatureBar = (
+    section: { id: string; label: string; icon: ComponentType<{ size?: number }>; actions?: Array<{ id: string; permission: string; label: string; href: string; icon: ComponentType<{ size?: number }> }> },
+    ariaLabel: string,
+  ) => {
+    const Icon = section.icon;
+
+    return (
+      <nav aria-label={ariaLabel} className="resource-floating-dock resource-floating-feature-mode">
+        <button
+          type="button"
+          aria-label="Search current page"
+          title="Search"
+          onClick={openSearch}
+          className="resource-dock-action"
+        >
+          <Search size={22} />
+        </button>
+
+        <span className="resource-dock-divider" />
+
+        <span aria-label={section.label} title={section.label} className="resource-dock-action resource-dock-action-active">
+          <Icon size={22} />
+        </span>
+
+        {section.actions
+          ?.filter((action) => permissionSet.has(action.permission))
+          .map((action) => {
+            const ActionIcon = action.icon;
+            const active = pathname === action.href;
+
+            return (
+              <Link
+                key={action.id}
+                href={action.href}
+                aria-label={action.label}
+                title={action.label}
+                aria-current={active ? "page" : undefined}
+                className={cn("resource-dock-action", active && "resource-dock-action-active")}
+              >
+                <ActionIcon size={22} />
+              </Link>
+            );
+          })}
+
+        <span className="resource-dock-divider" />
+
+        <button
+          type="button"
+          aria-label="Back to full navigation"
+          title="Back"
+          onClick={closeMiniBar}
+          className="resource-dock-action"
+        >
+          <Undo2 size={22} />
+        </button>
+      </nav>
+    );
+  };
+
   if (searching) {
     return (
       <>
-        <nav
-          aria-label="Page search"
-          className="resource-floating-dock resource-floating-search-mode"
-        >
-          <span
-            className="resource-dock-search-active"
-            aria-hidden="true"
-          >
+        <nav aria-label="Page search" className="resource-floating-dock resource-floating-search-mode">
+          <span className="resource-dock-search-active" aria-hidden="true">
             <Search size={24} />
           </span>
 
@@ -156,8 +204,7 @@ export default function ResourceFloatingActionBar({
             aria-invalid={matchState === "not-found"}
             className={cn(
               "resource-dock-search-input",
-              matchState === "not-found" &&
-                "resource-dock-search-input-not-found",
+              matchState === "not-found" && "resource-dock-search-input-not-found",
             )}
           />
 
@@ -179,181 +226,52 @@ export default function ResourceFloatingActionBar({
     );
   }
 
-  /*
-   * TICKETS MINI BAR
-   *
-   * Search
-   * Tickets
-   * Permission-driven ticket actions
-   * Back
-   */
   if (miniBar === "tickets" && ticketsSection) {
-    return (
-      <>
-        <nav
-          aria-label="Ticket actions"
-          className="resource-floating-dock resource-floating-feature-mode"
-        >
-          <button
-            type="button"
-            aria-label="Search current page"
-            title="Search"
-            onClick={openSearch}
-            className="resource-dock-action"
-          >
-            <Search size={22} />
-          </button>
-
-          <span className="resource-dock-divider" />
-
-          <span
-            aria-label={ticketsSection.label}
-            title={ticketsSection.label}
-            className="resource-dock-action resource-dock-action-active"
-          >
-            <CheckSquare2 size={22} />
-          </span>
-
-          {ticketsSection.actions
-            ?.filter((action) => permissionSet.has(action.permission))
-            .map((action) => {
-              const Icon = action.icon;
-
-              const active =
-                action.id === "tickets-drafts"
-                  ? pathname.startsWith(action.href)
-                  : pathname === action.href;
-
-              return (
-                <Link
-                  key={action.id}
-                  href={action.href}
-                  aria-label={action.label}
-                  title={action.label}
-                  aria-current={active ? "page" : undefined}
-                  className={cn(
-                    "resource-dock-action",
-                    active && "resource-dock-action-active",
-                  )}
-                >
-                  <Icon size={action.id === "tickets-create" ? 23 : 22} />
-                </Link>
-              );
-            })}
-
-          <span className="resource-dock-divider" />
-
-          <button
-            type="button"
-            aria-label="Back to full navigation"
-            title="Back"
-            onClick={closeMiniBar}
-            className="resource-dock-action"
-          >
-            <Undo2 size={22} />
-          </button>
-        </nav>
-
-        <ResourceFloatingStyles />
-      </>
-    );
+    return <>
+      {renderFeatureBar(ticketsSection, "Ticket actions")}
+      <ResourceFloatingStyles />
+    </>;
   }
 
-  /*
-   * PROJECTS MINI BAR
-   *
-   * Search
-   * Projects
-   * Permission-driven project actions
-   * Back
-   *
-   * There is currently no resource-portal project
-   * creation route, so only the configured actions render.
-   */
   if (miniBar === "projects" && projectsSection) {
-    return (
-      <>
-        <nav
-          aria-label="Project actions"
-          className="resource-floating-dock resource-floating-feature-mode"
-        >
-          <button
-            type="button"
-            aria-label="Search current page"
-            title="Search"
-            onClick={openSearch}
-            className="resource-dock-action"
-          >
-            <Search size={22} />
-          </button>
-
-          <span className="resource-dock-divider" />
-
-          <span
-            aria-label={projectsSection.label}
-            title={projectsSection.label}
-            className="resource-dock-action resource-dock-action-active"
-          >
-            <FolderKanban size={22} />
-          </span>
-
-          {projectsSection.actions
-            ?.filter((action) => permissionSet.has(action.permission))
-            .map((action) => {
-              const Icon = action.icon;
-
-              const active = pathname === action.href;
-
-              return (
-                <Link
-                  key={action.id}
-                  href={action.href}
-                  aria-label={action.label}
-                  title={action.label}
-                  aria-current={active ? "page" : undefined}
-                  className={cn(
-                    "resource-dock-action",
-                    active && "resource-dock-action-active",
-                  )}
-                >
-                  <Icon size={22} />
-                </Link>
-              );
-            })}
-
-          <span className="resource-dock-divider" />
-
-          <button
-            type="button"
-            aria-label="Back to full navigation"
-            title="Back"
-            onClick={closeMiniBar}
-            className="resource-dock-action"
-          >
-            <Undo2 size={22} />
-          </button>
-        </nav>
-
-        <ResourceFloatingStyles />
-      </>
-    );
+    return <>
+      {renderFeatureBar(projectsSection, "Project actions")}
+      <ResourceFloatingStyles />
+    </>;
   }
 
-  /*
-   * PROFILE MINI BAR
-   *
-   * Search | Profile | Settings | Logout | Back
-   *
-   * Profile remains available independently of RBAC navigation
-   * because it belongs to the currently signed-in resource.
-   */
+  if (miniBar === "resources" && resourcesSection) {
+    return <>
+      {renderFeatureBar(resourcesSection, "Resource actions")}
+      <ResourceFloatingStyles />
+    </>;
+  }
+
+  if (miniBar === "clients" && clientsSection) {
+    return <>
+      {renderFeatureBar(clientsSection, "Client actions")}
+      <ResourceFloatingStyles />
+    </>;
+  }
+
+  if (miniBar === "users" && usersSection) {
+    return <>
+      {renderFeatureBar(usersSection, "User actions")}
+      <ResourceFloatingStyles />
+    </>;
+  }
+
+  if (miniBar === "administration" && administrationSection) {
+    return <>
+      {renderFeatureBar(administrationSection, "Administration actions")}
+      <ResourceFloatingStyles />
+    </>;
+  }
+
   if (miniBar === "profile") {
     return (
       <>
-        <nav
-          aria-label="Profile actions"
-          className="resource-floating-dock resource-floating-feature-mode"
-        >
+        <nav aria-label="Profile actions" className="resource-floating-dock resource-floating-feature-mode">
           <button
             type="button"
             aria-label="Search current page"
@@ -366,23 +284,11 @@ export default function ResourceFloatingActionBar({
 
           <span className="resource-dock-divider" />
 
-          <span
-            aria-label="Resource details"
-            title="Resource details"
-            className="resource-dock-action resource-dock-action-active"
-          >
+          <span aria-label="Resource details" title="Resource details" className="resource-dock-action resource-dock-action-active">
             <UserRound size={22} />
           </span>
 
-          <Link
-            href="/resource-portal/profile"
-            aria-label="Edit resource"
-            title="Edit resource"
-            className={cn(
-              "resource-dock-action",
-              profileActive && "resource-dock-action-active",
-            )}
-          >
+          <Link href="/resource-portal/profile" aria-label="Edit resource" title="Edit resource" className={cn("resource-dock-action", profileActive && "resource-dock-action-active")}>
             <Settings size={22} />
           </Link>
 
@@ -414,20 +320,6 @@ export default function ResourceFloatingActionBar({
     );
   }
 
-  /*
-   * MAIN RESOURCE BAR
-   *
-   * Search
-   * Dashboard
-   * Projects
-   * Tickets
-   * Notifications
-   * Profile
-   *
-   * RBAC-controlled sections only appear when their section
-   * exists in resourceNavSections AND the resource has that
-   * section's required permission.
-   */
   return (
     <>
       {notificationsOpen ? (
@@ -439,25 +331,17 @@ export default function ResourceFloatingActionBar({
             onClick={() => setNotificationsOpen(false)}
           />
 
-          <ResourceNotificationPopover
-            onClose={() => setNotificationsOpen(false)}
-          />
+          <ResourceNotificationPopover onClose={() => setNotificationsOpen(false)} />
         </>
       ) : null}
 
-      <nav
-        aria-label="Resource portal navigation"
-        className="resource-floating-dock resource-floating-full-mode"
-      >
+      <nav aria-label="Resource portal navigation" className="resource-floating-dock resource-floating-full-mode">
         <button
           type="button"
           aria-label="Search current page"
           title="Search"
           onClick={openSearch}
-          className={cn(
-            "resource-dock-action",
-            mainAction === "search" && "resource-dock-action-active",
-          )}
+          className={cn("resource-dock-action", mainAction === "search" && "resource-dock-action-active")}
         >
           <Search size={22} />
         </button>
@@ -465,69 +349,48 @@ export default function ResourceFloatingActionBar({
         <span className="resource-dock-divider" />
 
         {canViewDashboard && dashboardSection?.href ? (
-          <Link
-            href={dashboardSection.href}
-            aria-label={dashboardSection.label}
-            title={dashboardSection.label}
-            aria-current={dashboardActive ? "page" : undefined}
-            onClick={() => {
-              setNotificationsOpen(false);
-              setMainAction("dashboard");
-              setMiniBar(null);
-            }}
-            className={cn(
-              "resource-dock-action",
-              (dashboardActive || mainAction === "dashboard") &&
-                "resource-dock-action-active",
-            )}
-          >
+          <Link href={dashboardSection.href} aria-label={dashboardSection.label} title={dashboardSection.label} aria-current={dashboardActive ? "page" : undefined} onClick={() => { setNotificationsOpen(false); setMainAction("dashboard"); setMiniBar(null); }} className={cn("resource-dock-action", (dashboardActive || mainAction === "dashboard") && "resource-dock-action-active")}>
             <LayoutDashboard size={22} />
           </Link>
         ) : null}
 
         {canViewProjects && projectsSection ? (
-          <button
-            type="button"
-            aria-label={projectsSection.label}
-            title={projectsSection.label}
-            aria-current={projectsActive ? "page" : undefined}
-            onClick={() => {
-              setNotificationsOpen(false);
-              setMainAction("projects");
-              setMiniBar("projects");
-            }}
-            className={cn(
-              "resource-dock-action",
-              (projectsActive || mainAction === "projects") &&
-                "resource-dock-action-active",
-            )}
-          >
+          <button type="button" aria-label={projectsSection.label} title={projectsSection.label} aria-current={projectsActive ? "page" : undefined} onClick={() => { setNotificationsOpen(false); setMainAction("projects"); setMiniBar("projects"); }} className={cn("resource-dock-action", (projectsActive || mainAction === "projects") && "resource-dock-action-active")}>
             <FolderKanban size={22} />
           </button>
         ) : null}
 
         {canViewTickets && ticketsSection ? (
-          <button
-            type="button"
-            aria-label={ticketsSection.label}
-            title={ticketsSection.label}
-            aria-current={ticketsActive ? "page" : undefined}
-            onClick={() => {
-              setNotificationsOpen(false);
-              setMainAction("tickets");
-              setMiniBar("tickets");
-            }}
-            className={cn(
-              "resource-dock-action",
-              (ticketsActive || mainAction === "tickets") &&
-                "resource-dock-action-active",
-            )}
-          >
+          <button type="button" aria-label={ticketsSection.label} title={ticketsSection.label} aria-current={ticketsActive ? "page" : undefined} onClick={() => { setNotificationsOpen(false); setMainAction("tickets"); setMiniBar("tickets"); }} className={cn("resource-dock-action", (ticketsActive || mainAction === "tickets") && "resource-dock-action-active")}>
             <CheckSquare2 size={22} />
           </button>
         ) : null}
 
-        {canViewTickets || canViewNotifications ? (
+        {canViewResources && resourcesSection ? (
+          <button type="button" aria-label={resourcesSection.label} title={resourcesSection.label} aria-current={resourcesActive ? "page" : undefined} onClick={() => { setNotificationsOpen(false); setMainAction("resources"); setMiniBar("resources"); }} className={cn("resource-dock-action", (resourcesActive || mainAction === "resources") && "resource-dock-action-active")}>
+            <Users size={22} />
+          </button>
+        ) : null}
+
+        {canViewClients && clientsSection ? (
+          <button type="button" aria-label={clientsSection.label} title={clientsSection.label} aria-current={clientsActive ? "page" : undefined} onClick={() => { setNotificationsOpen(false); setMainAction("clients"); setMiniBar("clients"); }} className={cn("resource-dock-action", (clientsActive || mainAction === "clients") && "resource-dock-action-active")}>
+            <Building2 size={22} />
+          </button>
+        ) : null}
+
+        {canViewUsers && usersSection ? (
+          <button type="button" aria-label={usersSection.label} title={usersSection.label} aria-current={usersActive ? "page" : undefined} onClick={() => { setNotificationsOpen(false); setMainAction("users"); setMiniBar("users"); }} className={cn("resource-dock-action", (usersActive || mainAction === "users") && "resource-dock-action-active")}>
+            <Users size={22} />
+          </button>
+        ) : null}
+
+        {canViewAdministration && administrationSection ? (
+          <button type="button" aria-label={administrationSection.label} title={administrationSection.label} aria-current={administrationActive ? "page" : undefined} onClick={() => { setNotificationsOpen(false); setMainAction("administration"); setMiniBar("administration"); }} className={cn("resource-dock-action", (administrationActive || mainAction === "administration") && "resource-dock-action-active")}>
+            <ShieldCheck size={22} />
+          </button>
+        ) : null}
+
+        {canViewTickets || canViewResources || canViewClients || canViewUsers || canViewAdministration || canViewNotifications ? (
           <span className="resource-dock-divider" />
         ) : null}
 
@@ -543,13 +406,7 @@ export default function ResourceFloatingActionBar({
               setMiniBar(null);
               setNotificationsOpen((current) => !current);
             }}
-            className={cn(
-              "resource-dock-action",
-              (notificationsOpen ||
-                notificationsActive ||
-                mainAction === "notifications") &&
-                "resource-dock-action-active",
-            )}
+            className={cn("resource-dock-action", (notificationsOpen || notificationsActive || mainAction === "notifications") && "resource-dock-action-active")}
           >
             <Bell size={22} />
 
@@ -566,16 +423,8 @@ export default function ResourceFloatingActionBar({
           aria-label="Profile"
           title="Profile"
           aria-current={profileActive ? "page" : undefined}
-          onClick={() => {
-            setNotificationsOpen(false);
-            setMainAction("profile");
-            setMiniBar("profile");
-          }}
-          className={cn(
-            "resource-dock-action",
-            (profileActive || mainAction === "profile") &&
-              "resource-dock-action-active",
-          )}
+          onClick={() => { setNotificationsOpen(false); setMainAction("profile"); setMiniBar("profile"); }}
+          className={cn("resource-dock-action", (profileActive || mainAction === "profile") && "resource-dock-action-active")}
         >
           <UserRound size={22} />
         </button>
@@ -692,10 +541,6 @@ function ResourceFloatingStyles() {
         transform: scale(0.96);
       }
 
-      /*
-       * Every icon in the MAIN action bar gets the same cyan
-       * circular highlight when pressed.
-       */
       .resource-floating-full-mode .resource-dock-action:active {
         background: #0284c7;
         color: #ffffff;
@@ -845,4 +690,3 @@ function ResourceFloatingStyles() {
     `}</style>
   );
 }
-

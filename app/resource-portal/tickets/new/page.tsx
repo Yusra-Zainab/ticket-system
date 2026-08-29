@@ -1,16 +1,14 @@
+import TicketForm from "@/components/features/TicketForm";
 import { requireResourcePageSession } from "@/lib/auth";
-import {
-  findResourceTicket,
-  listResourceProjects,
-} from "@/lib/resourcePortal";
-import ResourceTicketForm from "@/components/resource-portal/ResourceTicketForm";
+import { findResourceTicket, listResourceProjects } from "@/lib/resourcePortal";
+import type { Project, Ticket } from "@/types";
 
 export const dynamic = "force-dynamic";
 
 export default async function NewResourceTicketPage({
   searchParams,
 }: {
-  searchParams: Promise<{ draft?: string; projectId?: string }>;
+  searchParams: Promise<{ draft?: string; projectId?: string; project?: string; module?: string; subModule?: string; url?: string }>;
 }) {
   const user = await requireResourcePageSession();
   const selection = await searchParams;
@@ -22,15 +20,20 @@ export default async function NewResourceTicketPage({
       : Promise.resolve(undefined),
   ]);
 
-  const draft = foundDraft?.lifecycle === "DRAFT" ? foundDraft : undefined;
+  const draft = foundDraft?.lifecycle === "DRAFT" ? (foundDraft as unknown as Ticket) : undefined;
 
   return (
     <div className="mx-auto max-w-7xl">
-      <ResourceTicketForm
-        projects={projects}
+      <TicketForm
+        initialSelection={selection}
         initialTicket={draft}
-        initialProjectId={selection.projectId || ""}
+        projects={projects as unknown as Project[]}
+        ticketBaseHref="/resource-portal/tickets"
+        ticketDraftsHref="/resource-portal/tickets/drafts"
+        projectBaseHref="/resource-portal/projects"
+        returnToHref="/resource-portal/tickets/new"
       />
     </div>
   );
 }
+

@@ -146,8 +146,10 @@ async function patchProject(id: string, payload: Record<string, unknown>) {
 
 export default function ProjectsTable({
   initialProjects,
+  projectHrefBase = "/projects",
 }: {
   initialProjects: Project[];
+  projectHrefBase?: string;
 }) {
   const [projects, setProjects] = useState(initialProjects);
 
@@ -667,7 +669,7 @@ export default function ProjectsTable({
 
                       {/* No hover rename/popover intentionally. */}
                       <Link
-                        href={`/projects/${project.id}`}
+                        href={`${projectHrefBase}/${project.id}`}
                         className="truncate font-semibold text-[#101828] transition-colors hover:text-[#0284C7]"
                       >
                         {project.name}

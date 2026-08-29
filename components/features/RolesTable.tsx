@@ -8,9 +8,7 @@ import {
   Check,
   ChevronDown,
   Filter,
-  Plus,
   Search,
-  X,
 } from "lucide-react";
 
 import { useMemo, useState } from "react";
@@ -23,8 +21,10 @@ type TypeFilter = "All" | RoleType;
 
 export default function RolesTable({
   initialRoles,
+  roleFormHref = "/admin/roles/new",
 }: {
   initialRoles: RoleRecord[];
+  roleFormHref?: string;
 }) {
   const [query, setQuery] = useState("");
 
@@ -170,7 +170,7 @@ export default function RolesTable({
                 >
                   <td className="px-8 py-4">
                     <Link
-                      href={`/admin/roles/new?role=${role.id}`}
+                      href={`${roleFormHref}?role=${role.id}`}
                       className="text-sm font-medium text-[#101828] hover:text-[#0284C7]"
                     >
                       {role.name}

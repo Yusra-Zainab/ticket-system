@@ -42,3 +42,19 @@ SET @visibility_sql := IF(
 PREPARE portal_stmt FROM @visibility_sql;
 EXECUTE portal_stmt;
 DEALLOCATE PREPARE portal_stmt;
+
+SET @role_permission_scopes_exists := (
+  SELECT COUNT(*)
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'roles'
+    AND COLUMN_NAME = 'permission_scopes'
+);
+SET @role_permission_scopes_sql := IF(
+  @role_permission_scopes_exists = 0,
+  "ALTER TABLE roles ADD COLUMN permission_scopes JSON NULL AFTER permissions",
+  "SELECT 1"
+);
+PREPARE portal_stmt FROM @role_permission_scopes_sql;
+EXECUTE portal_stmt;
+DEALLOCATE PREPARE portal_stmt;

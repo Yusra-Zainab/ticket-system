@@ -452,6 +452,8 @@ export interface Role {
   permissions: string[];
 }
 
+export type RolePermissionScope = "ALL" | "ASSIGNED_ONLY";
+
 export type RoleType = "SYSTEM" | "CUSTOM";
 
 export interface RoleRecord {
@@ -469,6 +471,8 @@ export interface RoleRecord {
 
   permissions: string[];
 
+  permissionScopes?: Record<string, RolePermissionScope>;
+
   updatedAt: string;
 }
 
@@ -484,6 +488,8 @@ export interface RoleFormRecord {
   type: RoleType;
 
   permissions: string[];
+
+  permissionScopes?: Record<string, RolePermissionScope>;
 }
 
 export interface AdminUserListRow {

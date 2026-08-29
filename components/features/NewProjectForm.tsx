@@ -23,7 +23,7 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import RichTextEditor from "@/components/ui/RichTextEditor";
@@ -247,8 +247,6 @@ function valuesFromProject(project?: Project): ProjectFormValues {
   };
 }
 
-const emptyFieldErrors: FieldErrorMap = {};
-
 const emptyModuleDraft: ModuleDraft = {
   moduleName: "",
   subModuleName: "",
@@ -304,11 +302,23 @@ export default function NewProjectForm({
   clients,
   returnTo,
   initialProject,
+  projectBaseHref = "/projects",
+  projectDraftsHref = "/projects/drafts",
+  ticketNewHref = "/tickets/new",
+  allowTeamAssignment = true,
+  allowProjectModules = true,
+  allowProjectFiles = true,
 }: {
   users: User[];
   clients: Client[];
   returnTo?: string;
   initialProject?: Project;
+  projectBaseHref?: string;
+  projectDraftsHref?: string;
+  ticketNewHref?: string;
+  allowTeamAssignment?: boolean;
+  allowProjectModules?: boolean;
+  allowProjectFiles?: boolean;
 }) {
   const router = useRouter();
 
@@ -359,11 +369,13 @@ export default function NewProjectForm({
       values.modules.find((module) => module.name === values.moduleName) ?? null,
     [values.moduleName, values.modules],
   );
-  const availableSubModules = selectedModuleDefinition?.subModules ?? [];
+  const availableSubModules = useMemo(
+    () => selectedModuleDefinition?.subModules ?? [],
+    [selectedModuleDefinition],
+  );
   const [touchedFields, setTouchedFields] = useState<
     Partial<Record<ProjectFieldName, boolean>>
   >({});
-  const [fieldErrors, setFieldErrors] = useState<FieldErrorMap>(emptyFieldErrors);
   const [moduleModal, setModuleModal] = useState<ModuleModalState | null>(null);
   const [moduleDraft, setModuleDraft] = useState<ModuleDraft>(emptyModuleDraft);
 
@@ -371,7 +383,6 @@ export default function NewProjectForm({
     field: ProjectFieldName,
     current: ProjectFormValues,
   ): string => {
-    const plainDescription = current.description.replace(/<[^>]*>/g, "").trim();
     const validateUrl = (value: string, label: string) => {
       if (!value.trim()) return "";
       try {
@@ -436,25 +447,8 @@ export default function NewProjectForm({
     }, {});
   };
 
-  useEffect(() => {
-    setFieldErrors(validateValues(values));
-  }, [values]);
-
-  useEffect(() => {
-    if (!values.moduleName) {
-      if (values.subModule) {
-        setValues((current) => ({ ...current, subModule: "" }));
-      }
-      return;
-    }
-
-    if (
-      values.subModule &&
-      !availableSubModules.some((subModule) => subModule.name === values.subModule)
-    ) {
-      setValues((current) => ({ ...current, subModule: "" }));
-    }
-  }, [availableSubModules, values.moduleName, values.subModule]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const fieldErrors = useMemo(() => validateValues(values), [values]);
 
   const touchField = (field: ProjectFieldName) => {
     setTouchedFields((current) => ({
@@ -617,7 +611,6 @@ export default function NewProjectForm({
     setTeamOpen(false);
     setUploadMenu(false);
     setTouchedFields({});
-    setFieldErrors(emptyFieldErrors);
     closeModuleModal();
     setError("");
     showNotice("Project form reset.");
@@ -781,18 +774,25 @@ export default function NewProjectForm({
 
       clientOwnerId: values.clientOwnerId || null,
 
-      coordinatorId: values.coordinatorId || null,
-      department: values.department,
+      ...(allowTeamAssignment
+        ? {
+            coordinatorId: values.coordinatorId || null,
+            department: values.department,
+            teamIds: values.teamIds,
+            team: values.teamIds
+              .map((id) => users.find((user) => user.id === id)?.name)
+              .filter((value): value is string => Boolean(value)),
+          }
+        : {}),
 
-      teamIds: values.teamIds,
-      team: values.teamIds
-        .map((id) => users.find((user) => user.id === id)?.name)
-        .filter((value): value is string => Boolean(value)),
-
-      moduleName: values.moduleName,
-      subModule: values.subModule,
-      moduleOwnerId: values.moduleOwnerId || null,
-      modules: values.modules,
+      ...(allowProjectModules
+        ? {
+            moduleName: values.moduleName,
+            subModule: values.subModule,
+            moduleOwnerId: values.moduleOwnerId || null,
+            modules: values.modules,
+          }
+        : {}),
 
       links: {
         staging: values.stagingUrl,
@@ -801,7 +801,7 @@ export default function NewProjectForm({
         github: values.githubUrl,
       },
 
-      attachments,
+      ...(allowProjectFiles ? { attachments } : {}),
 
       internalNotes: values.internalNotes,
     };
@@ -859,7 +859,9 @@ export default function NewProjectForm({
         throw new Error("The project was saved without an id.");
       }
 
-      await uploadPendingFiles(projectId);
+      if (allowProjectFiles) {
+        await uploadPendingFiles(projectId);
+      }
 
       router.refresh();
 
@@ -870,7 +872,7 @@ export default function NewProjectForm({
         }
 
         if (initialProject.lifecycle === "DRAFT") {
-          router.push(returnTo || "/projects/" + projectId + "?saved=1");
+          router.push(returnTo || `${projectBaseHref}/${projectId}?saved=1`);
           return;
         }
 
@@ -879,16 +881,16 @@ export default function NewProjectForm({
       }
 
       if (targetLifecycle === "DRAFT") {
-        router.push("/projects/drafts?saved=1");
+        router.push(`${projectDraftsHref}?saved=1`);
         return;
       }
 
       if (returnTo === "ticket") {
         router.push(
-          `/tickets/new?project=${encodeURIComponent(result.name ?? values.name)}&projectId=${encodeURIComponent(projectId)}`,
+          `${ticketNewHref}?project=${encodeURIComponent(result.name ?? values.name)}&projectId=${encodeURIComponent(projectId)}`,
         );
       } else {
-        router.push(returnTo || `/projects/${projectId}?saved=1`);
+        router.push(returnTo || `${projectBaseHref}/${projectId}?saved=1`);
       }
     } catch (cause) {
       const message =
@@ -927,7 +929,7 @@ export default function NewProjectForm({
 
           <div className="flex flex-wrap items-center gap-3">
             <Link
-              href="/projects/drafts"
+              href={projectDraftsHref}
               className="new-project-secondary-button inline-flex items-center gap-2"
             >
               Drafts
@@ -1136,8 +1138,8 @@ export default function NewProjectForm({
                   className="new-project-input bg-[#F9FAFB] placeholder:text-[#98A2B3]"
                 />
               </Field>
-            </div>
-          </FormSection>
+              </div>
+            </FormSection>
 
           <FormSection
             id="timeline-status"
@@ -1184,13 +1186,14 @@ export default function NewProjectForm({
             </div>
           </FormSection>
 
-          <FormSection
-            id="team-assignment"
-            icon={UserCheck}
-            title="Team Assignment"
-            onEnter={setActiveSection}
-          >
-            <div className="grid gap-4 md:grid-cols-2">
+          {allowTeamAssignment && (
+            <FormSection
+              id="team-assignment"
+              icon={UserCheck}
+              title="Team Assignment"
+              onEnter={setActiveSection}
+            >
+              <div className="grid gap-4 md:grid-cols-2">
               <Field label="Project Coordinator">
                 <SearchDropdown
                   value={values.coordinatorId}
@@ -1292,14 +1295,16 @@ export default function NewProjectForm({
               </Field>
             </div>
           </FormSection>
+          )}
 
-          <FormSection
-            id="modules-setup"
-            icon={Layers3}
-            title="Modules Setup"
-            onEnter={setActiveSection}
-          >
-            <div className="grid gap-4 md:grid-cols-2">
+          {allowProjectModules && (
+            <FormSection
+              id="modules-setup"
+              icon={Layers3}
+              title="Modules Setup"
+              onEnter={setActiveSection}
+            >
+              <div className="grid gap-4 md:grid-cols-2">
               <Field label="Module Name" error={getFieldError("moduleName")}>
                 <SearchDropdown
                   value={values.moduleName}
@@ -1362,9 +1367,9 @@ export default function NewProjectForm({
                   }))}
                 />
               </Field>
-            </div>
-
-          </FormSection>
+              </div>
+            </FormSection>
+          )}
 
           <FormSection
             id="project-links"
@@ -1422,112 +1427,114 @@ export default function NewProjectForm({
               </Field>
             </div>
 
-            <Field label="Upload Files">
-              <button
-                type="button"
-                disabled={uploading}
-                onClick={() => setUploadMenu(true)}
-                onDragOver={(event) => event.preventDefault()}
-                onDrop={(event) => {
-                  event.preventDefault();
-                  queueAttachments(Array.from(event.dataTransfer.files));
-                }}
-                className="flex w-full max-w-[672px] flex-col items-center rounded-xl border border-[#EAECF0] bg-white px-6 py-5 transition hover:border-[#0284C7] hover:bg-[#F8FDFF] disabled:cursor-wait disabled:opacity-60"
-              >
-                <span className="grid size-10 place-items-center rounded-lg border border-[#EAECF0] bg-white shadow-[0_1px_2px_rgba(16,24,40,0.05)]">
-                  <UploadCloud size={20} className="text-[#475467]" />
-                </span>
-
-                <strong className="mt-3 text-sm font-semibold text-[#0284C7]">
-                  Click to upload{" "}
-                  <span className="font-normal text-[#475467]">
-                    or drag and drop
+            {allowProjectFiles && (
+              <Field label="Upload Files">
+                <button
+                  type="button"
+                  disabled={uploading}
+                  onClick={() => setUploadMenu(true)}
+                  onDragOver={(event) => event.preventDefault()}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    queueAttachments(Array.from(event.dataTransfer.files));
+                  }}
+                  className="flex w-full max-w-[672px] flex-col items-center rounded-xl border border-[#EAECF0] bg-white px-6 py-5 transition hover:border-[#0284C7] hover:bg-[#F8FDFF] disabled:cursor-wait disabled:opacity-60"
+                >
+                  <span className="grid size-10 place-items-center rounded-lg border border-[#EAECF0] bg-white shadow-[0_1px_2px_rgba(16,24,40,0.05)]">
+                    <UploadCloud size={20} className="text-[#475467]" />
                   </span>
-                </strong>
 
-                <small className="mt-1 text-xs text-[#475467]">
-                  SVG, PNG, JPG, PDF or TXT (max. 10 MB)
-                </small>
-              </button>
+                  <strong className="mt-3 text-sm font-semibold text-[#0284C7]">
+                    Click to upload {" "}
+                    <span className="font-normal text-[#475467]">
+                      or drag and drop
+                    </span>
+                  </strong>
 
-              <input
-                ref={fileInput}
-                type="file"
-                multiple
-                className="hidden"
-                accept=".svg,.png,.jpg,.jpeg,.gif,.pdf,.txt"
-                onChange={(event) => {
-                  queueAttachments(Array.from(event.target.files ?? []));
+                  <small className="mt-1 text-xs text-[#475467]">
+                    SVG, PNG, JPG, PDF or TXT (max. 10 MB)
+                  </small>
+                </button>
 
-                  event.target.value = "";
-                }}
-              />
+                <input
+                  ref={fileInput}
+                  type="file"
+                  multiple
+                  className="hidden"
+                  accept=".svg,.png,.jpg,.jpeg,.gif,.pdf,.txt"
+                  onChange={(event) => {
+                    queueAttachments(Array.from(event.target.files ?? []));
 
-              {pendingFiles.length > 0 && (
-                <ul className="mt-3 grid max-w-[672px] gap-2 sm:grid-cols-2">
-                  {pendingFiles.map((file) => (
-                    <li
-                      key={`${file.name}-${file.size}-${file.lastModified}`}
-                      className="flex min-w-0 items-center gap-2 rounded-lg border border-[#B2DDFF] bg-[#EFF8FF] p-3 text-sm"
-                    >
-                      <File size={16} className="shrink-0 text-[#175CD3]" />
+                    event.target.value = "";
+                  }}
+                />
 
-                      <span className="min-w-0 flex-1 truncate text-[#344054]">
-                        {file.name}
-                      </span>
-
-                      <span className="shrink-0 text-[11px] font-medium text-[#175CD3]">
-                        Pending
-                      </span>
-
-                      <button
-                        type="button"
-                        aria-label={`Remove ${file.name}`}
-                        onClick={() =>
-                          setPendingFiles((items) =>
-                            items.filter((item) => item !== file),
-                          )
-                        }
-                        className="grid size-7 shrink-0 place-items-center rounded-md text-[#667085] hover:bg-white hover:text-[#D92D20]"
+                {pendingFiles.length > 0 && (
+                  <ul className="mt-3 grid max-w-[672px] gap-2 sm:grid-cols-2">
+                    {pendingFiles.map((file) => (
+                      <li
+                        key={`${file.name}-${file.size}-${file.lastModified}`}
+                        className="flex min-w-0 items-center gap-2 rounded-lg border border-[#B2DDFF] bg-[#EFF8FF] p-3 text-sm"
                       >
-                        <X size={15} />
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
+                        <File size={16} className="shrink-0 text-[#175CD3]" />
 
-              {attachments.length > 0 && (
-                <ul className="mt-3 grid max-w-[672px] gap-2 sm:grid-cols-2">
-                  {attachments.map((attachment) => (
-                    <li
-                      key={attachment.id}
-                      className="flex min-w-0 items-center gap-2 rounded-lg border border-[#EAECF0] bg-[#F9FAFB] p-3 text-sm"
-                    >
-                      <File size={16} className="shrink-0 text-[#667085]" />
+                        <span className="min-w-0 flex-1 truncate text-[#344054]">
+                          {file.name}
+                        </span>
 
-                      <a
-                        href={attachment.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="min-w-0 flex-1 truncate text-[#344054] hover:text-[#0284C7]"
+                        <span className="shrink-0 text-[11px] font-medium text-[#175CD3]">
+                          Pending
+                        </span>
+
+                        <button
+                          type="button"
+                          aria-label={`Remove ${file.name}`}
+                          onClick={() =>
+                            setPendingFiles((items) =>
+                              items.filter((item) => item !== file),
+                            )
+                          }
+                          className="grid size-7 shrink-0 place-items-center rounded-md text-[#667085] hover:bg-white hover:text-[#D92D20]"
+                        >
+                          <X size={15} />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                {attachments.length > 0 && (
+                  <ul className="mt-3 grid max-w-[672px] gap-2 sm:grid-cols-2">
+                    {attachments.map((attachment) => (
+                      <li
+                        key={attachment.id}
+                        className="flex min-w-0 items-center gap-2 rounded-lg border border-[#EAECF0] bg-[#F9FAFB] p-3 text-sm"
                       >
-                        {attachment.name}
-                      </a>
+                        <File size={16} className="shrink-0 text-[#667085]" />
 
-                      <button
-                        type="button"
-                        aria-label={`Remove ${attachment.name}`}
-                        onClick={() => void removeAttachment(attachment)}
-                        className="grid size-7 shrink-0 place-items-center rounded-md text-[#667085] hover:bg-white hover:text-[#D92D20]"
-                      >
-                        <X size={15} />
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </Field>
+                        <a
+                          href={attachment.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="min-w-0 flex-1 truncate text-[#344054] hover:text-[#0284C7]"
+                        >
+                          {attachment.name}
+                        </a>
+
+                        <button
+                          type="button"
+                          aria-label={`Remove ${attachment.name}`}
+                          onClick={() => void removeAttachment(attachment)}
+                          className="grid size-7 shrink-0 place-items-center rounded-md text-[#667085] hover:bg-white hover:text-[#D92D20]"
+                        >
+                          <X size={15} />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </Field>
+            )}
           </FormSection>
 
           <FormSection

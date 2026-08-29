@@ -36,6 +36,34 @@ function buildResourceCrumbs(pathname: string): ResourceCrumb[] {
     return [{ label: "Projects" }];
   }
 
+  if (pathname === "/resource-portal/projects/new") {
+    return [
+      { label: "Projects", href: "/resource-portal/projects" },
+      { label: "..." },
+      { label: "New Project" },
+    ];
+  }
+
+  if (pathname === "/resource-portal/projects/drafts") {
+    return [
+      { label: "Projects", href: "/resource-portal/projects" },
+      { label: "..." },
+      { label: "Project Drafts" },
+    ];
+  }
+
+  if (
+    pathname.startsWith("/resource-portal/projects/") &&
+    pathname.endsWith("/edit") &&
+    pathname.split("/").filter(Boolean).length === 5
+  ) {
+    return [
+      { label: "Projects", href: "/resource-portal/projects" },
+      { label: "..." },
+      { label: "Edit Project" },
+    ];
+  }
+
   if (
     pathname.startsWith("/resource-portal/projects/") &&
     pathname.split("/").filter(Boolean).length === 3

@@ -108,6 +108,10 @@ export default function TicketForm({
   initialTicket,
   projects = [],
   users = [],
+  ticketBaseHref = "/tickets",
+  ticketDraftsHref = "/tickets/drafts",
+  projectBaseHref = "/projects",
+  returnToHref = "/tickets/new",
 }: {
   initialSelection?: {
     project?: string;
@@ -119,6 +123,10 @@ export default function TicketForm({
   initialTicket?: Ticket;
   projects?: Project[];
   users?: User[];
+  ticketBaseHref?: string;
+  ticketDraftsHref?: string;
+  projectBaseHref?: string;
+  returnToHref?: string;
 }) {
   const router = useRouter();
   const { saveDraft, submitTicket } = useApp();
@@ -157,7 +165,6 @@ export default function TicketForm({
   const {
     register,
     control,
-    handleSubmit,
     reset,
     getValues,
     setValue,
@@ -193,8 +200,8 @@ export default function TicketForm({
     [selectedProject],
   );
   const availableSubModules = useMemo(() => {
-    const module = findProjectModule(availableModules, getValues("module") ?? "");
-    return module?.subModules ?? [];
+    const activeModuleInfo = findProjectModule(availableModules, getValues("module") ?? "");
+    return activeModuleInfo?.subModules ?? [];
   }, [availableModules, getValues]);
   const fieldClass = (name: keyof Values) =>
     cn(
@@ -334,11 +341,11 @@ export default function TicketForm({
       if (mode === "submit") {
         await submitTicket(storedTicket);
         await uploadPendingFiles(ticketId);
-        router.push("/tickets");
+        router.push(ticketBaseHref);
       } else {
         await saveDraft(storedTicket);
         await uploadPendingFiles(ticketId);
-        router.push("/tickets/drafts");
+        router.push(ticketDraftsHref);
       }
     } catch (error) {
       setNotice(
@@ -384,7 +391,7 @@ export default function TicketForm({
           Create a Ticket
         </h1>
         <div className="flex flex-wrap gap-2">
-          <Link href="/tickets/drafts" className="button-secondary">
+          <Link href={ticketDraftsHref} className="button-secondary">
             Drafts
           </Link>
           <button
@@ -484,7 +491,7 @@ export default function TicketForm({
                       id: project.id,
                     }))}
                     newLabel="New Project"
-                    newHref="/projects/new?returnTo=%2Ftickets%2Fnew"
+                    newHref={`${projectBaseHref}/new?returnTo=${encodeURIComponent(returnToHref)}`}
                   />
                 </Field>
               )}
@@ -513,8 +520,8 @@ export default function TicketForm({
                       onAction={() => {
                         router.push(
                           selectedProjectId
-                            ? `/projects/${selectedProjectId}/edit?section=modules-setup&returnTo=%2Ftickets%2Fnew`
-                            : "/projects/new?returnTo=%2Ftickets%2Fnew",
+                            ? `${projectBaseHref}/${selectedProjectId}/edit?section=modules-setup&returnTo=${encodeURIComponent(returnToHref)}`
+                            : `${projectBaseHref}/new?returnTo=${encodeURIComponent(returnToHref)}`,
                         );
                       }}
                     />
@@ -544,8 +551,8 @@ export default function TicketForm({
                       onAction={() => {
                         router.push(
                           selectedProjectId
-                            ? `/projects/${selectedProjectId}/edit?section=modules-setup&returnTo=%2Ftickets%2Fnew`
-                            : "/projects/new?returnTo=%2Ftickets%2Fnew",
+                            ? `${projectBaseHref}/${selectedProjectId}/edit?section=modules-setup&returnTo=${encodeURIComponent(returnToHref)}`
+                            : `${projectBaseHref}/new?returnTo=${encodeURIComponent(returnToHref)}`,
                         );
                       }}
                     />
@@ -1403,4 +1410,8 @@ function ConfirmDialog({
     </div>
   );
 }
+
+
+
+
 

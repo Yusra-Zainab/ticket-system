@@ -18,7 +18,7 @@ export default async function ResourceProfilePage() {
   ]);
 
   return (
-    <div className="mx-auto max-w-7xl">
+    <div /*className="mx-auto max-w-7xl"*/>
       <ResourceProfileView
         profile={profile}
         projects={projects}

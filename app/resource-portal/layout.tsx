@@ -17,7 +17,6 @@ export default async function ResourceLayout({
     getRolePermissions(user.role),
   ]);
 
-  console.log("[resource-layout]", { userRole: user.role, permissions });
 
   return (
     <>
@@ -180,6 +179,25 @@ export default async function ResourceLayout({
         .resource-portal-main {
           width: 100%;
           min-width: 0;
+          padding-inline: 20px;
+        }
+
+        @media (min-width: 640px) {
+          .resource-portal-main {
+            padding-inline: 32px;
+          }
+        }
+
+        @media (min-width: 1024px) {
+          .resource-portal-main {
+            padding-inline: 48px;
+          }
+        }
+
+        @media (min-width: 1280px) {
+          .resource-portal-main {
+            padding-inline: 64px;
+          }
         }
 
         /*

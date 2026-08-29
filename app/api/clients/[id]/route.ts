@@ -4,6 +4,8 @@ import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 
 import { z } from "zod";
 
+import { requireApiPermission } from "@/lib/apiPermissions";
+
 import { db, findClientRecord } from "@/lib/db";
 
 const updateSchema = z.object({
@@ -46,6 +48,12 @@ export async function GET(
     }>;
   },
 ) {
+  const auth = await requireApiPermission("View Clients");
+
+  if ("response" in auth) {
+    return auth.response;
+  }
+
   const { id } = await params;
 
   const client = await findClientRecord(id);
@@ -74,6 +82,12 @@ export async function PATCH(
     }>;
   },
 ) {
+  const auth = await requireApiPermission("Edit Clients");
+
+  if ("response" in auth) {
+    return auth.response;
+  }
+
   const { id } = await params;
 
   const clientId = Number(id);
@@ -95,6 +109,25 @@ export async function PATCH(
     const value = updateSchema.parse(await request.json());
 
     const form = value.formData;
+
+    if (Array.isArray(form.projectIds)) {
+      const assignAuth = await requireApiPermission("Assign Client Projects");
+
+      if ("response" in assignAuth) {
+        return assignAuth.response;
+      }
+    }
+
+    if (
+      form.accountManagerId !== undefined ||
+      form.coordinatorId !== undefined
+    ) {
+      const teamAuth = await requireApiPermission("Manage Client Team");
+
+      if ("response" in teamAuth) {
+        return teamAuth.response;
+      }
+    }
 
     const clientName =
       stringValue(form.clientName) ||
@@ -325,6 +358,12 @@ export async function DELETE(
     }>;
   },
 ) {
+  const auth = await requireApiPermission("Delete Clients");
+
+  if ("response" in auth) {
+    return auth.response;
+  }
+
   const { id } = await params;
 
   const clientId = Number(id);
