@@ -469,6 +469,21 @@ function OverviewTab({
       </DetailSection>
 
       <DetailSection title="Primary Contact">
+        <div className="mb-4 flex items-center gap-3">
+          <Avatar
+            name={form.primaryContactName || "Primary contact"}
+            src={form.primaryContactAvatar}
+            className="size-12"
+          />
+          <div>
+            <strong className="block text-sm text-[#101828]">
+              {form.primaryContactName || "—"}
+            </strong>
+            <small className="text-[#667085]">
+              {form.primaryJobTitle || form.primaryEmail || ""}
+            </small>
+          </div>
+        </div>
         <DetailGrid>
           <DetailValue label="Full Name" value={form.primaryContactName} />
 

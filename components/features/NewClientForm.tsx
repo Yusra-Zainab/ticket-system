@@ -27,6 +27,7 @@ import { useRouter } from "next/navigation";
 
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 
+import { Avatar } from "@/components/ui/Avatar";
 import RichTextEditor from "@/components/ui/RichTextEditor";
 import StickyToast from "@/components/ui/StickyToast";
 
@@ -777,6 +778,18 @@ export default function NewClientForm({
             onActive={setActiveSection}
             tooltip="The primary contact is the main person your team communicates with for the client account."
           >
+            {(values.primaryContactAvatar || values.primaryContactName) && (
+              <div className="mb-4 flex items-center gap-3">
+                <Avatar
+                  name={values.primaryContactName || "Primary contact"}
+                  src={values.primaryContactAvatar}
+                  className="size-11"
+                />
+                <span className="text-xs text-[#667085]">
+                  Photo is set by the contact from their own portal profile.
+                </span>
+              </div>
+            )}
             <div className="grid gap-4 md:grid-cols-2">
               <Field label="Full Name">
                 <input
@@ -1060,7 +1073,14 @@ export default function NewClientForm({
                         }
                       >
                         <td className="border-b border-[#EAECF0] px-5 py-2 font-medium text-[#101828]">
-                          {member.name}
+                          <span className="flex items-center gap-2.5">
+                            <Avatar
+                              name={member.name}
+                              src={member.avatar}
+                              className="size-7"
+                            />
+                            {member.name}
+                          </span>
                         </td>
 
                         <td className="border-b border-[#EAECF0] px-5 py-2 text-[#475467]">

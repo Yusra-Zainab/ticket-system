@@ -563,8 +563,15 @@ export default function ClientsTable({
                   </td>
 
                   {/* Primary Contact */}
-                  <td className="px-2 text-center text-[14px] font-normal leading-5 text-[#475467]">
-                    {client.primaryContact}
+                  <td className="px-2 text-[14px] font-normal leading-5 text-[#475467]">
+                    <span className="flex items-center justify-center gap-2">
+                      <Avatar
+                        name={client.primaryContact}
+                        src={client.primaryContactAvatar}
+                        className="size-6 text-[9px]"
+                      />
+                      {client.primaryContact}
+                    </span>
                   </td>
 
                   {/* Contact Method */}
