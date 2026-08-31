@@ -89,7 +89,7 @@ export default function ProjectsDraftsTable({
                 </td>
 
                 <td className="px-5 text-sm text-[#475467]">
-                  {new Date(project.lastUpdated).toLocaleString()}
+                  {new Date(project.lastUpdated).toLocaleString("en-GB")}
                 </td>
 
                 <td className="px-5">

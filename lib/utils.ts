@@ -8,7 +8,7 @@ export function cn(...inputs: ClassValue[]) {
 export function formatDate(value: string) {
   const date = new Date(value);
   if (!value || Number.isNaN(date.getTime())) return 'Not set';
-  return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(date);
+  return new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).format(date);
 }
 
 export function initials(name: string) {

@@ -1,12 +1,13 @@
 import { randomUUID } from "node:crypto";
 
-import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
+import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { z } from "zod";
 
 import {
-  requireAdminPageSession,
-  requireClientPageSession,
-  requireResourcePageSession,
+  getSessionUser,
+  isAdminRole,
+  isClientRole,
+  isResourceRole,
 } from "@/lib/auth";
 import { findClientTicket } from "@/lib/clientPortal";
 import { db } from "@/lib/db";
@@ -51,24 +52,6 @@ function avatarOf(user: unknown) {
   return typeof row.avatar === "string" ? row.avatar : null;
 }
 
-async function hasDatabaseColumn(
-  connection: PoolConnection,
-  table: string,
-  column: string,
-) {
-  const [rows] = await connection.query<Array<RowDataPacket & { count: number }>>(
-    `
-      SELECT COUNT(*) AS count
-      FROM information_schema.COLUMNS
-      WHERE TABLE_SCHEMA = DATABASE()
-        AND TABLE_NAME = ?
-        AND COLUMN_NAME = ?
-    `,
-    [table, column],
-  );
-
-  return Number(rows[0]?.count ?? 0) > 0;
-}
 
 export async function POST(
   request: Request,
@@ -84,26 +67,52 @@ export async function POST(
   try {
     const { portal: rawPortal, ticketId } = await context.params;
     const portal = portalSchema.parse(rawPortal);
+
+    /*
+     * Auth first — before body parsing or opening a transaction. Uses the
+     * API-appropriate session check: the page-session helpers `redirect()`
+     * on failure, and inside a route handler that redirect throw was being
+     * swallowed by the catch below into a generic 500 instead of a 401/403
+     * (F24).
+     */
+    const sessionUser = await getSessionUser();
+    if (!sessionUser) {
+      return Response.json(
+        { error: "Authentication required." },
+        { status: 401 },
+      );
+    }
+    const portalRoleOk =
+      portal === "client"
+        ? isClientRole(sessionUser.role)
+        : portal === "resource"
+          ? isResourceRole(sessionUser.role)
+          : isAdminRole(sessionUser.role);
+    if (!portalRoleOk) {
+      return Response.json(
+        { error: "You can't comment through this portal." },
+        { status: 403 },
+      );
+    }
+
     const values = bodySchema.parse(await request.json());
 
     let user: { id: number; name: string; avatar?: string | null };
 
     if (portal === "client") {
-      const clientUser = await requireClientPageSession();
-      const allowed = await findClientTicket(clientUser, ticketId);
+      const allowed = await findClientTicket(sessionUser, ticketId);
       if (!allowed) {
         return Response.json({ error: "Ticket not found." }, { status: 404 });
       }
-      user = clientUser;
+      user = sessionUser;
     } else if (portal === "resource") {
-      const resourceUser = await requireResourcePageSession();
-      const allowed = await findResourceTicket(resourceUser, ticketId);
+      const allowed = await findResourceTicket(sessionUser, ticketId);
       if (!allowed) {
         return Response.json({ error: "Ticket not found." }, { status: 404 });
       }
-      user = resourceUser;
+      user = sessionUser;
     } else {
-      user = await requireAdminPageSession();
+      user = sessionUser;
     }
 
     connection = await db.getConnection();
@@ -156,12 +165,8 @@ export async function POST(
       activity,
     };
 
-    const hasVisibility = await hasDatabaseColumn(connection, "comments", "visibility");
-
     await connection.execute(
-      hasVisibility
-        ? "INSERT INTO comments (ticket_id, user_id, content, visibility) VALUES (?, ?, ?, 'PUBLIC')"
-        : "INSERT INTO comments (ticket_id, user_id, content) VALUES (?, ?, ?)",
+      "INSERT INTO comments (ticket_id, user_id, content) VALUES (?, ?, ?)",
       [row.id, user.id, values.text],
     );
 

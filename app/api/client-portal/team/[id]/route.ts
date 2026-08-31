@@ -9,6 +9,7 @@ import {
   findClientTeamMember,
   getClientContext,
 } from "@/lib/clientPortal";
+import { AvatarError, persistUserAvatar } from "@/lib/avatars";
 import { db } from "@/lib/db";
 
 const schema = z.object({
@@ -176,6 +177,8 @@ export async function PATCH(
       .join(" ")
       .trim();
 
+    const avatarUrl = await persistUserAvatar(numericId, values.avatar);
+
     const nextFormData = {
       ...currentFormData,
       clientId: context.clientId,
@@ -184,7 +187,7 @@ export async function PATCH(
       phone: values.phone,
       jobTitle: values.jobTitle,
       communicationChannel: values.communicationChannel,
-      avatarUrl: values.avatar || "",
+      avatarUrl: avatarUrl ?? "",
     };
 
     await db.execute(
@@ -201,7 +204,7 @@ export async function PATCH(
       [
         name,
         values.email,
-        values.avatar || null,
+        avatarUrl,
         JSON.stringify(nextFormData),
         numericId,
       ],
@@ -278,7 +281,7 @@ export async function PATCH(
         phone: values.phone,
         contactChannel: values.communicationChannel,
         accessLevel: "Client Portal",
-        avatar: values.avatar || "",
+        avatar: avatarUrl ?? "",
       };
     });
 
@@ -291,7 +294,7 @@ export async function PATCH(
         phone: values.phone,
         contactChannel: values.communicationChannel,
         accessLevel: "Client Portal",
-        avatar: values.avatar || "",
+        avatar: avatarUrl ?? "",
       });
     }
 
@@ -323,12 +326,15 @@ export async function PATCH(
         jobTitle: values.jobTitle,
         communicationChannel:
           values.communicationChannel,
-        avatar: values.avatar || null,
+        avatar: avatarUrl,
         status: member.status,
         addedAt: member.addedAt,
       },
     });
   } catch (error) {
+    if (error instanceof AvatarError) {
+      return Response.json({ error: error.message }, { status: 400 });
+    }
     if (error instanceof z.ZodError) {
       return Response.json(
         {

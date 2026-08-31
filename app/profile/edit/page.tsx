@@ -24,6 +24,7 @@ export default async function EditProfilePage() {
         jobTitle: profile.formData.jobTitle || profile.role,
         timeZone: profile.formData.timeZone || defaultProfileTimeZone,
         role: profile.role.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase()),
+        avatar: profile.avatar || "",
         twoFactorEnabled: profile.formData.twoFactorEnabled ?? true,
       }}
     />

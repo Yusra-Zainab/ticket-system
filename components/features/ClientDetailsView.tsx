@@ -767,7 +767,11 @@ function TeamTab({
             key={member.id}
             className="client-team-card"
           >
-            <Avatar name={member.name} className="size-10" />
+            <Avatar
+              name={member.name}
+              src={member.avatar}
+              className="size-10"
+            />
 
             <span>
               <strong>{member.name}</strong>
@@ -1104,7 +1108,12 @@ function TeamAvatars({ project }: { project: Project }) {
   return (
     <div className="client-project-team">
       {shown.map((member) => (
-        <Avatar key={member.id} name={member.name} className="size-6" />
+        <Avatar
+          key={member.id}
+          name={member.name}
+          src={member.avatar}
+          className="size-6"
+        />
       ))}
 
       {members.length > shown.length && (

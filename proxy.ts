@@ -162,6 +162,12 @@ function roleApiPermission(
     return null;
   }
 
+  if (/^\/api\/roles\/[^/]+$/.test(pathname)) {
+    if (upper === "GET") return "View Roles";
+    if (upper === "DELETE") return "Delete Custom Roles";
+    return null;
+  }
+
   return null;
 }
 
@@ -242,6 +248,25 @@ export async function proxy(request: NextRequest) {
       return NextResponse.redirect(new URL(portalHomeForRole(user.role), request.url));
     }
     return NextResponse.next();
+  }
+
+  /*
+   * Client-portal accounts have their own `/api/client-portal/*` surface and
+   * never belong on an admin page or admin API — not even where they hold a
+   * permission that shares a name with admin's (the "Client User" system role
+   * carries "View Tickets" / "View Projects", which previously let a client
+   * call `GET /api/tickets` or `/api/projects` and read every tenant's data,
+   * including internal ticket notes — F22). Resource-portal accounts are
+   * deliberately *not* blocked here: the resource portal reuses the admin API
+   * routes by design and is gated by the per-permission maps below.
+   */
+  if (isClientRole(user.role)) {
+    if (pathname.startsWith("/api/")) {
+      return jsonUnauthorized(403, "Client portal access required.");
+    }
+    return NextResponse.redirect(
+      new URL(portalHomeForRole(user.role), request.url),
+    );
   }
 
   const projectApiPermissionName = projectApiPermission(pathname, request.method);

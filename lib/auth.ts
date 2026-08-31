@@ -6,6 +6,8 @@ import { createHash, randomBytes, scrypt } from "node:crypto";
 
 import net from "node:net";
 
+import tls from "node:tls";
+
 import { cookies } from "next/headers";
 
 import { redirect } from "next/navigation";
@@ -14,7 +16,7 @@ import { type NextRequest, NextResponse } from "next/server";
 
 import type { RowDataPacket } from "mysql2/promise";
 
-import { db } from "@/lib/db";
+import { db, getEmailTransport } from "@/lib/db";
 
 import {
   isAdminRole,
@@ -206,7 +208,6 @@ type PasswordResetRow = RowDataPacket & {
    ========================================================= */
 
 declare global {
-  // eslint-disable-next-line no-var
   var __ticketAuthInitPromise: Promise<void> | undefined;
 }
 
@@ -235,6 +236,17 @@ export async function hashPassword(password: string) {
   const derived = (await deriveKey(password, salt, 64)) as Buffer;
 
   return `${salt}:${derived.toString("hex")}`;
+}
+
+/*
+ * A valid scrypt hash of a value no user can have. Verifying an
+ * incoming password against this (instead of returning early) keeps
+ * "unknown email" and "wrong password" on the same timing path.
+ */
+let dummyHashPromise: Promise<string> | undefined;
+export function dummyPasswordHash() {
+  dummyHashPromise ??= hashPassword(randomBytes(32).toString("hex"));
+  return dummyHashPromise;
 }
 
 export async function verifyPassword(
@@ -359,8 +371,6 @@ function findSeededPortalAccountByEmail(email: string) {
 async function syncPortalAccount(
   account: (typeof SEEDED_PORTAL_ACCOUNTS)[number],
 ) {
-  const passwordHash = await hashPassword(account.password);
-
   const persistedRole = persistedRoleForUserTable(account.role);
 
   const [rows] = await db.query<QueryUserRow[]>(
@@ -385,37 +395,24 @@ async function syncPortalAccount(
   );
 
   if (rows[0]) {
-    await db.execute(
-      `
-        UPDATE users
-
-        SET
-          name = ?,
-          password = ?,
-          role = ?,
-          lifecycle = 'OPEN',
-          form_data = ?,
-          updated_at =
-            CURRENT_TIMESTAMP
-
-        WHERE
-          id = ?
-      `,
-      [
-        account.name,
-
-        passwordHash,
-
-        persistedRole,
-
-        JSON.stringify(account.formData),
-
-        rows[0].id,
-      ],
-    );
+    /*
+     * The seeded account already exists — leave it alone. It used to be
+     * hard-reset (name / password / role / form_data) on every login and
+     * password-reset, which meant password changes for these accounts
+     * never stuck and scrypt ran on every attempt (F6). Only ensure the
+     * account isn't accidentally disabled.
+     */
+    if (rows[0].lifecycle !== "OPEN") {
+      await db.execute(
+        "UPDATE users SET lifecycle = 'OPEN', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+        [rows[0].id],
+      );
+    }
 
     return;
   }
+
+  const passwordHash = await hashPassword(account.password);
 
   await db.execute(
     `
@@ -854,6 +851,17 @@ export async function authenticateUser(
 
   const user = await findUserByEmail(email);
 
+  /*
+   * Always run the (expensive) scrypt verification, even when there is
+   * no matching user, so an unknown email and a wrong password take the
+   * same amount of time — otherwise response timing leaks which emails
+   * are registered (F3).
+   */
+  const valid = await verifyPassword(
+    password,
+    user?.password ?? (await dummyPasswordHash()),
+  );
+
   if (!user || user.lifecycle !== "OPEN") {
     return null;
   }
@@ -862,9 +870,7 @@ export async function authenticateUser(
     return null;
   }
 
-  const valid = await verifyPassword(password, user.password);
-
-  return valid ? user : null;
+  return valid && Boolean(user.password) ? user : null;
 }
 
 /* =========================================================
@@ -1045,6 +1051,10 @@ export async function resetPasswordFromToken(
 
       SET
         password = ?,
+        form_data = JSON_REMOVE(
+          COALESCE(form_data, JSON_OBJECT()),
+          '$.mustChangePassword'
+        ),
         updated_at =
           CURRENT_TIMESTAMP
 
@@ -1142,7 +1152,25 @@ async function smtpConversation(
 
 /* =========================================================
    SEND MAIL
+
+   Transport comes from the Email Settings page
+   (`email_settings` table, driver=SMTP) when configured;
+   otherwise falls back to the local MailHog dev endpoint
+   (`MAILHOG_HOST` / `MAILHOG_SMTP_PORT` env).
    ========================================================= */
+
+function connectSmtp(
+  host: string,
+  port: number,
+  useTls: boolean,
+): Promise<net.Socket> {
+  return new Promise((resolve, reject) => {
+    const socket = useTls
+      ? tls.connect({ host, port, servername: host }, () => resolve(socket))
+      : net.createConnection({ host, port }, () => resolve(socket));
+    socket.once("error", reject);
+  });
+}
 
 export async function sendMail({
   to,
@@ -1155,11 +1183,28 @@ export async function sendMail({
 
   html: string;
 }) {
-  const host = process.env.MAILHOG_HOST ?? "127.0.0.1";
+  const transport = await getEmailTransport().catch(() => null);
 
-  const port = Number.parseInt(process.env.MAILHOG_SMTP_PORT ?? "1025", 10);
+  const host =
+    transport?.configured && transport.host
+      ? transport.host
+      : (process.env.MAILHOG_HOST ?? "127.0.0.1");
 
-  const from = process.env.MAIL_FROM ?? ADMIN_ACCOUNTS[0].email;
+  const port =
+    transport?.configured && transport.port
+      ? transport.port
+      : Number.parseInt(process.env.MAILHOG_SMTP_PORT ?? "1025", 10);
+
+  const from =
+    (transport?.configured && transport.fromAddress) ||
+    process.env.MAIL_FROM ||
+    ADMIN_ACCOUNTS[0].email;
+
+  const username = transport?.configured ? transport.username : "";
+  const password = transport?.configured ? transport.password : "";
+  const encryption = transport?.configured ? transport.encryption : "None";
+  const implicitTls = encryption === "SSL";
+  const startTls = encryption === "TLS";
 
   const messageId = `<${randomBytes(12).toString("hex")}@ticket-system.local>`;
 
@@ -1191,42 +1236,48 @@ export async function sendMail({
     .join("\r\n")
     .replace(/\r?\n\.\r?\n/g, "\r\n..\r\n");
 
-  await new Promise<void>((resolve, reject) => {
-    const socket = net.createConnection(
-      {
-        host,
+  let socket = await connectSmtp(host, port, implicitTls);
 
-        port,
-      },
-      async () => {
-        try {
-          await smtpConversation(socket, [220]);
+  try {
+    await smtpConversation(socket, [220]);
+    await smtpConversation(socket, [250], "EHLO ticket-system\r\n");
 
-          await smtpConversation(socket, [250], "EHLO localhost\r\n");
+    if (startTls) {
+      await smtpConversation(socket, [220], "STARTTLS\r\n");
+      socket = await new Promise<net.Socket>((resolve, reject) => {
+        const upgraded = tls.connect(
+          { socket, servername: host },
+          () => resolve(upgraded),
+        );
+        upgraded.once("error", reject);
+      });
+      await smtpConversation(socket, [250], "EHLO ticket-system\r\n");
+    }
 
-          await smtpConversation(socket, [250], `MAIL FROM:<${from}>\r\n`);
+    if (username && password) {
+      await smtpConversation(socket, [334], "AUTH LOGIN\r\n");
+      await smtpConversation(
+        socket,
+        [334],
+        `${Buffer.from(username).toString("base64")}\r\n`,
+      );
+      await smtpConversation(
+        socket,
+        [235],
+        `${Buffer.from(password).toString("base64")}\r\n`,
+      );
+    }
 
-          await smtpConversation(socket, [250], `RCPT TO:<${to}>\r\n`);
-
-          await smtpConversation(socket, [354], "DATA\r\n");
-
-          await smtpConversation(socket, [250], `${payload}\r\n.\r\n`);
-
-          await smtpConversation(socket, [221], "QUIT\r\n");
-
-          socket.end();
-
-          resolve();
-        } catch (error) {
-          socket.destroy();
-
-          reject(error);
-        }
-      },
-    );
-
-    socket.once("error", reject);
-  });
+    await smtpConversation(socket, [250], `MAIL FROM:<${from}>\r\n`);
+    await smtpConversation(socket, [250], `RCPT TO:<${to}>\r\n`);
+    await smtpConversation(socket, [354], "DATA\r\n");
+    await smtpConversation(socket, [250], `${payload}\r\n.\r\n`);
+    await smtpConversation(socket, [221], "QUIT\r\n");
+    socket.end();
+  } catch (error) {
+    socket.destroy();
+    throw error;
+  }
 }
 
 /* =========================================================
@@ -1282,6 +1333,19 @@ export async function issueSessionResponse(userId: number) {
 
   const { token, expiresAt } = await createSession(userId);
 
+  /*
+   * Accounts onboarded with a generated temporary password carry
+   * form_data.mustChangePassword — send them straight to the profile
+   * editor to choose a real password (F14).
+   */
+  const mustChangePassword =
+    parseUserFormData(user.form_data).mustChangePassword === true;
+  const profileEditByPortal: Record<string, string> = {
+    admin: "/profile/edit",
+    resource: "/resource-portal/profile/edit",
+    client: "/client-portal/profile/edit",
+  };
+
   const response = NextResponse.json({
     ok: true,
 
@@ -1289,7 +1353,11 @@ export async function issueSessionResponse(userId: number) {
 
     portal,
 
-    redirectTo: portalHomeForRole(user.role),
+    mustChangePassword,
+
+    redirectTo: mustChangePassword
+      ? (profileEditByPortal[portal] ?? portalHomeForRole(user.role))
+      : portalHomeForRole(user.role),
   });
 
   response.cookies.set(SESSION_COOKIE, token, {

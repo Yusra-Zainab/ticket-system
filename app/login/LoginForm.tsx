@@ -10,6 +10,8 @@ import {
   useState,
 } from "react";
 
+import { cn } from "@/lib/utils";
+
 const roles = [
   "Admin",
   "Resource",
@@ -74,10 +76,10 @@ export default function LoginForm() {
 
       valid = false;
     } else if (
-      password.length < 6
+      password.length < 8
     ) {
       setPasswordError(
-        "Password must be at least 6 characters",
+        "Password must be at least 8 characters",
       );
 
       valid = false;
@@ -158,7 +160,11 @@ export default function LoginForm() {
               }
             }}
             placeholder="Enter your email"
-            className="auth-input"
+            aria-invalid={Boolean(emailError)}
+            className={cn(
+              "auth-input transition-colors",
+              emailError && "!border-red-500 focus:!border-red-500",
+            )}
           />
         </AuthField>
 
@@ -180,7 +186,11 @@ export default function LoginForm() {
               }
             }}
             placeholder="Enter your password"
-            className="auth-input"
+            aria-invalid={Boolean(passwordError)}
+            className={cn(
+              "auth-input transition-colors",
+              passwordError && "!border-red-500 focus:!border-red-500",
+            )}
           />
         </AuthField>
 

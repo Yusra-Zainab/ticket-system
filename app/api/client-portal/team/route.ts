@@ -14,6 +14,7 @@ import {
   isClientRole,
   sendMail,
 } from "@/lib/auth";
+import { AvatarError, persistUserAvatar } from "@/lib/avatars";
 import { getClientContext, listClientTeam } from "@/lib/clientPortal";
 import { db } from "@/lib/db";
 
@@ -119,14 +120,14 @@ export async function POST(request: Request) {
       .join(" ")
       .trim();
 
-    const formData = {
+    const formData: Record<string, unknown> = {
       clientId: context.clientId,
       firstName: values.firstName,
       lastName: values.lastName,
       phone: values.phone,
       jobTitle: values.jobTitle,
       communicationChannel: values.communicationChannel,
-      avatarUrl: values.avatar || "",
+      avatarUrl: "",
       emailNotifications: true,
     };
 
@@ -150,12 +151,20 @@ export async function POST(request: Request) {
         name,
         values.email,
         await hashPassword(temporaryPassword),
-        values.avatar || null,
+        null,
         JSON.stringify(formData),
       ],
     );
 
     const userId = Number(result.insertId ?? 0);
+
+    const avatarUrl = await persistUserAvatar(userId, values.avatar);
+    formData.avatarUrl = avatarUrl ?? "";
+    await db.execute("UPDATE users SET avatar = ?, form_data = ? WHERE id = ?", [
+      avatarUrl,
+      JSON.stringify(formData),
+      userId,
+    ]);
 
     /*
      * Keep the Admin Client Details representation in sync.
@@ -195,7 +204,7 @@ export async function POST(request: Request) {
       phone: values.phone,
       contactChannel: values.communicationChannel,
       accessLevel: "Client Portal",
-      avatar: values.avatar || "",
+      avatar: avatarUrl ?? "",
     });
 
     await db.execute(
@@ -256,6 +265,9 @@ export async function POST(request: Request) {
       { status: 201 },
     );
   } catch (error) {
+    if (error instanceof AvatarError) {
+      return Response.json({ error: error.message }, { status: 400 });
+    }
     if (error instanceof z.ZodError) {
       return Response.json(
         {

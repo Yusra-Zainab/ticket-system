@@ -19,7 +19,7 @@ export default async function RolesPage() {
         actionIcon={Plus}
       />
 
-      <RolesTable initialRoles={roles} />
+      <RolesTable initialRoles={roles} allowDelete />
     </div>
   );
 }

@@ -6,7 +6,13 @@ import type {
 } from "mysql2/promise";
 
 import { requireApiPermission } from "@/lib/apiPermissions";
-import { db, hasProjectPriorityColumn, listProjects } from "@/lib/db";
+import {
+  db,
+  getRolePermissionScope,
+  hasProjectPriorityColumn,
+  listProjects,
+} from "@/lib/db";
+import { isAdminRole } from "@/lib/auth";
 
 const projectStatus = z.enum([
   "Planning",
@@ -101,6 +107,23 @@ export async function GET(request: Request) {
 
   if ("response" in auth) {
     return auth.response;
+  }
+
+  /*
+   * Unscoped list — safe for admins, but a role with "View Projects" =
+   * ASSIGNED_ONLY must not use it to bypass the scoping the resource portal
+   * applies via `listResourceProjects` / `listAssignedProjectIds` (F22). No
+   * first-party UI calls this route.
+   */
+  if (
+    !isAdminRole(auth.user.role) &&
+    (await getRolePermissionScope(auth.user.role, "View Projects")) ===
+      "ASSIGNED_ONLY"
+  ) {
+    return Response.json(
+      { error: "Use the portal project list for scoped access." },
+      { status: 403 },
+    );
   }
 
   try {

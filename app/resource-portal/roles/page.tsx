@@ -31,6 +31,7 @@ export default async function ResourcePortalRolesPage() {
       <RolesTable
         initialRoles={roles}
         roleFormHref="/resource-portal/roles/new"
+        allowDelete={permissions.includes("Delete Custom Roles")}
       />
     </div>
   );

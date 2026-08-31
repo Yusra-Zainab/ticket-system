@@ -1,9 +1,68 @@
 import type { RowDataPacket } from "mysql2/promise";
 import { z } from "zod";
 
-import { getSessionUser } from "@/lib/auth";
+import { getSessionUser, sendMail } from "@/lib/auth";
 import { requireApiPermission } from "@/lib/apiPermissions";
 import { db, findTicket, getRolePermissionScope, getRolePermissions } from "@/lib/db";
+
+const APP_URL = process.env.APP_URL ?? "http://localhost:3000";
+
+type NotifyUserRow = RowDataPacket & {
+  id: number;
+  email: string;
+  form_data: string | Record<string, unknown> | null;
+};
+
+/*
+ * Email the ticket's creator + assignee about a change, skipping the
+ * user who made it and anyone who opted out via
+ * formData.emailNotifications === false. Best-effort: never throws.
+ */
+async function notifyTicketParticipants(
+  ticketId: string,
+  title: string,
+  summary: string,
+  recipientIds: Array<number | null | undefined>,
+  actorId: number | null | undefined,
+) {
+  try {
+    const ids = [
+      ...new Set(
+        recipientIds.filter(
+          (value): value is number =>
+            typeof value === "number" && value > 0 && value !== actorId,
+        ),
+      ),
+    ];
+    if (!ids.length) return;
+
+    const [rows] = await db.query<NotifyUserRow[]>(
+      `SELECT id, email, form_data FROM users
+        WHERE id IN (${ids.map(() => "?").join(",")}) AND lifecycle = 'OPEN'`,
+      ids,
+    );
+
+    await Promise.all(
+      rows.map(async (row) => {
+        const formData =
+          typeof row.form_data === "string"
+            ? (JSON.parse(row.form_data || "{}") as Record<string, unknown>)
+            : (row.form_data ?? {});
+        if (formData.emailNotifications === false) return;
+        if (!row.email) return;
+
+        await sendMail({
+          to: row.email,
+          subject: `[${ticketId}] ${title}`,
+          html: `<p>${summary}</p>
+            <p><a href="${APP_URL}/tickets/${encodeURIComponent(ticketId)}">View ticket ${ticketId}</a></p>`,
+        }).catch((error) => console.error("Ticket notification failed:", error));
+      }),
+    );
+  } catch (error) {
+    console.error("notifyTicketParticipants failed:", error);
+  }
+}
 
 const updateSchema = z
   .object({
@@ -220,6 +279,67 @@ export async function PATCH(request: Request, context: RouteContext<"/api/ticket
 
     if (body.title !== undefined && body.title.trim() !== existing.title.trim() && databaseTicketId !== null) {
       await db.execute("INSERT INTO activities (ticket_id, user_id, action, status) VALUES (?, ?, ?, ?)", [databaseTicketId, sessionUser?.id ?? null, "Renamed ticket", existing.status ?? null]);
+    }
+
+    /*
+     * Activity trail + participant notifications for status / priority /
+     * assignment changes (previously only comments and renames were
+     * logged, and no email was ever sent for these — F10 / F13).
+     */
+    const priorAssignee =
+      typeof assignment?.assigned_to === "number" ? assignment.assigned_to : null;
+    const nextAssignee =
+      body.assignedTo !== undefined
+        ? ((entries.find(([key]) => key === "assignedTo")?.[1] as number | null) ??
+          null)
+        : priorAssignee;
+    const actorId = sessionUser?.id ?? null;
+    const statusChanged =
+      body.status !== undefined && body.status !== existing.status;
+    const priorityChanged =
+      body.priorityType !== undefined || body.priorityNumber !== undefined;
+    const assigneeChanged =
+      body.assignedTo !== undefined && nextAssignee !== priorAssignee;
+
+    if (databaseTicketId !== null) {
+      if (statusChanged) {
+        await db.execute(
+          "INSERT INTO activities (ticket_id, user_id, action, status) VALUES (?, ?, ?, ?)",
+          [databaseTicketId, actorId, "Changed status", body.status ?? null],
+        );
+      }
+      if (priorityChanged) {
+        await db.execute(
+          "INSERT INTO activities (ticket_id, user_id, action, status) VALUES (?, ?, ?, ?)",
+          [databaseTicketId, actorId, "Changed priority", existing.status ?? null],
+        );
+      }
+      if (assigneeChanged) {
+        await db.execute(
+          "INSERT INTO activities (ticket_id, user_id, action, status) VALUES (?, ?, ?, ?)",
+          [databaseTicketId, actorId, "Changed assignee", existing.status ?? null],
+        );
+      }
+    }
+
+    const title = existing.title;
+    if (assigneeChanged && nextAssignee) {
+      await notifyTicketParticipants(
+        id,
+        title,
+        "You have been assigned to this ticket.",
+        [nextAssignee],
+        actorId,
+      );
+    }
+    if (statusChanged) {
+      await notifyTicketParticipants(
+        id,
+        title,
+        `Ticket status changed to <strong>${body.status}</strong>.`,
+        [existing.createdById, nextAssignee],
+        actorId,
+      );
     }
 
     return Response.json(await findTicket(id));

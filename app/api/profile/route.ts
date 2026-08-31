@@ -1,7 +1,10 @@
 import { z } from "zod";
 
 import { hashPassword, requireAdminPageSession } from "@/lib/auth";
+import { AvatarError, persistUserAvatar } from "@/lib/avatars";
 import { countActiveSessionsForUser, db, findAdminUser } from "@/lib/db";
+import { passwordSchema } from "@/lib/passwordPolicy";
+import { avatarSchema } from "@/lib/validation";
 
 const schema = z.object({
   firstName: z.string().min(1).max(120),
@@ -11,7 +14,8 @@ const schema = z.object({
   jobTitle: z.string().max(120).optional().default(""),
   timeZone: z.string().max(120).optional().default(""),
   twoFactorEnabled: z.boolean().optional().default(true),
-  newPassword: z.string().min(8).max(200).optional(),
+  avatar: avatarSchema.optional().default(""),
+  newPassword: passwordSchema.optional(),
 });
 
 export async function GET() {
@@ -45,8 +49,10 @@ export async function PATCH(request: Request) {
       return Response.json({ error: "Profile not found." }, { status: 404 });
     }
 
+    const avatarUrl = await persistUserAvatar(sessionUser.id, values.avatar);
+
     const fullName = [values.firstName, values.lastName].filter(Boolean).join(" ").trim();
-    const nextFormData = {
+    const nextFormData: Record<string, unknown> = {
       ...current.formData,
       firstName: values.firstName,
       lastName: values.lastName,
@@ -57,6 +63,9 @@ export async function PATCH(request: Request) {
       timeZone: values.timeZone,
       twoFactorEnabled: values.twoFactorEnabled,
     };
+    if (values.newPassword) {
+      delete nextFormData.mustChangePassword; // real password chosen (F14)
+    }
 
     await db.execute(
       `
@@ -65,6 +74,7 @@ export async function PATCH(request: Request) {
           name = ?,
           email = ?,
           role = ?,
+          avatar = ?,
           form_data = ?,
           ${values.newPassword ? "password = ?," : ""}
           updated_at = CURRENT_TIMESTAMP
@@ -75,6 +85,7 @@ export async function PATCH(request: Request) {
             fullName || current.name,
             values.email,
             (values.jobTitle || current.role).trim().toLowerCase().replaceAll(" ", "_"),
+            avatarUrl,
             JSON.stringify(nextFormData),
             await hashPassword(values.newPassword),
             sessionUser.id,
@@ -83,6 +94,7 @@ export async function PATCH(request: Request) {
             fullName || current.name,
             values.email,
             (values.jobTitle || current.role).trim().toLowerCase().replaceAll(" ", "_"),
+            avatarUrl,
             JSON.stringify(nextFormData),
             sessionUser.id,
           ],
@@ -96,6 +108,9 @@ export async function PATCH(request: Request) {
       activeSessions,
     });
   } catch (error) {
+    if (error instanceof AvatarError) {
+      return Response.json({ error: error.message }, { status: 400 });
+    }
     if (error instanceof z.ZodError) {
       return Response.json(
         { error: "Invalid profile information.", details: error.flatten() },

@@ -4,7 +4,10 @@ import { Eye, EyeOff } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
+import AvatarUpload from "@/components/ui/AvatarUpload";
+import PasswordChecklist from "@/components/ui/PasswordChecklist";
 import StickyToast from "@/components/ui/StickyToast";
+import { firstPasswordError } from "@/lib/passwordRules";
 import type { ClientPortalProfile } from "@/types/clientPortal";
 
 type EditableProfile = {
@@ -87,9 +90,7 @@ export default function ClientProfileForm({
   );
 
   const passwordError =
-    newPassword.length > 0 && newPassword.length < 8
-      ? "Password must be at least 8 characters."
-      : "";
+    newPassword.length > 0 ? firstPasswordError(newPassword) : "";
 
   const confirmPasswordError =
     confirmPassword.length > 0 && newPassword !== confirmPassword
@@ -306,6 +307,15 @@ export default function ClientProfileForm({
         </div>
 
         <section className="profile-section">
+          <h3 className="profile-section-title">Profile Photo</h3>
+          <AvatarUpload
+            value={values.avatar}
+            onChange={(next) => setField("avatar", next)}
+            name={fullName}
+          />
+        </section>
+
+        <section className="profile-section">
           <h3 className="profile-section-title">Personal Information</h3>
 
           <div className="profile-edit-grid">
@@ -481,6 +491,10 @@ export default function ClientProfileForm({
                   {passwordError}
                 </span>
               ) : null}
+
+              {newPassword.length > 0 ? (
+                <PasswordChecklist password={newPassword} />
+              ) : null}
             </ProfileField>
 
             <ProfileField label="Confirm Password">
@@ -514,6 +528,7 @@ export default function ClientProfileForm({
           onDismiss={() => setNotice("")}
         />
       ) : null}
+
     </div>
   );
 }

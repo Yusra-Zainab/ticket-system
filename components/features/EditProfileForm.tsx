@@ -4,7 +4,10 @@ import { ChevronDown, Eye } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
+import AvatarUpload from "@/components/ui/AvatarUpload";
+import PasswordChecklist from "@/components/ui/PasswordChecklist";
 import StickyToast from "@/components/ui/StickyToast";
+import { firstPasswordError } from "@/lib/passwordRules";
 
 type ProfileData = {
   firstName: string;
@@ -14,6 +17,7 @@ type ProfileData = {
   jobTitle: string;
   timeZone: string;
   role: string;
+  avatar: string;
   twoFactorEnabled?: boolean;
 };
 
@@ -63,11 +67,7 @@ export default function EditProfileForm({
     [values, original, newPassword, confirmPassword],
   );
   const passwordError =
-    newPassword.length > 0 && newPassword.length < 8
-      ? "Password must be at least 8 characters."
-      : !/\S/.test(newPassword) && newPassword.length > 0
-        ? "Password must include at least one non-space character."
-        : "";
+    newPassword.length > 0 ? firstPasswordError(newPassword) : "";
   const confirmPasswordError =
     confirmPassword.length > 0 && newPassword !== confirmPassword
       ? "Passwords do not match."
@@ -202,8 +202,19 @@ export default function EditProfileForm({
       <main className="profile-content">
         <div className="profile-identity">
           <div className="profile-avatar" aria-label={fullName || "Profile User"}>
-            {(values.firstName[0] ?? "A").toUpperCase()}
-            {(values.lastName[0] ?? "D").toUpperCase()}
+            {values.avatar ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={values.avatar}
+                alt={fullName || "Profile User"}
+                className="h-full w-full rounded-full object-cover"
+              />
+            ) : (
+              <>
+                {(values.firstName[0] ?? "A").toUpperCase()}
+                {(values.lastName[0] ?? "D").toUpperCase()}
+              </>
+            )}
           </div>
 
           <div className="profile-identity-copy">
@@ -211,6 +222,15 @@ export default function EditProfileForm({
             <p>{values.role}</p>
           </div>
         </div>
+
+        <section className="profile-section">
+          <h3 className="profile-section-title">Profile Photo</h3>
+          <AvatarUpload
+            value={values.avatar}
+            onChange={(next) => setField("avatar", next)}
+            name={fullName || "Profile User"}
+          />
+        </section>
 
         <section className="profile-section">
           <h3 className="profile-section-title">Personal Information</h3>
@@ -322,6 +342,10 @@ export default function EditProfileForm({
               {passwordError && (
                 <span className="profile-field-error">{passwordError}</span>
               )}
+
+              {newPassword.length > 0 && (
+                <PasswordChecklist password={newPassword} />
+              )}
             </ProfileField>
 
             <ProfileField label="Confirm Password">
@@ -356,6 +380,7 @@ export default function EditProfileForm({
           }}
         />
       )}
+
     </div>
   );
 }

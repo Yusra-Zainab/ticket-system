@@ -84,7 +84,7 @@ function relativeDate(value: string) {
 
   if (days > 1 && days < 7) return `${days} days ago`;
 
-  return new Intl.DateTimeFormat("en-US", {
+  return new Intl.DateTimeFormat("en-GB", {
     month: "short",
     day: "numeric",
     year: "numeric",

@@ -72,20 +72,6 @@ function numberArray(value: unknown) {
     : [];
 }
 
-export async function hasDatabaseColumn(table: string, column: string) {
-  const [rows] = await db.query<(RowDataPacket & { count: number })[]>(
-    `
-      SELECT COUNT(*) AS count
-      FROM information_schema.COLUMNS
-      WHERE TABLE_SCHEMA = DATABASE()
-        AND TABLE_NAME = ?
-        AND COLUMN_NAME = ?
-    `,
-    [table, column],
-  );
-  return Number(rows[0]?.count ?? 0) > 0;
-}
-
 export async function getClientContext(
   user: Pick<ClientPortalSessionUser, "id" | "email">,
 ): Promise<ClientContext | null> {
@@ -635,7 +621,6 @@ function mergePortalComments<T extends { id: string; userId?: number | null; use
 }
 
 async function publicComments(databaseTicketId: number): Promise<ClientPortalComment[]> {
-  const visibility = await hasDatabaseColumn("comments", "visibility");
   const [rows] = await db.query<
     (RowDataPacket & {
       id: number;
@@ -650,7 +635,7 @@ async function publicComments(databaseTicketId: number): Promise<ClientPortalCom
       SELECT c.id, c.user_id, c.content, c.created_at, u.name AS user_name, u.avatar
       FROM comments c
       LEFT JOIN users u ON u.id = c.user_id
-      WHERE c.ticket_id = ? ${visibility ? "AND c.visibility = 'PUBLIC'" : ""}
+      WHERE c.ticket_id = ?
       ORDER BY c.created_at ASC
     `,
     [databaseTicketId],
@@ -891,8 +876,8 @@ export async function getClientProfile(
     phone: String(data.phone ?? ""),
     jobTitle: String(data.jobTitle ?? ""),
     avatar: String(
-      data.avatarUrl ??
-        row?.avatar ??
+      row?.avatar ||
+        data.avatarUrl ||
         "",
     ),
     company: context?.company ?? "",
@@ -1037,9 +1022,9 @@ export async function listClientTeam(
         ),
         avatar:
           String(
-            data.avatarUrl ??
-              row.avatar ??
-              legacyMember?.avatar ??
+            row.avatar ||
+              data.avatarUrl ||
+              legacyMember?.avatar ||
               "",
           ) || null,
         status:

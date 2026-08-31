@@ -170,5 +170,29 @@ await connection.query(`CREATE TABLE IF NOT EXISTS project_resources (
   CONSTRAINT fk_project_resources_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 )`);
 
+/*
+ * Profile pictures. `users.avatar` is a varchar(255) that only ever holds a
+ * URL string ("/api/avatars/{id}?v=..." for uploads, or an external
+ * https:// URL). The image bytes live here, one row per user.
+ */
+await connection.query(`CREATE TABLE IF NOT EXISTS user_avatars (
+  user_id INT NOT NULL,
+  mime_type VARCHAR(100) NOT NULL,
+  size_bytes INT UNSIGNED NOT NULL DEFAULT 0,
+  image_data LONGBLOB NOT NULL,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (user_id),
+  CONSTRAINT fk_user_avatars_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+)`);
+
+/*
+ * The column used to be written with full data: URLs, which silently
+ * truncated at 255 chars — every one of those is unusable. Clear them so
+ * the UI falls back to initials until the user re-uploads.
+ */
+await connection.query(
+  "UPDATE users SET avatar = NULL WHERE avatar LIKE 'data:%'",
+);
+
 await connection.end();
 console.log("Database migration complete.");

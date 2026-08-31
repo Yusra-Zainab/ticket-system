@@ -3,15 +3,17 @@
 import Link from "next/link";
 import {
   Bell,
-  Camera,
   CheckCircle2,
   Eye,
   EyeOff,
   XCircle,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 
+import AvatarUpload from "@/components/ui/AvatarUpload";
+import PasswordChecklist from "@/components/ui/PasswordChecklist";
+import { checkPasswordStrength, firstPasswordError } from "@/lib/passwordRules";
 import type { ResourcePortalProfile } from "@/types/resourcePortal";
 
 function initials(profile: ResourcePortalProfile) {
@@ -51,21 +53,9 @@ export default function ResourceProfileForm({
 
   const displayName = `${firstName} ${lastName}`.trim() || profile.name;
 
-  const passwordChecks = useMemo(
-    () => ({
-      minLength: newPassword.length >= 8,
-      nonSpace: /\S/.test(newPassword),
-      maxLength: newPassword.length <= 200,
-    }),
-    [newPassword],
-  );
-
   const passwordStarted = newPassword.length > 0 || confirmPassword.length > 0;
   const passwordValid =
-    newPassword.length > 0 &&
-    passwordChecks.minLength &&
-    passwordChecks.nonSpace &&
-    passwordChecks.maxLength;
+    newPassword.length > 0 && checkPasswordStrength(newPassword).ok;
   const confirmStarted = confirmPassword.length > 0;
   const confirmValid =
     confirmStarted && passwordValid && confirmPassword === newPassword;
@@ -74,13 +64,7 @@ export default function ResourceProfileForm({
     ? ""
     : !newPassword
       ? "Enter a new password."
-      : !passwordChecks.minLength
-        ? "Password must be at least 8 characters."
-        : !passwordChecks.nonSpace
-          ? "Password must include at least one non-space character."
-          : !passwordChecks.maxLength
-            ? "Password must be 200 characters or fewer."
-            : "";
+      : firstPasswordError(newPassword);
 
   const confirmPasswordError = !passwordStarted
     ? ""
@@ -188,18 +172,6 @@ export default function ResourceProfileForm({
               initials(profile)
             )}
           </div>
-
-          <button
-            type="button"
-            aria-label="Edit resource image"
-            title="Edit resource image"
-            className="resource-edit-details-avatar-button"
-            onClick={() =>
-              document.getElementById("resource-edit-avatar-url")?.focus()
-            }
-          >
-            <Camera size={14} />
-          </button>
         </div>
 
         <div className="resource-edit-details-identity-copy">
@@ -255,18 +227,11 @@ export default function ResourceProfileForm({
         </EditSection>
 
         <EditSection title="Profile Image">
-          <div className="resource-edit-details-grid">
-            <EditField label="Profile Image URL">
-              <input
-                id="resource-edit-avatar-url"
-                value={avatar}
-                onChange={(event) => setAvatar(event.target.value)}
-                type="url"
-                placeholder="https://example.com/profile.jpg"
-                className="resource-edit-input"
-              />
-            </EditField>
-          </div>
+          <AvatarUpload
+            value={avatar}
+            onChange={setAvatar}
+            name={displayName}
+          />
         </EditSection>
 
         <EditSection title="Account & Security" id="account">
@@ -320,24 +285,15 @@ export default function ResourceProfileForm({
           </div>
 
           {passwordStarted ? (
-            <div className="resource-edit-password-rules" aria-live="polite">
-              <PasswordRule
-                valid={passwordChecks.minLength}
-                label="At least 8 characters"
-              />
-              <PasswordRule
-                valid={passwordChecks.nonSpace}
-                label="Contains at least one non-space character"
-              />
-              <PasswordRule
-                valid={passwordChecks.maxLength}
-                label="200 characters or fewer"
-              />
-              <PasswordRule
-                valid={confirmValid}
-                label="Confirmation matches the new password"
-              />
-            </div>
+            <PasswordChecklist
+              password={newPassword}
+              extraRules={[
+                {
+                  label: "Confirmation matches the new password",
+                  ok: confirmValid,
+                },
+              ]}
+            />
           ) : null}
         </EditSection>
 
@@ -469,14 +425,6 @@ function PasswordField({
   );
 }
 
-function PasswordRule({ valid, label }: { valid: boolean; label: string }) {
-  return (
-    <span className={valid ? "is-valid" : "is-invalid"}>
-      {valid ? <CheckCircle2 size={15} /> : <XCircle size={15} />}
-      {label}
-    </span>
-  );
-}
 
 function ResourceEditDetailsStyles() {
   return (
@@ -812,31 +760,6 @@ function ResourceEditDetailsStyles() {
       }
 
       .resource-edit-field-message.is-invalid {
-        color: #b42318;
-      }
-
-      .resource-edit-password-rules {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px 18px;
-        border-radius: 8px;
-        background: #f9fafb;
-        padding: 12px 14px;
-      }
-
-      .resource-edit-password-rules span {
-        display: inline-flex;
-        align-items: center;
-        gap: 5px;
-        font-size: 12px;
-        font-weight: 600;
-      }
-
-      .resource-edit-password-rules .is-valid {
-        color: #067647;
-      }
-
-      .resource-edit-password-rules .is-invalid {
         color: #b42318;
       }
 

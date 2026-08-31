@@ -18,11 +18,17 @@ import {
 
 import { requireApiPermission } from "@/lib/apiPermissions";
 
+import { AvatarError, persistUserAvatar } from "@/lib/avatars";
+
 import {
   db,
   findResource,
   listResourceRows,
 } from "@/lib/db";
+
+import { generateTempPassword } from "@/lib/passwordPolicy";
+
+import { avatarSchema } from "@/lib/validation";
 
 import {
   isResourceRole,
@@ -30,8 +36,6 @@ import {
   portalForRole,
   portalHomeForRole,
 } from "@/lib/userRoles";
-
-const DEFAULT_ONBOARDING_PASSWORD = "Password123!";
 
 const schema =
   z.object({
@@ -69,11 +73,7 @@ const schema =
         .min(1)
         .max(100),
 
-    avatar:
-      z
-        .string()
-        .nullable()
-        .optional(),
+    avatar: avatarSchema.nullable().optional(),
 
     formData:
       z
@@ -327,11 +327,6 @@ export async function POST(
       );
     }
 
-    const storedFormData =
-      JSON.stringify(
-        value.formData,
-      );
-
     /*
      * Credentials are generated when:
      *
@@ -352,8 +347,15 @@ export async function POST(
 
     const temporaryPassword =
       shouldIssueCredentials
-        ? DEFAULT_ONBOARDING_PASSWORD
+        ? generateTempPassword()
         : "";
+
+    const storedFormData =
+      JSON.stringify(
+        shouldIssueCredentials
+          ? { ...value.formData, mustChangePassword: true }
+          : value.formData,
+      );
 
     let userId =
       current
@@ -395,8 +397,7 @@ export async function POST(
 
             normalizedRole,
 
-            value.avatar ??
-              null,
+            null,
 
             value.lifecycle,
 
@@ -436,8 +437,7 @@ export async function POST(
 
             normalizedRole,
 
-            value.avatar ??
-              null,
+            null,
 
             value.lifecycle,
 
@@ -501,8 +501,7 @@ export async function POST(
 
             normalizedRole,
 
-            value.avatar ??
-              null,
+            null,
 
             value.lifecycle,
 
@@ -512,6 +511,15 @@ export async function POST(
 
       userId =
         result.insertId;
+    }
+
+    // Photo: bytes live in `user_avatars`, `users.avatar` holds the URL (F26).
+    if (value.avatar !== undefined) {
+      const avatarUrl = await persistUserAvatar(userId, value.avatar);
+      await db.execute("UPDATE users SET avatar = ? WHERE id = ?", [
+        avatarUrl,
+        userId,
+      ]);
     }
 
     await syncProjectAssignments(
@@ -610,6 +618,9 @@ export async function POST(
   } catch (
     error
   ) {
+    if (error instanceof AvatarError) {
+      return Response.json({ error: error.message }, { status: 400 });
+    }
     if (
       error instanceof
       z.ZodError

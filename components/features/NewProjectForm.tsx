@@ -1925,7 +1925,7 @@ function SearchDropdown({
                     close();
                     onAction();
                   }}
-                  className="inline-flex h-[50px] shrink-0 items-center justify-center gap-1 rounded-[8px] border border-[#06B6D4] bg-white px-3 text-sm font-semibold text-[#0284C7] shadow-[0_1px_2px_rgba(16,24,40,0.05)] hover:bg-[#F0F9FF]"
+                  className="inline-flex h-[50px] shrink-0 items-center justify-center gap-1 rounded-[8px] border border-[#0284C7] bg-white px-3 text-sm font-semibold text-[#0284C7] shadow-[0_1px_2px_rgba(16,24,40,0.05)] hover:bg-[#F0F9FF]"
                 >
                   <Plus size={14} />
                   {actionLabel}

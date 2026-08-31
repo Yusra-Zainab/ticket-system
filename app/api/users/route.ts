@@ -1,21 +1,20 @@
-import { randomBytes } from "node:crypto";
-
 import { z } from "zod";
 
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 
 import { hashPassword, sendMail } from "@/lib/auth";
 import { requireApiPermission } from "@/lib/apiPermissions";
+import { AvatarError, persistUserAvatar } from "@/lib/avatars";
 import { db, listUsers } from "@/lib/db";
-import { isAdminRole, normalizeUserRole } from "@/lib/userRoles";
-
-const DEFAULT_ADMIN_PASSWORD = "Password123!";
+import { generateTempPassword } from "@/lib/passwordPolicy";
+import { avatarSchema } from "@/lib/validation";
+import { normalizeUserRole } from "@/lib/userRoles";
 
 const schema = z.object({
   name: z.string().min(2).max(255),
   email: z.email(),
   role: z.string().min(2).max(100),
-  avatar: z.string().nullable().optional(),
+  avatar: avatarSchema.nullable().optional(),
   lifecycle: z.enum(["OPEN", "DRAFT"]).default("OPEN"),
   formData: z.record(z.string(), z.unknown()).default({}),
   password: z.string().min(8).max(200).optional(),
@@ -83,17 +82,16 @@ export async function POST(request: Request) {
       value.formData.workEmail.trim()
         ? value.formData.workEmail.trim()
         : value.email.trim();
-    const password =
-      value.password ??
-      (isAdminRole(value.role)
-        ? DEFAULT_ADMIN_PASSWORD
-        : randomBytes(18).toString("base64url"));
+    const generatedPassword = value.password ? null : generateTempPassword();
+    const password = value.password ?? generatedPassword!;
     const formData = {
       ...value.formData,
       email: workEmail,
       workEmail,
       jobTitle: String(value.formData.jobTitle ?? ""),
       role: persistedRole,
+      // Force a change on first login when we set the password (F14).
+      ...(generatedPassword ? { mustChangePassword: true } : {}),
     };
     const [existingUsers] = await db.query<ExistingUserRow[]>(
       `
@@ -143,11 +141,20 @@ export async function POST(request: Request) {
         workEmail,
         await hashPassword(password),
         persistedRole,
-        value.avatar ?? null,
+        null,
         value.lifecycle,
         JSON.stringify(formData),
       ],
     );
+
+    // Store the photo now that the row exists (F26).
+    const avatarUrl = await persistUserAvatar(result.insertId, value.avatar);
+    if (avatarUrl) {
+      await db.execute("UPDATE users SET avatar = ? WHERE id = ?", [
+        avatarUrl,
+        result.insertId,
+      ]);
+    }
 
     if (persistedRole === "superadmin") {
       await db.execute(
@@ -160,15 +167,21 @@ export async function POST(request: Request) {
       );
     }
 
-    if (isAdminRole(value.role)) {
+    /*
+     * Email the temporary credentials when we generated the password, so
+     * the account is usable and the recipient knows to change it (F14).
+     * If the admin set an explicit password they already know it.
+     */
+    if (generatedPassword) {
       try {
         await sendMail({
           to: workEmail,
-          subject: "Your admin account has been created",
+          subject: "Your account has been created",
           html: `
-            <p>Your admin account has been created.</p>
+            <p>Your account has been created.</p>
             <p><strong>Work Email:</strong> ${workEmail}</p>
-            <p><strong>Password:</strong> ${DEFAULT_ADMIN_PASSWORD}</p>
+            <p><strong>Temporary Password:</strong> ${generatedPassword}</p>
+            <p>You will be asked to choose a new password when you first sign in.</p>
           `,
         });
       } catch (mailError) {
@@ -180,7 +193,7 @@ export async function POST(request: Request) {
             name: value.name,
             email: workEmail,
             role: persistedRole,
-            avatar: value.avatar ?? null,
+            avatar: avatarUrl,
             warning:
               "User created, but the onboarding email could not be sent to the work email.",
           },
@@ -197,13 +210,16 @@ export async function POST(request: Request) {
         name: value.name,
         email: workEmail,
         role: persistedRole,
-        avatar: value.avatar ?? null,
+        avatar: avatarUrl,
       },
       {
         status: 201,
       },
     );
   } catch (error) {
+    if (error instanceof AvatarError) {
+      return Response.json({ error: error.message }, { status: 400 });
+    }
     if (error instanceof z.ZodError) {
       return Response.json(
         {

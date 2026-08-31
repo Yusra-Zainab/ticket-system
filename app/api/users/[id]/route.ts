@@ -4,6 +4,7 @@ import type { RowDataPacket } from "mysql2/promise";
 
 import { hashPassword } from "@/lib/auth";
 import { requireApiPermission } from "@/lib/apiPermissions";
+import { AvatarError, persistUserAvatar } from "@/lib/avatars";
 import { db } from "@/lib/db";
 import {
   formatUserRole,
@@ -204,6 +205,11 @@ export async function PATCH(
       );
     }
 
+    const nextAvatar =
+      values.avatar !== undefined
+        ? await persistUserAvatar(current.id, values.avatar)
+        : current.avatar;
+
     const nextFormData = {
       ...existingFormData,
       ...submittedFormData,
@@ -226,7 +232,7 @@ export async function PATCH(
       values.name ?? current.name,
       nextEmail,
       nextRole,
-      values.avatar !== undefined ? values.avatar : current.avatar,
+      nextAvatar,
       nextLifecycle,
       JSON.stringify(nextFormData),
     ];
@@ -280,6 +286,9 @@ export async function PATCH(
       redirectTo: portalHomeForRole(nextRole),
     });
   } catch (error) {
+    if (error instanceof AvatarError) {
+      return Response.json({ error: error.message }, { status: 400 });
+    }
     if (error instanceof z.ZodError) {
       return Response.json(
         {

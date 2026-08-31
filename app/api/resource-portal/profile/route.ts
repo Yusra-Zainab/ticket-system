@@ -2,25 +2,20 @@ import type { RowDataPacket } from "mysql2/promise";
 import { z } from "zod";
 
 import { getSessionUser, hashPassword, isResourceRole } from "@/lib/auth";
+import { AvatarError, persistUserAvatar } from "@/lib/avatars";
 import { db } from "@/lib/db";
+import { passwordSchema } from "@/lib/passwordPolicy";
+import { avatarSchema } from "@/lib/validation";
 import { getResourceProfile } from "@/lib/resourcePortal";
-
-const newPasswordSchema = z
-  .string()
-  .min(8, "Password must be at least 8 characters.")
-  .max(200, "Password must be 200 characters or fewer.")
-  .refine((value) => /\S/.test(value), {
-    message: "Password must include at least one non-space character.",
-  });
 
 const schema = z.object({
   firstName: z.string().trim().min(1).max(120),
   lastName: z.string().trim().max(120).optional().default(""),
   phone: z.string().trim().max(80).optional().default(""),
   jobTitle: z.string().trim().max(120).optional().default(""),
-  avatar: z.string().trim().max(2000).optional().default(""),
+  avatar: avatarSchema.optional().default(""),
   emailNotifications: z.boolean().optional().default(true),
-  newPassword: newPasswordSchema.optional(),
+  newPassword: passwordSchema.optional(),
 });
 
 async function resourceUser() {
@@ -54,6 +49,8 @@ export async function PATCH(request: Request) {
 
     const values = schema.parse(await request.json());
 
+    const avatarUrl = await persistUserAvatar(user.id, values.avatar);
+
     const [rows] = await db.query<
       Array<
         RowDataPacket & {
@@ -71,20 +68,30 @@ export async function PATCH(request: Request) {
       current = {};
     }
 
-    const next = {
+    const next: Record<string, unknown> = {
       ...current,
       firstName: values.firstName,
       lastName: values.lastName,
       phone: values.phone,
       jobTitle: values.jobTitle,
-      avatarUrl: values.avatar,
+      avatarUrl: avatarUrl ?? "",
       emailNotifications: values.emailNotifications,
     };
+    if (values.newPassword) {
+      delete next.mustChangePassword; // real password chosen (F14)
+    }
 
     const name = [values.firstName, values.lastName]
       .filter(Boolean)
       .join(" ")
       .trim();
+
+    /*
+     * `users.avatar` holds the serving-endpoint URL (or null). The resource
+     * tables / detail views / ticket-comment + project-team avatars all read
+     * the column (F18); the bytes live in `user_avatars` (F26).
+     */
+    const avatarColumn = avatarUrl;
 
     if (values.newPassword) {
       await db.execute(
@@ -92,6 +99,7 @@ export async function PATCH(request: Request) {
           UPDATE users
           SET
             name = ?,
+            avatar = ?,
             form_data = ?,
             password = ?,
             updated_at = CURRENT_TIMESTAMP
@@ -99,6 +107,7 @@ export async function PATCH(request: Request) {
         `,
         [
           name,
+          avatarColumn,
           JSON.stringify(next),
           await hashPassword(values.newPassword),
           user.id,
@@ -110,16 +119,20 @@ export async function PATCH(request: Request) {
           UPDATE users
           SET
             name = ?,
+            avatar = ?,
             form_data = ?,
             updated_at = CURRENT_TIMESTAMP
           WHERE id = ?
         `,
-        [name, JSON.stringify(next), user.id],
+        [name, avatarColumn, JSON.stringify(next), user.id],
       );
     }
 
     return Response.json(await getResourceProfile({ ...user, name }));
   } catch (error) {
+    if (error instanceof AvatarError) {
+      return Response.json({ error: error.message }, { status: 400 });
+    }
     if (error instanceof z.ZodError) {
       const firstIssue = error.issues[0]?.message;
       return Response.json(

@@ -8,7 +8,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
   Camera,
-  ChevronDown,
   Clock3,
   File,
   FileText,
@@ -26,6 +25,7 @@ import {
   UserRound,
   X,
 } from "lucide-react";
+import Combobox from "@/components/ui/Combobox";
 import RichTextEditor from "@/components/ui/RichTextEditor";
 import { cn } from "@/lib/utils";
 import { findProjectModule, normalizeProjectModules } from "@/lib/projectModules";
@@ -46,7 +46,7 @@ const tagStyles = {
 const plainLength = (value: string) =>
   value.replace(/<[^>]*>/g, "").trim().length;
 const createActivityEntry = (text: string) =>
-  `${new Date().toLocaleString()} · ${text}`;
+  `${new Date().toLocaleString("en-GB")} · ${text}`;
 const schema = z.object({
   project: z.string().default(""),
   projectId: z.string().optional(),
@@ -478,7 +478,7 @@ export default function TicketForm({
               control={control}
               render={({ field }) => (
                 <Field label="Project Name" error={errors.project?.message}>
-                  <SearchDropdown
+                  <Combobox
                     value={field.value ?? ""}
                     onChange={(value, _url, id) => {
                       field.onChange(value);
@@ -502,7 +502,7 @@ export default function TicketForm({
                 control={control}
                 render={({ field }) => (
                   <Field label="Module" error={errors.module?.message}>
-                    <SearchDropdown
+                    <Combobox
                       value={field.value ?? ""}
                       onChange={(value) => {
                         field.onChange(value);
@@ -533,7 +533,7 @@ export default function TicketForm({
                 control={control}
                 render={({ field }) => (
                   <Field label="Sub Module" error={errors.subModule?.message}>
-                    <SearchDropdown
+                    <Combobox
                       value={field.value ?? ""}
                       onChange={(value) => {
                         field.onChange(value);
@@ -640,7 +640,7 @@ export default function TicketForm({
                 control={control}
                 render={({ field }) => (
                   <Field label="Ticket Type" error={errors.type?.message}>
-                    <SearchDropdown
+                    <Combobox
                       value={field.value ?? ""}
                       onChange={field.onChange}
                       placeholder="Select request type."
@@ -821,7 +821,7 @@ export default function TicketForm({
                     label="Priority Level"
                     error={errors.priority?.message}
                   >
-                    <SearchDropdown
+                    <Combobox
                       value={field.value ?? ""}
                       onChange={field.onChange}
                       placeholder="Select urgency."
@@ -878,7 +878,7 @@ export default function TicketForm({
                     label="Estimated Time"
                     error={errors.estimatedTime?.message}
                   >
-                    <SearchDropdown
+                    <Combobox
                       value={field.value ?? ""}
                       onChange={(value) => {
                         if (value === "Custom") {
@@ -915,7 +915,7 @@ export default function TicketForm({
                 control={control}
                 render={({ field }) => (
                   <Field label="Assigned To" error={errors.assignedTo?.message}>
-                    <SearchDropdown
+                    <Combobox
                       value={field.value ?? ""}
                       onChange={(value) => field.onChange(value)}
                       placeholder="Select responsible person."
@@ -1219,143 +1219,6 @@ function UploadChoice({
       <strong className="mt-4 block text-sm text-slate-800">{title}</strong>
       <small className="mt-1 block text-slate-500">{detail}</small>
     </button>
-  );
-}
-function SearchDropdown({
-  value,
-  onChange,
-  placeholder,
-  searchPlaceholder,
-  options,
-  newLabel,
-  newHref,
-  onAction,
-}: {
-  value: string;
-  onChange: (value: string, url?: string, id?: string) => void;
-  placeholder: string;
-  searchPlaceholder: string;
-  options: Array<{
-    label: string;
-    detail?: string;
-    color?: string;
-    url?: string;
-    id?: string;
-  }>;
-  newLabel?: string;
-  newHref?: string;
-  onAction?: () => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState("");
-  const selected = options.find((option) => option.label === value);
-  const filtered = options.filter((option) =>
-    option.label.toLowerCase().includes(query.toLowerCase()),
-  );
-  return (
-    <div className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((current) => !current)}
-        className="field flex items-center justify-between text-left"
-      >
-        <span className={value ? "text-slate-800" : "text-slate-400"}>
-          {selected?.color ? (
-            <span className="inline-flex min-w-0 items-center gap-3">
-              <TagChip label={selected.label} color={selected.color} />
-              {selected.detail && (
-                <span className="truncate text-sm text-slate-500">
-                  {selected.detail}
-                </span>
-              )}
-            </span>
-          ) : (
-            value || placeholder
-          )}
-        </span>
-        <ChevronDown
-          size={16}
-          className={cn("transition-transform", open && "rotate-180")}
-        />
-      </button>
-      {open && (
-        <div className="absolute z-30 mt-1 w-full overflow-hidden rounded-xl border border-slate-200 bg-white p-2 shadow-[0_18px_50px_rgba(15,23,42,0.18)]">
-          <div className="flex gap-2 border-b border-slate-100 p-1 pb-3">
-            <input
-              autoFocus
-              className="field !min-h-10 !rounded-lg !border-slate-200 !py-2.5"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder={searchPlaceholder}
-            />
-            {newLabel && (newHref || onAction) ? (
-              newHref ? (
-                <Link
-                  href={newHref}
-                  className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-lg border border-[#0284C7] px-3 py-2 text-center text-xs font-semibold text-[#0284C7] hover:bg-sky-50"
-                >
-                  {newLabel}
-                </Link>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setOpen(false);
-                    setQuery("");
-                    onAction?.();
-                  }}
-                  className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-lg border border-[#0284C7] px-3 py-2 text-center text-xs font-semibold text-[#0284C7] hover:bg-sky-50"
-                >
-                  {newLabel}
-                </button>
-              )
-            ) : null}
-          </div>
-          <div className="mt-2 max-h-52 overflow-y-auto">
-            {filtered.map((option) => (
-              <button
-                type="button"
-                key={option.label}
-                onClick={() => {
-                  onChange(option.label, option.url, option.id);
-                  setOpen(false);
-                  setQuery("");
-                }}
-                className="flex w-full items-center gap-3 rounded-lg border-b border-slate-100 px-3 py-3 text-left text-sm last:border-0 hover:bg-slate-50"
-              >
-                <div className="flex min-w-0 items-center gap-3">
-                  {option.color ? (
-                    <TagChip label={option.label} color={option.color} />
-                  ) : (
-                    <span className="font-medium text-slate-700">
-                      {option.label}
-                    </span>
-                  )}
-                  {option.detail && (
-                    <span className="truncate text-xs text-slate-500">
-                      {option.detail}
-                    </span>
-                  )}
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function TagChip({ label, color }: { label: string; color: string }) {
-  return (
-    <span
-        className={cn(
-          "inline-flex w-28 shrink-0 items-center justify-center rounded-full px-3 py-1 text-center text-xs font-semibold ring-1 ring-inset",
-          color,
-        )}
-      >
-      {label}
-    </span>
   );
 }
 function ConfirmDialog({

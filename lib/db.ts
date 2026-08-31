@@ -1786,6 +1786,50 @@ export const defaultEmailSettings: EmailSettings = {
   hasMailgunSecret: false,
 };
 
+/*
+ * Server-only transport config INCLUDING the stored secrets. Never
+ * expose this to a Client Component — `getEmailSettings()` is the
+ * redacted version for the settings form. Used by `sendMail()` so the
+ * driver/host/port/credentials configured in the Email Settings page
+ * actually take effect (previously `sendMail` hard-coded MailHog).
+ */
+export type EmailTransport = {
+  configured: boolean;
+  driver: EmailDriver;
+  host: string;
+  port: number;
+  username: string;
+  password: string;
+  encryption: EmailEncryption;
+  fromAddress: string;
+};
+
+export async function getEmailTransport(): Promise<EmailTransport> {
+  const [rows] = await db.query<EmailSettingsRow[]>(
+    `SELECT driver, host, port, username, encryption, from_address, password
+       FROM email_settings WHERE id = 1 LIMIT 1`,
+  );
+  const row = rows[0];
+  const host = row?.host?.trim() ?? "";
+  const port = Number(row?.port ?? 0);
+
+  return {
+    // "configured" only when a real SMTP host+port were saved.
+    configured:
+      (row?.driver ?? "") === "SMTP" &&
+      host.length > 0 &&
+      Number.isInteger(port) &&
+      port > 0,
+    driver: (row?.driver ?? "") as EmailDriver,
+    host,
+    port,
+    username: row?.username?.trim() ?? "",
+    password: row?.password ?? "",
+    encryption: (row?.encryption ?? "None") as EmailEncryption,
+    fromAddress: row?.from_address?.trim() ?? "",
+  };
+}
+
 export async function getEmailSettings(): Promise<EmailSettings> {
   const [rows] = await db.query<EmailSettingsRow[]>(
     `

@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useState } from "react";
 
+import { cn } from "@/lib/utils";
+
 export default function ForgotPasswordForm() {
   const [email, setEmail] = useState("");
 
@@ -94,7 +96,11 @@ export default function ForgotPasswordForm() {
                   }
                 }}
                 placeholder="Enter your email"
-                className="auth-input"
+                aria-invalid={Boolean(emailError)}
+                className={cn(
+                  "auth-input transition-colors",
+                  emailError && "!border-red-500 focus:!border-red-500",
+                )}
               />
 
               {emailError && <span className="auth-error">{emailError}</span>}

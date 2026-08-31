@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 import {
   ArrowLeft,
@@ -9,6 +10,8 @@ import {
   ChevronDown,
   Filter,
   Search,
+  Trash2,
+  X,
 } from "lucide-react";
 
 import { useMemo, useState } from "react";
@@ -22,10 +25,18 @@ type TypeFilter = "All" | RoleType;
 export default function RolesTable({
   initialRoles,
   roleFormHref = "/admin/roles/new",
+  allowDelete = false,
 }: {
   initialRoles: RoleRecord[];
   roleFormHref?: string;
+  allowDelete?: boolean;
 }) {
+  const router = useRouter();
+
+  const [deleteTarget, setDeleteTarget] = useState<RoleRecord | undefined>();
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+
   const [query, setQuery] = useState("");
 
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -76,6 +87,38 @@ export default function RolesTable({
 
     setPage(1);
   };
+
+  async function deleteRole() {
+    if (!deleteTarget || deleting) return;
+
+    setDeleting(true);
+    setDeleteError("");
+
+    try {
+      const response = await fetch(
+        `/api/roles/${encodeURIComponent(deleteTarget.id)}`,
+        { method: "DELETE" },
+      );
+      const body = (await response.json().catch(() => ({}))) as {
+        error?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(
+          typeof body.error === "string" ? body.error : "Unable to delete role.",
+        );
+      }
+
+      setDeleteTarget(undefined);
+      router.refresh();
+    } catch (reason) {
+      setDeleteError(
+        reason instanceof Error ? reason.message : "Unable to delete role.",
+      );
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -155,6 +198,8 @@ export default function RolesTable({
                 <HeaderCell>Type</HeaderCell>
 
                 <HeaderCell>Last Updated</HeaderCell>
+
+                {allowDelete && <th className="w-[70px] px-4 py-3" />}
               </tr>
             </thead>
 
@@ -196,13 +241,32 @@ export default function RolesTable({
                   <td className="px-6 py-4 text-center text-sm text-[#475467]">
                     <DateLabel value={role.updatedAt} />
                   </td>
+
+                  {allowDelete && (
+                    <td className="px-3 py-4 text-center">
+                      {role.type === "CUSTOM" ? (
+                        <button
+                          type="button"
+                          aria-label={`Delete ${role.name}`}
+                          title="Delete role"
+                          onClick={() => {
+                            setDeleteError("");
+                            setDeleteTarget(role);
+                          }}
+                          className="mx-auto grid size-9 place-items-center rounded-lg text-[#98A2B3] transition hover:bg-red-50 hover:text-red-600"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      ) : null}
+                    </td>
+                  )}
                 </tr>
               ))}
 
               {!visibleRoles.length && (
                 <tr>
                   <td
-                    colSpan={6}
+                    colSpan={allowDelete ? 7 : 6}
                     className="px-6 py-16 text-center text-sm text-[#667085]"
                   >
                     No roles match this view.
@@ -257,6 +321,71 @@ export default function RolesTable({
           </div>
         </div>
       </div>
+
+      {deleteTarget && (
+        <div
+          className="modal-backdrop"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !deleting) {
+              setDeleteTarget(undefined);
+            }
+          }}
+        >
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            className="ticket-modal !w-[420px]"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-2xl font-bold text-slate-700">
+                  Delete role
+                </h2>
+
+                <p className="mt-4 text-sm leading-6 text-slate-600">
+                  Delete <strong>{deleteTarget.name}</strong>? This cannot be
+                  undone. Roles still assigned to users can&apos;t be deleted.
+                </p>
+
+                {deleteError && (
+                  <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700">
+                    {deleteError}
+                  </p>
+                )}
+              </div>
+
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={() => setDeleteTarget(undefined)}
+                className="grid size-9 place-items-center rounded-lg text-slate-400 hover:bg-slate-100"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={() => setDeleteTarget(undefined)}
+                className="button-secondary"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={() => void deleteRole()}
+                className="rounded-lg bg-red-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                {deleting ? "Deleting..." : "Delete role"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

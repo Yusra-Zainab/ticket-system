@@ -6,7 +6,6 @@ import {
   addResourceActivity,
   findResourceTicket,
   getResourceTicketAccess,
-  hasDatabaseColumn,
 } from "@/lib/resourcePortal";
 
 const allowedStatuses = ["Active", "Blocked", "Awaiting", "QA", "Validation"] as const;
@@ -63,9 +62,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }
 
     if (values.action === "comment") {
-      const hasVisibility = await hasDatabaseColumn("comments", "visibility");
       await db.execute(
-        hasVisibility ? "INSERT INTO comments (ticket_id, user_id, content, visibility) VALUES (?, ?, ?, 'PUBLIC')" : "INSERT INTO comments (ticket_id, user_id, content) VALUES (?, ?, ?)",
+        "INSERT INTO comments (ticket_id, user_id, content) VALUES (?, ?, ?)",
         [access.databaseId, user.id, values.content],
       );
       await addResourceActivity(access.databaseId, user.id, "Added a comment", access.status);

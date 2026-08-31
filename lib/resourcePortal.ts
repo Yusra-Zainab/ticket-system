@@ -493,6 +493,7 @@ export async function getResourceTicketAccess(
       SELECT t.id AS database_id, t.ticket_id, t.lifecycle, t.created_by, t.assigned_to,
              t.project_id, t.status, t.form_data, ${projectFormData} AS project_form_data
       FROM tickets t
+      LEFT JOIN projects p ON p.id = t.project_id
       WHERE t.ticket_id = ?
       LIMIT 1
     `,
@@ -786,7 +787,10 @@ export async function getResourceProfile(
     email: row.email,
     phone: String(data.phone ?? ""),
     jobTitle: String(data.jobTitle ?? row.role.replaceAll("_", " ")),
-    avatar: String(data.avatarUrl ?? row.avatar ?? ""),
+    // `users.avatar` (the column every other read site uses) is canonical;
+    // `form_data.avatarUrl` is only a legacy fallback. `||` so an empty
+    // string in form_data doesn't shadow a real column value (F26).
+    avatar: String(row.avatar || data.avatarUrl || ""),
     role: row.role,
     emailNotifications: data.emailNotifications !== false,
   };

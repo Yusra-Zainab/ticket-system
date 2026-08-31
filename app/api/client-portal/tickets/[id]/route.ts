@@ -6,7 +6,6 @@ import {
   addClientActivity,
   findClientTicket,
   getClientTicketAccess,
-  hasDatabaseColumn,
 } from "@/lib/clientPortal";
 
 const editSchema = z.object({
@@ -58,11 +57,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }
 
     if (values.action === "comment") {
-      const hasVisibility = await hasDatabaseColumn("comments", "visibility");
       await db.execute(
-        hasVisibility
-          ? "INSERT INTO comments (ticket_id, user_id, content, visibility) VALUES (?, ?, ?, 'PUBLIC')"
-          : "INSERT INTO comments (ticket_id, user_id, content) VALUES (?, ?, ?)",
+        "INSERT INTO comments (ticket_id, user_id, content) VALUES (?, ?, ?)",
         [access.databaseId, user.id, values.content],
       );
       await addClientActivity(access.databaseId, user.id, "Added a comment", access.status);

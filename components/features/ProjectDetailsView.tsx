@@ -807,6 +807,8 @@ export default function ProjectDetailsView({
               : undefined,
 
             meta: member.role,
+
+            imageSrc: member.avatar,
           }))}
           avatar
         />
@@ -1566,6 +1568,8 @@ type RecordItem = {
   href?: string;
 
   meta?: string;
+
+  imageSrc?: string | null;
 };
 
 function RecordsPanel({
@@ -1606,7 +1610,11 @@ function RecordsPanel({
               <>
                 <div className="flex min-w-0 items-center gap-3">
                   {avatar ? (
-                    <Avatar name={item.title} className="size-10" />
+                    <Avatar
+                      name={item.title}
+                      src={item.imageSrc}
+                      className="size-10"
+                    />
                   ) : null}
 
                   <div className="min-w-0">
@@ -1706,7 +1714,7 @@ function formatTimelineDate(value: string) {
 
   const hasTime = !/^\d{4}-\d{2}-\d{2}$/.test(value.trim());
 
-  return new Intl.DateTimeFormat("en-US", {
+  return new Intl.DateTimeFormat("en-GB", {
     month: "short",
 
     day: "numeric",
@@ -1748,7 +1756,7 @@ function formatProjectDate(value: string) {
     })}`;
   }
 
-  return new Intl.DateTimeFormat("en-US", {
+  return new Intl.DateTimeFormat("en-GB", {
     month: "short",
 
     day: "numeric",
