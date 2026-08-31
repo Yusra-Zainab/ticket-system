@@ -3,29 +3,31 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
-import {
-  Bell,
-  BriefcaseBusiness,
-  CheckSquare2,
-  Contact,
-  LayoutDashboard,
-  List,
-  LogOut,
-  Mail,
-  Plus,
-  Search,
-  Settings,
-  ShieldCheck,
-  SlidersHorizontal,
-  Undo2,
-  UserRound,
-  UsersRound,
-} from "lucide-react";
+import { ShieldCheck } from "lucide-react";
 
 import { useState } from "react";
 
 import NotificationPopover from "@/components/ui/NotificationPopover";
 import { usePageSearch } from "@/components/providers/PageSearchProvider";
+import {
+  AdministrationIcon,
+  BackIcon,
+  ClientsIcon,
+  CreateNewIcon,
+  DashboardIcon,
+  EmailSettingsIcon,
+  ListIcon,
+  LogOutIcon,
+  type NavIcon,
+  NotificationIcon,
+  ProfileIcon,
+  ProjectsIcon,
+  ResourcesIcon,
+  SearchIcon,
+  SettingsIcon,
+  TicketsIcon,
+  UsersIcon,
+} from "@/components/ui/navIcons";
 import { cn } from "@/lib/utils";
 
 export interface FloatingActionBarProps {
@@ -44,7 +46,7 @@ type FeatureConfig = {
   href: string;
   createHref?: string;
   listHref?: string;
-  icon: typeof CheckSquare2;
+  icon: NavIcon;
 };
 
 const featureConfig: Record<FeatureKey, FeatureConfig> = {
@@ -53,7 +55,7 @@ const featureConfig: Record<FeatureKey, FeatureConfig> = {
     href: "/tickets",
     createHref: "/tickets/new",
     listHref: "/tickets",
-    icon: CheckSquare2,
+    icon: TicketsIcon,
   },
 
   projects: {
@@ -61,7 +63,7 @@ const featureConfig: Record<FeatureKey, FeatureConfig> = {
     href: "/projects",
     createHref: "/projects/new",
     listHref: "/projects",
-    icon: BriefcaseBusiness,
+    icon: ProjectsIcon,
   },
 
   resources: {
@@ -69,7 +71,7 @@ const featureConfig: Record<FeatureKey, FeatureConfig> = {
     href: "/resources",
     createHref: "/resources/new",
     listHref: "/resources",
-    icon: UsersRound,
+    icon: ResourcesIcon,
   },
 
   clients: {
@@ -77,13 +79,13 @@ const featureConfig: Record<FeatureKey, FeatureConfig> = {
     href: "/clients",
     createHref: "/clients/new",
     listHref: "/clients",
-    icon: Contact,
+    icon: ClientsIcon,
   },
 
   administration: {
     label: "Administration",
     href: "/admin/users",
-    icon: SlidersHorizontal,
+    icon: AdministrationIcon,
   },
 };
 
@@ -144,7 +146,7 @@ export default function FloatingActionBar({
         className="floating-dock floating-search-mode"
       >
         <span className="dock-search-active">
-          <Search size={24} />
+          <SearchIcon size={24} />
         </span>
 
         <input
@@ -173,7 +175,7 @@ export default function FloatingActionBar({
           }}
           className="dock-action"
         >
-          <Undo2 size={22} />
+          <BackIcon size={22} />
         </button>
       </nav>
     );
@@ -199,7 +201,7 @@ export default function FloatingActionBar({
           }}
           className="dock-action"
         >
-          <Search size={22} />
+          <SearchIcon size={22} />
         </button>
 
         <span className="dock-divider" />
@@ -209,7 +211,7 @@ export default function FloatingActionBar({
           title="Profile"
           className="dock-action dock-action-active"
         >
-          <UserRound size={22} />
+          <ProfileIcon size={22} />
         </span>
 
         <Link
@@ -218,7 +220,7 @@ export default function FloatingActionBar({
           title="Profile settings"
           className="dock-action"
         >
-          <Settings size={22} />
+          <SettingsIcon size={22} />
         </Link>
 
         <button
@@ -234,7 +236,7 @@ export default function FloatingActionBar({
           }}
           className="dock-action-logout"
         >
-          <LogOut size={22} />
+          <LogOutIcon size={22} />
         </button>
 
         <span className="dock-divider" />
@@ -246,7 +248,7 @@ export default function FloatingActionBar({
           onClick={() => setAccountOpen(false)}
           className="dock-action"
         >
-          <Undo2 size={22} />
+          <BackIcon size={22} />
         </button>
       </nav>
     );
@@ -281,7 +283,7 @@ export default function FloatingActionBar({
           }}
           className="dock-action"
         >
-          <Search size={22} />
+          <SearchIcon size={22} />
         </button>
 
         <span className="dock-divider" />
@@ -292,7 +294,7 @@ export default function FloatingActionBar({
           title="Administration"
           className="dock-action dock-action-active"
         >
-          <SlidersHorizontal size={22} />
+          <AdministrationIcon size={22} />
         </span>
 
         {/* Users */}
@@ -306,7 +308,7 @@ export default function FloatingActionBar({
             pathname.startsWith("/admin/users") && "dock-action-active",
           )}
         >
-          <UsersRound size={22} />
+          <UsersIcon size={22} />
         </Link>
 
         {/* Roles */}
@@ -335,7 +337,7 @@ export default function FloatingActionBar({
               "dock-action-active",
           )}
         >
-          <Mail size={22} />
+          <EmailSettingsIcon size={22} />
         </Link>
 
         <span className="dock-divider" />
@@ -347,7 +349,7 @@ export default function FloatingActionBar({
           onClick={() => setActiveFeature(null)}
           className="dock-action"
         >
-          <Undo2 size={22} />
+          <BackIcon size={22} />
         </button>
       </nav>
     );
@@ -377,7 +379,7 @@ export default function FloatingActionBar({
           }}
           className="dock-action"
         >
-          <Search size={22} />
+          <SearchIcon size={22} />
         </button>
 
         <span className="dock-divider" />
@@ -397,7 +399,7 @@ export default function FloatingActionBar({
             title={`Create ${config.label}`}
             className="dock-action"
           >
-            <Plus size={23} />
+            <CreateNewIcon size={23} />
           </Link>
         )}
 
@@ -408,7 +410,7 @@ export default function FloatingActionBar({
             title={`${config.label} list`}
             className="dock-action"
           >
-            <List size={22} />
+            <ListIcon size={22} />
           </Link>
         )}
 
@@ -421,7 +423,7 @@ export default function FloatingActionBar({
           onClick={() => setActiveFeature(null)}
           className="dock-action"
         >
-          <Undo2 size={22} />
+          <BackIcon size={22} />
         </button>
       </nav>
     );
@@ -462,7 +464,7 @@ export default function FloatingActionBar({
           }}
           className="dock-action"
         >
-          <Search size={22} />
+          <SearchIcon size={22} />
         </button>
 
         <span className="dock-divider" />
@@ -482,7 +484,7 @@ export default function FloatingActionBar({
             dashboardActive && "dock-action-active !bg-[#0284C7] !text-white",
           )}
         >
-          <LayoutDashboard
+          <DashboardIcon
             size={22}
             className={cn(dashboardActive && "!text-white")}
           />
@@ -570,7 +572,7 @@ export default function FloatingActionBar({
               "dock-action-active",
           )}
         >
-          <Bell size={22} />
+          <NotificationIcon size={22} />
 
           {notificationsCount > 0 && (
             <span className="notification-count">
@@ -598,7 +600,7 @@ export default function FloatingActionBar({
               "dock-action-active",
           )}
         >
-          <UserRound size={22} />
+          <ProfileIcon size={22} />
         </button>
       </nav>
     </>

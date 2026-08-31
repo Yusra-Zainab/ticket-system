@@ -2,34 +2,34 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import {
-  Bell,
-  BriefcaseBusiness,
-  CheckSquare2,
-  FileText,
-  Gauge,
-  List,
-  LogOut,
-  Plus,
-  Search,
-  Settings,
-  Undo2,
-  UserRound,
-  UsersRound,
-} from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import { FileText } from "lucide-react";
 import { useState } from "react";
 
 import ClientNotificationPopover from "@/components/client-portal/ClientNotificationPopover";
 import { useClientNotifications } from "@/components/providers/ClientNotificationsProvider";
 import { usePageSearch } from "@/components/providers/PageSearchProvider";
+import {
+  BackIcon,
+  CreateNewIcon,
+  DashboardIcon,
+  ListIcon,
+  type NavIcon,
+  NotificationIcon,
+  ProfileIcon,
+  ProjectsIcon,
+  SearchIcon,
+  SettingsIcon,
+  TicketsIcon,
+  UsersIcon,
+  LogOutIcon,
+} from "@/components/ui/navIcons";
 import { cn } from "@/lib/utils";
 
 type ClientFeatureKey = "projects" | "tickets" | "team";
 
 type FeatureConfig = {
   label: string;
-  icon: LucideIcon;
+  icon: NavIcon;
   listHref: string;
   createHref?: string;
   createLabel?: string;
@@ -40,13 +40,13 @@ type FeatureConfig = {
 const featureConfig: Record<ClientFeatureKey, FeatureConfig> = {
   projects: {
     label: "Projects",
-    icon: BriefcaseBusiness,
+    icon: ProjectsIcon,
     listHref: "/client-portal/projects",
   },
 
   tickets: {
     label: "Tickets",
-    icon: CheckSquare2,
+    icon: TicketsIcon,
     listHref: "/client-portal/tickets",
     createHref: "/client-portal/tickets/new",
     createLabel: "Create Ticket",
@@ -56,7 +56,7 @@ const featureConfig: Record<ClientFeatureKey, FeatureConfig> = {
 
   team: {
     label: "Team",
-    icon: UsersRound,
+    icon: UsersIcon,
     listHref: "/client-portal/team",
     createHref: "/client-portal/team/new",
     createLabel: "Add Team Member",
@@ -135,7 +135,7 @@ export default function ClientFloatingActionBar() {
         className="floating-dock floating-search-mode"
       >
         <span className="dock-search-active" aria-hidden="true">
-          <Search size={24} />
+          <SearchIcon size={24} />
         </span>
 
         <input
@@ -165,7 +165,7 @@ export default function ClientFloatingActionBar() {
           onClick={closeSearch}
           className="dock-action"
         >
-          <Undo2 size={22} />
+          <BackIcon size={22} />
         </button>
       </nav>
     );
@@ -188,7 +188,7 @@ export default function ClientFloatingActionBar() {
           onClick={openSearch}
           className="dock-action"
         >
-          <Search size={22} />
+          <SearchIcon size={22} />
         </button>
 
         <span className="dock-divider" />
@@ -198,7 +198,7 @@ export default function ClientFloatingActionBar() {
           title="Profile"
           className="dock-action dock-action-active"
         >
-          <UserRound size={22} />
+          <ProfileIcon size={22} />
         </span>
 
         <Link
@@ -211,7 +211,7 @@ export default function ClientFloatingActionBar() {
               "dock-action-active",
           )}
         >
-          <Settings size={22} />
+          <SettingsIcon size={22} />
         </Link>
 
         <button
@@ -221,7 +221,7 @@ export default function ClientFloatingActionBar() {
           onClick={() => void logout()}
           className="dock-action-logout"
         >
-          <LogOut size={22} />
+          <LogOutIcon size={22} />
         </button>
 
         <span className="dock-divider" />
@@ -233,7 +233,7 @@ export default function ClientFloatingActionBar() {
           onClick={() => setAccountOpen(false)}
           className="dock-action"
         >
-          <Undo2 size={22} />
+          <BackIcon size={22} />
         </button>
       </nav>
     );
@@ -262,7 +262,7 @@ export default function ClientFloatingActionBar() {
           onClick={openSearch}
           className="dock-action"
         >
-          <Search size={22} />
+          <SearchIcon size={22} />
         </button>
 
         <span className="dock-divider" />
@@ -285,7 +285,7 @@ export default function ClientFloatingActionBar() {
               pathname === config.createHref && "dock-action-active",
             )}
           >
-            <Plus size={23} />
+            <CreateNewIcon size={23} />
           </Link>
         ) : null}
 
@@ -313,7 +313,7 @@ export default function ClientFloatingActionBar() {
             pathname === config.listHref && "dock-action-active",
           )}
         >
-          <List size={22} />
+          <ListIcon size={22} />
         </Link>
 
         <span className="dock-divider" />
@@ -325,7 +325,7 @@ export default function ClientFloatingActionBar() {
           onClick={() => setActiveFeature(null)}
           className="dock-action"
         >
-          <Undo2 size={22} />
+          <BackIcon size={22} />
         </button>
       </nav>
     );
@@ -367,7 +367,7 @@ export default function ClientFloatingActionBar() {
         onClick={openSearch}
         className="dock-action"
       >
-        <Search size={22} />
+        <SearchIcon size={22} />
       </button>
 
       <span className="dock-divider" />
@@ -387,7 +387,7 @@ export default function ClientFloatingActionBar() {
           dashboardActive && "dock-action-active",
         )}
       >
-        <Gauge size={22} />
+        <DashboardIcon size={22} />
       </Link>
 
       <ClientFeatureButton
@@ -442,7 +442,7 @@ export default function ClientFloatingActionBar() {
             "dock-action-active",
         )}
       >
-        <Bell size={22} />
+        <NotificationIcon size={22} />
 
         {notificationsCount > 0 ? (
           <span className="notification-count">
@@ -468,7 +468,7 @@ export default function ClientFloatingActionBar() {
           profileActive && "dock-action-active",
         )}
       >
-        <UserRound size={22} />
+        <ProfileIcon size={22} />
       </button>
       </nav>
     </>

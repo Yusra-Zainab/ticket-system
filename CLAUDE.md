@@ -59,6 +59,7 @@ Roles table also has `permission_scopes` (JSON column, keyed by permission strin
 - `lib/resourcePortal.ts` — resource-portal-specific data fetchers (`listResourceProjects`, `listResourceTickets`) that apply ASSIGNED_ONLY scoping.
 - `lib/resourcePortalNav.ts` — declarative nav config (`resourceNavSections`) driving the floating action bar; adding a page = adding an entry here, the action bar component itself shouldn't need logic changes.
 - `components/resource-portal/ResourceFloatingActionBar.tsx` — permission-driven bottom nav + per-category mini-bars (search → section icon → filtered actions → back).
+- `components/ui/navIcons.tsx` — shared inline SVG icons for **all three** floating action bars (admin `components/ui/FloatingActionBar.tsx`, client `components/client-portal/ClientFloatingActionBar.tsx`, resource). Mirrors `public/icons/*.svg` but renders inline with `stroke="currentColor"` so the dock's active-state color swap still works (a raw `<img>`/`public/icons` SVG can't recolor). The **drafts** action deliberately stays on lucide `FileText`. Type `NavIcon`; lucide icons are still assignable to it.
 - `components/resource-portal/ResourcePortalShell.tsx` — breadcrumbs, layout frame, renders the action bar.
 - `app/resource-portal/layout.tsx` — session + permissions fetch, shared styles.
 - `proxy.ts` — route-level auth/permission gate, being incrementally converted from blanket admin-only to per-method permission maps.

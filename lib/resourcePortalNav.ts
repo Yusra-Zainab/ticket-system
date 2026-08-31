@@ -1,24 +1,26 @@
-import type { LucideIcon } from "lucide-react";
+import { FileText } from "lucide-react";
+
 import {
-  Bell,
-  Building2,
-  CheckSquare2,
-  FileText,
-  FolderKanban,
-  LayoutDashboard,
-  List,
-  Mail,
-  Plus,
-  ShieldCheck,
-  Users,
-} from "lucide-react";
+  AdministrationIcon,
+  ClientsIcon,
+  CreateNewIcon,
+  DashboardIcon,
+  EmailSettingsIcon,
+  ListIcon,
+  type NavIcon,
+  NotificationIcon,
+  ProjectsIcon,
+  ResourcesIcon,
+  TicketsIcon,
+  UsersIcon,
+} from "@/components/ui/navIcons";
 
 export type ResourceNavAction = {
   id: string;
   permission: string;
   label: string;
   href: string;
-  icon: LucideIcon;
+  icon: NavIcon;
 };
 
 export type ResourceNavSection = {
@@ -33,7 +35,7 @@ export type ResourceNavSection = {
     | "notifications";
   permission: string;
   label: string;
-  icon: LucideIcon;
+  icon: NavIcon;
   href?: string;
   actions?: ResourceNavAction[];
 };
@@ -53,28 +55,28 @@ export const resourceNavSections: ResourceNavSection[] = [
     id: "dashboard",
     permission: "View Dashboard",
     label: "Dashboard",
-    icon: LayoutDashboard,
+    icon: DashboardIcon,
     href: "/resource-portal/dashboard",
   },
   {
     id: "projects",
     permission: "View Projects",
     label: "Projects",
-    icon: FolderKanban,
+    icon: ProjectsIcon,
     actions: [
       {
         id: "projects-list",
         permission: "View Projects",
         label: "Projects list",
         href: "/resource-portal/projects",
-        icon: List,
+        icon: ListIcon,
       },
       {
         id: "projects-create",
         permission: "Create Projects",
         label: "New project",
         href: "/resource-portal/projects/new",
-        icon: Plus,
+        icon: CreateNewIcon,
       },
       {
         id: "projects-drafts",
@@ -89,14 +91,14 @@ export const resourceNavSections: ResourceNavSection[] = [
     id: "tickets",
     permission: "View Tickets",
     label: "Tickets",
-    icon: CheckSquare2,
+    icon: TicketsIcon,
     actions: [
       {
         id: "tickets-create",
         permission: "Create Tickets",
         label: "Create ticket",
         href: "/resource-portal/tickets/new",
-        icon: Plus,
+        icon: CreateNewIcon,
       },
       {
         id: "tickets-drafts",
@@ -110,7 +112,7 @@ export const resourceNavSections: ResourceNavSection[] = [
         permission: "View Tickets",
         label: "Tickets list",
         href: "/resource-portal/tickets",
-        icon: List,
+        icon: ListIcon,
       },
     ],
   },
@@ -118,21 +120,21 @@ export const resourceNavSections: ResourceNavSection[] = [
     id: "resources",
     permission: "View Resources",
     label: "Resources",
-    icon: Users,
+    icon: ResourcesIcon,
     actions: [
       {
         id: "resources-list",
         permission: "View Resources",
         label: "Resources list",
         href: "/resource-portal/resources",
-        icon: List,
+        icon: ListIcon,
       },
       {
         id: "resources-create",
         permission: "Create Resources",
         label: "New resource",
         href: "/resource-portal/resources/new",
-        icon: Plus,
+        icon: CreateNewIcon,
       },
       {
         id: "resources-drafts",
@@ -147,21 +149,21 @@ export const resourceNavSections: ResourceNavSection[] = [
     id: "clients",
     permission: "View Clients",
     label: "Clients",
-    icon: Building2,
+    icon: ClientsIcon,
     actions: [
       {
         id: "clients-list",
         permission: "View Clients",
         label: "Clients list",
         href: "/resource-portal/clients",
-        icon: List,
+        icon: ListIcon,
       },
       {
         id: "clients-create",
         permission: "Create Clients",
         label: "New client",
         href: "/resource-portal/clients/new",
-        icon: Plus,
+        icon: CreateNewIcon,
       },
       {
         id: "clients-drafts",
@@ -176,21 +178,21 @@ export const resourceNavSections: ResourceNavSection[] = [
     id: "users",
     permission: "View Users",
     label: "Users",
-    icon: Users,
+    icon: UsersIcon,
     actions: [
       {
         id: "users-list",
         permission: "View Users",
         label: "Users list",
         href: "/resource-portal/users",
-        icon: List,
+        icon: ListIcon,
       },
       {
         id: "users-create",
         permission: "Create Users",
         label: "New admin",
         href: "/resource-portal/users/new",
-        icon: Plus,
+        icon: CreateNewIcon,
       },
     ],
   },
@@ -198,28 +200,28 @@ export const resourceNavSections: ResourceNavSection[] = [
     id: "administration",
     permission: "View Roles",
     label: "Administration",
-    icon: ShieldCheck,
+    icon: AdministrationIcon,
     actions: [
       {
         id: "roles-list",
         permission: "View Roles",
         label: "Roles list",
         href: "/resource-portal/roles",
-        icon: List,
+        icon: ListIcon,
       },
       {
         id: "roles-create",
         permission: "Create Roles",
         label: "New role",
         href: "/resource-portal/roles/new",
-        icon: Plus,
+        icon: CreateNewIcon,
       },
       {
         id: "email-settings",
         permission: "Configure Email",
         label: "Email settings",
         href: "/resource-portal/settings/email",
-        icon: Mail,
+        icon: EmailSettingsIcon,
       },
     ],
   },
@@ -227,6 +229,6 @@ export const resourceNavSections: ResourceNavSection[] = [
     id: "notifications",
     permission: "View Notifications",
     label: "Notifications",
-    icon: Bell,
+    icon: NotificationIcon,
   },
 ];
