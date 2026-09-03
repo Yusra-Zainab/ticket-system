@@ -11,10 +11,12 @@ import ProjectTabs, {
 } from "@/components/features/ProjectTabs";
 import ProjectStatus from "@/components/features/ProjectStatus";
 import styles from "@/components/features/ProjectDetailsView.module.css";
+import TicketsTable from "@/components/features/TicketsTable";
 import { usePageSearch } from "@/components/providers/PageSearchProvider";
 import { Avatar } from "@/components/ui/Avatar";
-import { cn, formatDate, sanitizeRichText } from "@/lib/utils";
 import { normalizeProjectModules } from "@/lib/projectModules";
+import { ticketRowFromTicket } from "@/lib/ticketRows";
+import { cn, formatDate, sanitizeRichText } from "@/lib/utils";
 
 import type {
   Project,
@@ -268,13 +270,6 @@ export default function ProjectDetailsView({
    * Search is intentionally NOT
    * applied to Modules.
    */
-  const filteredTickets = search
-    ? projectTickets.filter((ticket) =>
-        `${ticket.title} ${ticket.status} ${ticket.assignedTo} ${ticket.reporter}`
-          .toLowerCase()
-          .includes(search),
-      )
-    : projectTickets;
 
   const filteredTeam = search
     ? teamMembers.filter((member) =>
@@ -598,6 +593,7 @@ export default function ProjectDetailsView({
         <MetricCard
           label="Last Updated"
           value={formatProjectDate(project.lastUpdated)}
+          wrap
         />
       </section>
 
@@ -744,19 +740,18 @@ export default function ProjectDetailsView({
           =================================================== */}
 
       {activeTab === "Tickets" && (
-        <RecordsPanel
-          title="Tickets"
-          description="Project tickets linked from the live database."
-          items={filteredTickets.map((ticket) => ({
-            id: ticket.id,
-
-            title: ticket.title,
-
-            href: `${ticketBaseHref}/${ticket.id}`,
-
-            meta: ticket.assignedTo || ticket.reporter,
-          }))}
-        />
+        <div className="rounded-2xl border border-[#EAECF0] bg-white p-5">
+          <TicketsTable
+            initialTickets={projectTickets.map((ticket) =>
+              ticketRowFromTicket(ticket),
+            )}
+            currentUserId=""
+            portal="admin"
+            detailBaseHref={ticketBaseHref}
+            hidePriority
+            readOnly
+          />
+        </div>
       )}
 
       {/* ===================================================
@@ -957,16 +952,26 @@ function MetricCard({
   label,
 
   value,
+
+  wrap = false,
 }: {
   label: string;
 
   value: string;
+
+  wrap?: boolean;
 }) {
   return (
     <article className="project-metric-card">
       <p className="project-metric-label font-semibold">{label}</p>
 
-      <p className="project-metric-value text-2xl font-semibold" title={value}>
+      <p
+        className={cn(
+          "project-metric-value font-semibold",
+          wrap && "project-metric-value--wrap",
+        )}
+        title={value}
+      >
         {value}
       </p>
     </article>

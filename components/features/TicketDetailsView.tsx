@@ -623,6 +623,7 @@ export default function TicketDetailsView({
               <Meta label="Due Date" value={formatDate(persistedDueDate)} />
               <Meta label="Estimated Time" value={persistedEstimatedTime || "Not set"} />
               <Meta label="Created Date" value={formatDate(ticket.created)} />
+              <Meta label="Last Updated" value={formatDate(ticket.updatedAt)} />
               <Meta label="Ticket ID" value={ticket.id} />
             </dl>
           )}
@@ -822,7 +823,7 @@ function ChoiceTag({ label, colors }: { label: string; colors: string }) {
   return (
     <span
       className={cn(
-        "inline-flex min-w-24 justify-center rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-inset",
+        "inline-flex min-w-24 items-center justify-center whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-inset",
         colors,
       )}
     >
@@ -1169,14 +1170,24 @@ function ActionModal({
 
         {action === "Assign Resource" && (
           <div className="mt-5">
-            <select className="field" value={assigneeDraft} onChange={(event) => setAssigneeDraft(event.target.value)}>
-              <option value="">Select resource</option>
-              {resources.map((resource) => (
-                <option key={resource} value={resource}>
-                  {resource}
-                </option>
-              ))}
-            </select>
+            <div className="relative">
+              <select
+                className="field appearance-none pr-10"
+                value={assigneeDraft}
+                onChange={(event) => setAssigneeDraft(event.target.value)}
+              >
+                <option value="">Select resource</option>
+                {resources.map((resource) => (
+                  <option key={resource} value={resource}>
+                    {resource}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown
+                size={16}
+                className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#667085]"
+              />
+            </div>
             <ModalActions
               onClose={onClose}
               onSave={() => confirm(`Assign this ticket to ${assigneeDraft || "the selected resource"}?`, () => applyAssignee(assigneeDraft))}

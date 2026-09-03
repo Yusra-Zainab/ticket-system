@@ -15,6 +15,7 @@ import { PageSearchProvider } from "@/components/providers/PageSearchProvider";
 import ResourceNotificationsProvider from "@/components/providers/ResourceNotificationsProvider";
 import ResourceFloatingActionBar from "@/components/resource-portal/ResourceFloatingActionBar";
 import ResourceNotificationStyles from "@/components/resource-portal/ResourceNotificationStyles";
+import { useNavHistory } from "@/components/ui/useNavHistory";
 import type { ResourcePortalNotification } from "@/types/resourcePortal";
 
 type ResourceCrumb = {
@@ -163,6 +164,7 @@ export default function ResourcePortalShell({
   const pathname = usePathname();
   const router = useRouter();
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const { canBack, canForward } = useNavHistory();
 
   const crumbs = buildResourceCrumbs(pathname);
 
@@ -185,7 +187,7 @@ export default function ResourcePortalShell({
               title="Dashboard"
               className="resource-shell-home"
             >
-              <Home size={17} />
+              <Home size={16} />
             </Link>
 
             {crumbs.map((crumb, index) => (
@@ -194,7 +196,7 @@ export default function ResourcePortalShell({
                 key={`${crumb.label}-${crumb.href ?? "current"}-${index}`}
               >
                 <ChevronRight
-                  size={15}
+                  size={16}
                   className="resource-shell-chevron"
                 />
 
@@ -219,9 +221,10 @@ export default function ResourcePortalShell({
                 aria-label="Go back"
                 title="Back"
                 onClick={() => router.back()}
+                disabled={!canBack}
                 className="resource-shell-history-button"
               >
-                <ArrowLeft size={17} />
+                <ArrowLeft size={16} />
               </button>
 
               <button
@@ -229,9 +232,10 @@ export default function ResourcePortalShell({
                 aria-label="Go forward"
                 title="Forward"
                 onClick={() => router.forward()}
+                disabled={!canForward}
                 className="resource-shell-history-button"
               >
-                <ArrowRight size={17} />
+                <ArrowRight size={16} />
               </button>
             </span>
 
@@ -248,7 +252,7 @@ export default function ResourcePortalShell({
               }}
             >
               <RotateCw
-                size={17}
+                size={16}
                 className={isRefreshing ? "resource-shell-refreshing" : ""}
               />
             </button>

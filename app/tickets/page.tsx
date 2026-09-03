@@ -4,8 +4,9 @@ import { connection } from "next/server";
 import TicketsTable from "@/components/features/TicketsTable";
 import PageHeader from "@/components/ui/PageHeader";
 import { requireAdminPageSession } from "@/lib/auth";
-import { listTickets } from "@/lib/db";
+import { getRolePermissions, listTickets } from "@/lib/db";
 import { getTicketListMeta } from "@/lib/ticketListMeta";
+import { ticketRowFromTicket } from "@/lib/ticketRows";
 import type { TicketListRow } from "@/types/ticketList";
 
 export const dynamic = "force-dynamic";
@@ -15,34 +16,19 @@ export default async function TicketsPage() {
   await connection();
 
   let rows: TicketListRow[] = [];
+  let canChangePriority = false;
 
   try {
-    const tickets = await listTickets("OPEN");
+    const [tickets, permissions] = await Promise.all([
+      listTickets("OPEN"),
+      getRolePermissions(user.role),
+    ]);
     const meta = await getTicketListMeta(tickets.map((ticket) => ticket.id));
 
-    rows = tickets.map((ticket) => {
-      const stored = meta.get(ticket.id);
-      const formData = ticket.formData ?? {};
-
-      return {
-        id: ticket.id,
-        title: ticket.title,
-        type: String(formData.type ?? "Task"),
-        priorityType: stored?.priorityType ?? "Not Assigned",
-        priorityNumber: stored?.priorityNumber ?? ticket.priority,
-        project: ticket.project,
-        createdBy: ticket.reporter,
-        createdById: stored?.createdById ?? String(ticket.createdById ?? ""),
-        assignedTo: ticket.assignedTo || "Unassigned",
-        createdAt: stored?.createdAt ?? ticket.created,
-        updatedAt: stored?.updatedAt ?? ticket.updatedAt,
-        dueDate: stored?.dueDate ?? ticket.dueDate,
-        status: ticket.status,
-        history: Array.isArray(formData.titleHistory)
-          ? formData.titleHistory.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
-          : [],
-      };
-    });
+    canChangePriority = permissions.includes("Change Ticket Priority");
+    rows = tickets.map((ticket) =>
+      ticketRowFromTicket(ticket, meta.get(ticket.id)),
+    );
   } catch (error) {
     console.error("Unable to load admin tickets:", error);
     rows = [];
@@ -62,6 +48,7 @@ export default async function TicketsPage() {
         currentUserId={String(user.id)}
         portal="admin"
         detailBaseHref="/tickets"
+        canChangePriority={canChangePriority}
       />
     </div>
   );

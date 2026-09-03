@@ -17,6 +17,7 @@ import { type ReactNode, useMemo, useState } from "react";
 
 import { usePageSearch } from "@/components/providers/PageSearchProvider";
 import { Avatar } from "@/components/ui/Avatar";
+import { SortArrows } from "@/components/ui/SortArrows";
 import { clientStatusDescriptions } from "@/lib/statusOptions";
 import { cn } from "@/lib/utils";
 
@@ -624,13 +625,15 @@ export default function ClientsTable({
               {visibleClients.length === 0 && (
                 <tr>
                   <td colSpan={9} className="h-44 text-center">
-                    <p className="text-sm font-semibold text-[#101828]">
-                      No clients found
-                    </p>
+                    <div className="mx-auto max-w-sm">
+                      <p className="text-sm font-semibold text-[#101828]">
+                        No clients found
+                      </p>
 
-                    <p className="mt-1 text-sm text-[#667085]">
-                      Try changing your search or filters.
-                    </p>
+                      <p className="mt-1 text-sm text-[#667085]">
+                        Try changing your search or filters.
+                      </p>
+                    </div>
                   </td>
                 </tr>
               )}
@@ -856,29 +859,7 @@ function ClientHeader({
       >
         {label}
 
-        <span className="grid">
-          <ChevronDown
-            size={12}
-            className={cn(
-              "rotate-180",
-
-              active && sort.direction === "asc"
-                ? "text-[#0284C7]"
-                : "text-[#98A2B3]",
-            )}
-          />
-
-          <ChevronDown
-            size={12}
-            className={cn(
-              "-mt-[5px]",
-
-              active && sort.direction === "desc"
-                ? "text-[#0284C7]"
-                : "text-[#98A2B3]",
-            )}
-          />
-        </span>
+        <SortArrows direction={active ? sort.direction : null} size={12} />
       </button>
     </th>
   );

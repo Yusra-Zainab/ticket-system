@@ -22,6 +22,7 @@ export default async function ResourceTicketsPage() {
 
   const canViewTickets = permissions.includes("View Tickets");
   const canCreateTickets = permissions.includes("Create Tickets");
+  const canChangePriority = permissions.includes("Change Ticket Priority");
 
   const meta = await getTicketListMeta(tickets.map((ticket) => ticket.id));
 
@@ -65,6 +66,7 @@ export default async function ResourceTicketsPage() {
           currentUserId={String(user.id)}
           portal="resource"
           detailBaseHref="/resource-portal/tickets"
+          canChangePriority={canChangePriority}
         />
       ) : null}
     </div>

@@ -143,17 +143,15 @@ button:not(:disabled),
 }
 .crumb-button {
   display: grid;
-  width: 2.5rem;
-  height: 2.5rem;
+  width: 2.25rem;
+  height: 2.25rem;
   place-items: center;
   border-radius: 0.5rem;
-}
-.crumb-button {
-  background: #e6f8fb;
+  background: #f0f9ff;
   color: #0284c7;
 }
-.crumb-button:hover {
-  background: #d8f3f8;
+.crumb-button:hover:not(:disabled) {
+  background: #e0f2fe;
 }
 /* =========================================================
    FLOATING ACTION BAR
@@ -169,21 +167,21 @@ button:not(:disabled),
   align-items: center;
   flex-wrap: nowrap;
 
-  border: 2px solid #06b6d4;
+  border: 2px solid rgba(6, 182, 212, 0.55);
   border-radius: 100px;
 
-  background: rgba(255, 255, 255, 0.96);
+  background: rgba(255, 255, 255, 0.62);
 
   padding: 7px 10px;
 
   color: #0284c7;
 
   box-shadow:
-    0 4px 9px rgba(0, 0, 0, 0.17),
+    0 8px 28px rgba(15, 23, 42, 0.16),
     0 1px 2px rgba(16, 24, 40, 0.05);
 
-  backdrop-filter: blur(7px);
-  -webkit-backdrop-filter: blur(7px);
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
 
   white-space: nowrap;
 }
@@ -796,17 +794,18 @@ button:not(:disabled),
 }
 .ticket-table-frame {
   display: flex;
-  overflow: hidden;
-  border: 1px solid #e2e8f0;
-  border-radius: 0.7rem;
-  background: white;
-  box-shadow: 0 1px 3px rgb(15 23 42 / 0.05);
+  align-items: flex-start;
+  gap: 0.75rem;
 }
+/* Priority rail — its own detached panel beside the table (item 9). */
 .priority-rail {
   width: 5.25rem;
   flex: none;
-  border-right: 1px solid #e2e8f0;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.7rem;
   background: #f8fafc;
+  box-shadow: 0 1px 3px rgb(15 23 42 / 0.05);
 }
 .priority-rail-title {
   height: 3.8rem;
@@ -826,11 +825,16 @@ button:not(:disabled),
   align-items: center;
   justify-content: center;
   gap: 0.35rem;
-  border-bottom: 1px solid white;
+  border-bottom: 1px solid #e8edf3;
+  background: #f8fafc;
   color: #64748b;
 }
-.priority-drop:hover,
-.priority-drop:focus {
+/* Alternating bands on the priority numbers (item 9). */
+.priority-drop-alt {
+  background: #eef2f7;
+}
+.priority-rail-drag .priority-drop:hover,
+.priority-rail-drag .priority-drop:focus {
   background: #e6f8fb;
   color: #0284c7;
 }
@@ -870,19 +874,23 @@ button:not(:disabled),
 .ticket-pill {
   display: inline-flex;
   min-width: 7.5rem;
+  align-items: center;
   justify-content: center;
   border-radius: 9999px;
   padding: 0.28rem 0.75rem;
   font-size: 0.76rem;
-  line-height: 1.1;
+  line-height: 1.2;
+  white-space: nowrap;
 }
 .ticket-type-pill {
   display: inline-flex;
   min-width: 7.5rem;
+  align-items: center;
   justify-content: center;
   border-radius: 9999px;
   padding: 0.28rem 0.7rem;
   font-size: 0.73rem;
+  white-space: nowrap;
 }
 .row-icon {
   display: grid;
@@ -1243,11 +1251,13 @@ button:not(:disabled),
 .detail-tag {
   display: inline-flex;
   min-width: 6.3rem;
+  align-items: center;
   justify-content: center;
   border-radius: 9999px;
   padding: 0.2rem 0.7rem;
   font-size: 0.75rem;
   font-weight: 500;
+  white-space: nowrap;
 }
 .comments-panel {
   overflow: hidden;
@@ -1604,8 +1614,6 @@ input.field:-webkit-autofill,
   width: 100%;
 
   min-height: 560px;
-
-  padding-bottom: 120px;
 }
 
 .role-form-actions {
@@ -2118,7 +2126,6 @@ input.field:-webkit-autofill,
 
 .new-resource-page {
   width: 100%;
-  padding-bottom: 120px;
 }
 
 /* =========================================================
@@ -6362,6 +6369,12 @@ input.field:-webkit-autofill,
   gap: 8px;
 }
 
+/* Badges hug their content instead of stretching the whole grid cell (item 21). */
+.resource-detail-value > .resource-status-badge {
+  align-self: flex-start;
+  width: auto;
+}
+
 .resource-detail-value > span:first-child {
   color: #344054;
 
@@ -7280,7 +7293,7 @@ input.field:-webkit-autofill,
 .admin-users-table {
   width: 100%;
 
-  min-width: 1100px;
+  min-width: 1240px;
 
   table-layout: fixed;
 
@@ -7336,7 +7349,7 @@ input.field:-webkit-autofill,
 }
 
 .admin-users-actions-head {
-  width: 100px;
+  width: 132px;
 }
 
 .admin-users-table td {
@@ -7450,14 +7463,19 @@ input.field:-webkit-autofill,
    ========================================================= */
 
 .admin-users-row-actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  justify-content: center;
   white-space: nowrap;
 }
 
 .admin-users-icon-action {
   display: inline-grid;
 
-  width: 40px;
-  height: 40px;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
 
   place-items: center;
 
@@ -9435,6 +9453,18 @@ input.field:-webkit-autofill,
   line-height: 38px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* "Last Updated" metric — allow the date/time to break onto a second line. */
+.project-metric-value--wrap {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 20px;
+  line-height: 26px;
+  white-space: normal;
+  text-overflow: clip;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .project-details-view .project-tabs {

@@ -41,10 +41,9 @@ export default async function ResourceLayout({
          */
         .resource-portal-frame {
           width: 100%;
-          max-width: 1800px;
           min-height: 100vh;
           margin: 0 auto;
-          padding: 28px 0 144px;
+          padding: 32px 0 96px;
         }
 
         /*
@@ -60,8 +59,7 @@ export default async function ResourceLayout({
           margin: 0 32px;
           overflow-x: auto;
           border-bottom: 1px solid rgba(2, 132, 199, 0.1);
-          border-radius: 8px;
-          padding: 8px 12px;
+          padding: 8px 20px;
           color: #0284c7;
           font-size: 14px;
           font-weight: 600;
@@ -77,15 +75,20 @@ export default async function ResourceLayout({
         .resource-shell-history-button,
         .resource-shell-refresh-button {
           display: grid;
-          width: 40px;
-          height: 40px;
-          flex: 0 0 40px;
+          width: 36px;
+          height: 36px;
+          flex: 0 0 36px;
           place-items: center;
           border: 0;
-          background: #e6f8fb;
+          background: #f0f9ff;
           color: #0284c7;
           text-decoration: none;
           cursor: pointer;
+        }
+
+        .resource-shell-history-button:disabled {
+          cursor: not-allowed;
+          opacity: 0.4;
         }
 
         .resource-shell-home {
@@ -93,9 +96,9 @@ export default async function ResourceLayout({
         }
 
         .resource-shell-home:hover,
-        .resource-shell-history-button:hover,
-        .resource-shell-refresh-button:hover {
-          background: #d8f3f8;
+        .resource-shell-history-button:not(:disabled):hover,
+        .resource-shell-refresh-button:not(:disabled):hover {
+          background: #e0f2fe;
         }
 
         .resource-shell-home:focus-visible,
@@ -143,7 +146,7 @@ export default async function ResourceLayout({
           margin-left: 8px;
           overflow: hidden;
           border-radius: 8px;
-          background: #e6f8fb;
+          background: #f0f9ff;
           color: #0284c7;
         }
 
@@ -179,25 +182,7 @@ export default async function ResourceLayout({
         .resource-portal-main {
           width: 100%;
           min-width: 0;
-          padding-inline: 20px;
-        }
-
-        @media (min-width: 640px) {
-          .resource-portal-main {
-            padding-inline: 32px;
-          }
-        }
-
-        @media (min-width: 1024px) {
-          .resource-portal-main {
-            padding-inline: 48px;
-          }
-        }
-
-        @media (min-width: 1280px) {
-          .resource-portal-main {
-            padding-inline: 64px;
-          }
+          padding-inline: 32px;
         }
 
         /*
@@ -220,21 +205,25 @@ export default async function ResourceLayout({
 
         @media (max-width: 760px) {
           .resource-portal-frame {
-            padding-top: 20px;
+            padding-top: 24px;
+          }
+
+          .resource-portal-main {
+            padding-inline: 16px;
           }
 
           .resource-shell-breadcrumbs {
             margin: 0 16px;
             gap: 8px;
-            padding: 6px 8px;
+            padding: 6px 12px;
           }
 
           .resource-shell-home,
           .resource-shell-history-button,
           .resource-shell-refresh-button {
-            width: 36px;
-            height: 36px;
-            flex-basis: 36px;
+            width: 34px;
+            height: 34px;
+            flex-basis: 34px;
           }
 
           .resource-shell-crumb-link,

@@ -5,7 +5,6 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  ChevronsUpDown,
   Filter,
   Search,
   X,
@@ -15,6 +14,7 @@ import { useMemo, useState } from "react";
 import ProjectStatus from "@/components/features/ProjectStatus";
 import { usePageSearch } from "@/components/providers/PageSearchProvider";
 import { Avatar } from "@/components/ui/Avatar";
+import { SortArrows } from "@/components/ui/SortArrows";
 import {
   projectPriorityDescriptions,
   projectStatusDescriptions,
@@ -467,7 +467,7 @@ export default function ProjectsTable({
       {/* Filter panel */}
       {filtersOpen && (
         <div className="rounded-[12px] border border-[#EAECF0] bg-gray-100 p-5 shadow-[0_1px_3px_rgba(16,24,40,0.06)]">
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[repeat(5,minmax(0,1fr))_auto] xl:items-end">
             <FilterDropdown
               label="Client"
               value={client}
@@ -566,14 +566,12 @@ export default function ProjectsTable({
               }}
               options={["All", ...teamMembers]}
             />
-          </div>
 
-          <div className="mt-4 flex justify-end">
             <button
               type="button"
               disabled={!hasFilters}
               onClick={clearFilters}
-              className="rounded-lg border border-red-500 px-3 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-600 hover:text-white disabled:cursor-not-allowed disabled:border-2 disabled:border-slate-500 disabled:text-slate-500 disabled:hover:bg-transparent"
+              className="h-[46px] shrink-0 rounded-lg border border-red-500 px-3 text-sm font-semibold text-red-600 transition hover:bg-red-600 hover:text-white disabled:cursor-not-allowed disabled:border-slate-400 disabled:text-slate-500 disabled:hover:bg-transparent"
             >
               Clear filters
             </button>
@@ -599,7 +597,8 @@ export default function ProjectsTable({
 
                     <SortHeader
                       label="Project Name"
-                      active={sort.key === "name"}
+                      sortKey="name"
+                      sort={sort}
                       onClick={() => toggleSort("name")}
                     />
                   </div>
@@ -608,7 +607,8 @@ export default function ProjectsTable({
                 <th className="w-[190px]">
                   <SortHeader
                     label="Client"
-                    active={sort.key === "client"}
+                    sortKey="client"
+                    sort={sort}
                     onClick={() => toggleSort("client")}
                   />
                 </th>
@@ -616,7 +616,8 @@ export default function ProjectsTable({
                 <th className="w-[180px]">
                   <SortHeader
                     label="Status"
-                    active={sort.key === "status"}
+                    sortKey="status"
+                    sort={sort}
                     onClick={() => toggleSort("status")}
                   />
                 </th>
@@ -624,7 +625,8 @@ export default function ProjectsTable({
                 <th className="w-[135px] text-center">
                   <SortHeader
                     label="Open Tickets"
-                    active={sort.key === "openTickets"}
+                    sortKey="openTickets"
+                    sort={sort}
                     onClick={() => toggleSort("openTickets")}
                     centered
                   />
@@ -633,7 +635,8 @@ export default function ProjectsTable({
                 <th className="w-[120px] text-center">
                   <SortHeader
                     label="Critical"
-                    active={sort.key === "criticalTickets"}
+                    sortKey="criticalTickets"
+                    sort={sort}
                     onClick={() => toggleSort("criticalTickets")}
                     centered
                   />
@@ -644,7 +647,8 @@ export default function ProjectsTable({
                 <th className="w-[150px]">
                   <SortHeader
                     label="Last Updated"
-                    active={sort.key === "lastUpdated"}
+                    sortKey="lastUpdated"
+                    sort={sort}
                     onClick={() => toggleSort("lastUpdated")}
                   />
                 </th>
@@ -885,15 +889,18 @@ export default function ProjectsTable({
 
 function SortHeader({
   label,
-  active,
+  sortKey,
+  sort,
   centered = false,
   onClick,
 }: {
   label: string;
-  active: boolean;
+  sortKey: SortKey;
+  sort: { key: SortKey; direction: SortDirection };
   centered?: boolean;
   onClick: () => void;
 }) {
+  const active = sort.key === sortKey;
   return (
     <button
       type="button"
@@ -905,10 +912,7 @@ function SortHeader({
     >
       {label}
 
-      <ChevronsUpDown
-        size={15}
-        className={cn("text-[#98A2B3]", active && "text-[#344054]")}
-      />
+      <SortArrows direction={active ? sort.direction : null} />
     </button>
   );
 }
