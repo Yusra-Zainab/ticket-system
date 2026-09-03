@@ -29,7 +29,8 @@ import Combobox from "@/components/ui/Combobox";
 import RichTextEditor from "@/components/ui/RichTextEditor";
 import { cn } from "@/lib/utils";
 import { findProjectModule, normalizeProjectModules } from "@/lib/projectModules";
-import { captureScreenSelection } from "@/lib/screenshot";
+import { captureRegion, type ScreenshotRect } from "@/lib/screenshot";
+import ScreenshotRegionOverlay from "@/components/features/ScreenshotRegionOverlay";
 import { useApp } from "@/components/providers/AppProvider";
 import type { Project, Ticket, TicketAttachment, User } from "@/types";
 
@@ -150,6 +151,7 @@ export default function TicketForm({
     String(savedForm?.projectId ?? initialSelection.projectId ?? ""),
   );
   const [uploadMenu, setUploadMenu] = useState(false);
+  const [snipping, setSnipping] = useState(false);
   const [confirmMode, setConfirmMode] = useState<ConfirmMode>();
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -254,11 +256,15 @@ export default function TicketForm({
       setUploading(false);
     }
   };
-  const captureScreenshot = async () => {
+  const startScreenshot = () => {
     setUploadMenu(false);
+    setSnipping(true);
+  };
+  const captureScreenshot = async (rect: ScreenshotRect) => {
+    setSnipping(false);
     try {
-      const file = await captureScreenSelection();
-      if (!file) return; // picker dismissed
+      const file = await captureRegion(rect);
+      if (!file) return;
       uploadAttachments([file]);
     } catch {
       notify(
@@ -376,6 +382,12 @@ export default function TicketForm({
       onSubmit={(event) => event.preventDefault()}
       className="ticket-create-page"
     >
+      {snipping && (
+        <ScreenshotRegionOverlay
+          onSelect={captureScreenshot}
+          onCancel={() => setSnipping(false)}
+        />
+      )}
       <header className="sticky top-0 z-30 -mx-3 mb-7 flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 bg-white/95 px-3 py-3 backdrop-blur">
         <h1 className="text-[2rem] font-bold tracking-tight text-slate-950">
           Create a Ticket
@@ -1014,8 +1026,8 @@ export default function TicketForm({
               <UploadChoice
                 icon={Camera}
                 title="Screenshot"
-                detail="Pick a screen, window, or tab"
-                onClick={captureScreenshot}
+                detail="Drag to snip part of the page"
+                onClick={startScreenshot}
               />
             </div>
             <p className="mt-5 rounded-lg bg-slate-50 p-3 text-xs text-slate-500">

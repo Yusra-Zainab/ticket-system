@@ -1,82 +1,71 @@
 /**
- * Screen-capture helper for the ticket attachment flows.
+ * Region screenshot helper for the ticket attachment flows.
  *
- * Opens the browser's native "Choose what to share" picker (the same UI Zoom
- * or Google Meet show for screen sharing), lets the user pick a screen, window
- * or tab, grabs a single frame and hands it back as a PNG `File`.
- *
- * Returns `null` when the user dismisses the picker without choosing anything
- * (so callers can stay quiet instead of showing an error).
+ * Works like a snipping tool: the caller shows `ScreenshotRegionOverlay`, the
+ * user drags a rectangle over the page, and `captureRegion` renders the page
+ * and crops it to that rectangle, returning a PNG `File`.
  */
-export async function captureScreenSelection(): Promise<File | null> {
-  const media =
-    typeof navigator !== "undefined" ? navigator.mediaDevices : undefined;
 
-  if (!media?.getDisplayMedia) {
-    throw new Error("Screen capture is not supported in this browser.");
+export type ScreenshotRect = {
+  /** viewport-relative CSS pixels */
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+export async function captureRegion(
+  rect: ScreenshotRect,
+): Promise<File | null> {
+  if (rect.width < 2 || rect.height < 2) {
+    return null;
   }
 
-  let stream: MediaStream;
+  const { toCanvas } = await import("html-to-image");
 
-  try {
-    stream = await media.getDisplayMedia({
-      video: { frameRate: 1 },
-      audio: false,
-    });
-  } catch (error) {
-    // The user closed the picker or denied permission - not a real failure.
-    if (
-      error instanceof DOMException &&
-      (error.name === "NotAllowedError" || error.name === "AbortError")
-    ) {
-      return null;
-    }
+  // Let the selection overlay finish unmounting so it isn't in the shot.
+  await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
+  await new Promise((resolve) => window.setTimeout(resolve, 30));
 
-    throw error;
+  const target = document.body;
+  const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+
+  const full = await toCanvas(target, {
+    backgroundColor: "#ffffff",
+    pixelRatio,
+    cacheBust: true,
+  });
+
+  // Map the viewport-relative selection into the rendered canvas.
+  const layoutWidth = target.getBoundingClientRect().width || target.scrollWidth;
+  const scale = full.width / layoutWidth;
+
+  const sx = (rect.x + window.scrollX) * scale;
+  const sy = (rect.y + window.scrollY) * scale;
+  const sw = rect.width * scale;
+  const sh = rect.height * scale;
+
+  const out = document.createElement("canvas");
+  out.width = Math.max(1, Math.round(sw));
+  out.height = Math.max(1, Math.round(sh));
+
+  const context = out.getContext("2d");
+
+  if (!context) {
+    throw new Error("Could not crop the screenshot.");
   }
 
-  try {
-    const video = document.createElement("video");
-    video.srcObject = stream;
-    video.muted = true;
+  context.drawImage(full, sx, sy, sw, sh, 0, 0, out.width, out.height);
 
-    await video.play();
+  const blob = await new Promise<Blob | null>((resolve) =>
+    out.toBlob((result) => resolve(result), "image/png"),
+  );
 
-    if (!video.videoWidth) {
-      await new Promise<void>((resolve) => {
-        video.addEventListener("loadedmetadata", () => resolve(), {
-          once: true,
-        });
-      });
-    }
-
-    // Give the compositor one frame to actually paint the shared surface.
-    await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
-
-    const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-
-    const context = canvas.getContext("2d");
-
-    if (!context || !canvas.width || !canvas.height) {
-      throw new Error("Could not read the captured frame.");
-    }
-
-    context.drawImage(video, 0, 0);
-
-    const blob = await new Promise<Blob | null>((resolve) =>
-      canvas.toBlob((result) => resolve(result), "image/png"),
-    );
-
-    if (!blob) {
-      throw new Error("Could not encode the screenshot.");
-    }
-
-    return new globalThis.File([blob], `screenshot-${Date.now()}.png`, {
-      type: "image/png",
-    });
-  } finally {
-    stream.getTracks().forEach((track) => track.stop());
+  if (!blob) {
+    throw new Error("Could not encode the screenshot.");
   }
+
+  return new globalThis.File([blob], `screenshot-${Date.now()}.png`, {
+    type: "image/png",
+  });
 }

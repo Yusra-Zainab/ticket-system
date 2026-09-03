@@ -26,7 +26,8 @@ import type { LucideIcon } from "lucide-react";
 
 import Combobox from "@/components/ui/Combobox";
 import RichTextEditor from "@/components/ui/RichTextEditor";
-import { captureScreenSelection } from "@/lib/screenshot";
+import ScreenshotRegionOverlay from "@/components/features/ScreenshotRegionOverlay";
+import { captureRegion, type ScreenshotRect } from "@/lib/screenshot";
 import { cn } from "@/lib/utils";
 import type {
   ResourcePortalProject,
@@ -160,6 +161,7 @@ export default function ResourceTicketForm({
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [selfAssign, setSelfAssign] = useState(false);
   const [uploadMenu, setUploadMenu] = useState(false);
+  const [snipping, setSnipping] = useState(false);
   const [confirmMode, setConfirmMode] = useState<ConfirmMode>();
   const [saving, setSaving] = useState<"DRAFT" | "OPEN" | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -286,11 +288,16 @@ export default function ResourceTicketForm({
     setUploadMenu(false);
   }
 
-  async function captureScreenshot() {
+  function startScreenshot() {
     setUploadMenu(false);
+    setSnipping(true);
+  }
+
+  async function captureScreenshot(rect: ScreenshotRect) {
+    setSnipping(false);
     try {
-      const file = await captureScreenSelection();
-      if (!file) return; // picker dismissed
+      const file = await captureRegion(rect);
+      if (!file) return;
       queueFiles([file]);
     } catch {
       setNotice(
@@ -397,6 +404,12 @@ export default function ResourceTicketForm({
       onSubmit={(event) => event.preventDefault()}
       className="ticket-create-page"
     >
+      {snipping && (
+        <ScreenshotRegionOverlay
+          onSelect={captureScreenshot}
+          onCancel={() => setSnipping(false)}
+        />
+      )}
       <header className="sticky top-0 z-30 -mx-3 mb-7 flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 bg-white/95 px-3 py-3 backdrop-blur">
         <h1 className="text-[2rem] font-bold tracking-tight text-slate-950">
           Create a Ticket
@@ -896,8 +909,8 @@ export default function ResourceTicketForm({
               <UploadChoice
                 icon={Camera}
                 title="Screenshot"
-                detail="Pick a screen, window, or tab"
-                onClick={() => void captureScreenshot()}
+                detail="Drag to snip part of the page"
+                onClick={startScreenshot}
               />
             </div>
 
