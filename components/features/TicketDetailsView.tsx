@@ -1172,7 +1172,7 @@ function ActionModal({
           <div className="mt-5">
             <div className="relative">
               <select
-                className="field appearance-none pr-10"
+                className="field pr-10 [appearance:none]! [-webkit-appearance:none]!"
                 value={assigneeDraft}
                 onChange={(event) => setAssigneeDraft(event.target.value)}
               >

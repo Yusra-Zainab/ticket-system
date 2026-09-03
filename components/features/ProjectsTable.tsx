@@ -425,22 +425,23 @@ export default function ProjectsTable({
             Filters
           </button>
 
-          <button
-            type="button"
-            disabled={!selected.length}
-            onClick={() => {
-              const selectedProject = projects.find((project) =>
-                selected.includes(project.id),
-              );
+          {selected.length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                const selectedProject = projects.find((project) =>
+                  selected.includes(project.id),
+                );
 
-              setPriorityDraft(selectedProject?.priority ?? "Not Assigned");
+                setPriorityDraft(selectedProject?.priority ?? "Not Assigned");
 
-              setPriorityDialogOpen(true);
-            }}
-            className="ticket-tool-button disabled:cursor-not-allowed disabled:opacity-45"
-          >
-            Change Priority Type of Selected
-          </button>
+                setPriorityDialogOpen(true);
+              }}
+              className="ticket-tool-button"
+            >
+              Change Priority Type of Selected
+            </button>
+          )}
         </div>
 
         <label className="relative ml-auto w-full xl:w-[365px]">
