@@ -152,7 +152,12 @@ export default function TicketForm({
   const [confirmMode, setConfirmMode] = useState<ConfirmMode>();
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [notice, setNotice] = useState("");
+  const [notice, setNotice] = useState<{
+    text: string;
+    tone: "success" | "error";
+  } | null>(null);
+  const notify = (text: string, tone: "success" | "error" = "success") =>
+    setNotice({ text, tone });
   const [customTimeOpen, setCustomTimeOpen] = useState(false);
   const [customDateTime, setCustomDateTime] = useState("");
   const [customStartedAt, setCustomStartedAt] = useState(0);
@@ -220,7 +225,7 @@ export default function TicketForm({
   const uploadAttachments = (incoming: File[]) => {
     if (!incoming.length) return;
     setPendingFiles((current) => [...current, ...incoming]);
-    setNotice("Files are ready and will be uploaded when the ticket is saved.");
+    notify("Files are ready and will be uploaded when the ticket is saved.");
     setUploadMenu(false);
   };
 
@@ -251,19 +256,14 @@ export default function TicketForm({
   const captureScreenshot = async () => {
     setUploadMenu(false);
     try {
-      const { default: html2canvas } = await import("html2canvas");
+      const { toBlob } = await import("html-to-image");
       // Let the attachment dialog unmount before snapshotting the page.
-      await new Promise((resolve) => window.setTimeout(resolve, 150));
-      const canvas = await html2canvas(document.body, {
-        useCORS: true,
+      await new Promise((resolve) => window.setTimeout(resolve, 200));
+      const blob = await toBlob(document.body, {
         backgroundColor: "#ffffff",
-        scale: Math.min(window.devicePixelRatio || 1, 2),
-        windowWidth: document.documentElement.scrollWidth,
-        windowHeight: document.documentElement.scrollHeight,
+        pixelRatio: Math.min(window.devicePixelRatio || 1, 2),
+        cacheBust: true,
       });
-      const blob = await new Promise<Blob | null>((resolve) =>
-        canvas.toBlob((result) => resolve(result), "image/png"),
-      );
       if (!blob) {
         throw new Error("Screenshot could not be encoded.");
       }
@@ -273,8 +273,9 @@ export default function TicketForm({
         }),
       ]);
     } catch {
-      setNotice(
+      notify(
         "Screenshot capture failed. Please try again or upload a file instead.",
+        "error",
       );
     }
   };
@@ -286,7 +287,7 @@ export default function TicketForm({
       setAttachments([]);
       setPendingFiles([]);
       setSelectedProjectId("");
-      setNotice("Form reset.");
+      notify("Form reset.");
       jump("project");
       return;
     }
@@ -348,8 +349,9 @@ export default function TicketForm({
         router.push(ticketDraftsHref);
       }
     } catch (error) {
-      setNotice(
+      notify(
         error instanceof Error ? error.message : "Unable to save the ticket.",
+        "error",
       );
     } finally {
       setLoading(false);
@@ -1123,18 +1125,16 @@ export default function TicketForm({
           role="status"
           className={cn(
             "ticket-toast",
-            notice.toLowerCase().includes("correct") ||
-              notice.toLowerCase().includes("cancelled") ||
-              notice.toLowerCase().includes("unable")
+            notice.tone === "error"
               ? "ticket-toast-error"
               : "ticket-toast-success",
           )}
         >
-          <p className="text-sm font-medium">{notice}</p>
+          <p className="text-sm font-medium">{notice.text}</p>
           <button
             type="button"
             className="ml-auto"
-            onClick={() => setNotice("")}
+            onClick={() => setNotice(null)}
             aria-label="Dismiss"
           >
             <X size={17} />

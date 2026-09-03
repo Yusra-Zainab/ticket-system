@@ -282,34 +282,27 @@ export default function ClientTicketForm({
   }
 
   async function captureScreenshot() {
+    setUploadMenu(false);
     try {
-      const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-      const video = document.createElement("video");
-      video.srcObject = stream;
-      await video.play();
-
-      const canvas = document.createElement("canvas");
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      canvas.getContext("2d")?.drawImage(video, 0, 0);
-      stream.getTracks().forEach((track) => track.stop());
-
-      canvas.toBlob(
-        (blob) => {
-          if (!blob) return;
-          queueFiles([
-            new globalThis.File([blob], `screenshot-${Date.now()}.png`, {
-              type: "image/png",
-            }),
-          ]);
-        },
-        "image/png",
-      );
+      const { toBlob } = await import("html-to-image");
+      await new Promise((resolve) => window.setTimeout(resolve, 200));
+      const blob = await toBlob(document.body, {
+        backgroundColor: "#ffffff",
+        pixelRatio: Math.min(window.devicePixelRatio || 1, 2),
+        cacheBust: true,
+      });
+      if (!blob) {
+        throw new Error("Screenshot could not be encoded.");
+      }
+      queueFiles([
+        new globalThis.File([blob], `screenshot-${Date.now()}.png`, {
+          type: "image/png",
+        }),
+      ]);
     } catch {
       setNotice(
-        "Screenshot capture was cancelled or is not supported by this browser.",
+        "Unable to capture a screenshot. Please try again or upload a file instead.",
       );
-      setUploadMenu(false);
     }
   }
 
