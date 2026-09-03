@@ -556,7 +556,7 @@ function ResourceProjectListStyles() {
         flex-direction: column;
         gap: 20px;
         color: #101828;
-        font-family: Geist, var(--font-inter), Inter, Arial, sans-serif;
+        font-family: var(--font-geist), var(--font-inter), Inter, Arial, sans-serif;
       }
 
       .resource-admin-sr-only {
@@ -911,7 +911,7 @@ function ResourceProjectListStyles() {
         border: 1px solid;
         border-radius: 16px;
         padding: 2px 10px;
-        font-family: Inter, var(--font-inter), sans-serif;
+        font-family: var(--font-geist), Inter, var(--font-inter), sans-serif;
         font-size: 12px;
         font-weight: 500;
         line-height: 18px;

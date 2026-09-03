@@ -208,7 +208,7 @@ export default function RoleForm({
           <h1
             className="text-[2rem] font-bold tracking-[-0.025em] text-slate-950 sm:text-[2.35rem]"
             style={{
-              fontFamily: "Satoshi, sans-serif",
+              fontFamily: "var(--font-satoshi), sans-serif",
             }}
           >
             {editing ? initialRole?.name : "Create New Role"}

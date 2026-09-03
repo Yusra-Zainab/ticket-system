@@ -1,13 +1,5 @@
 @import "tailwindcss";
 
-@font-face {
-  font-family: "Satoshi";
-  src: url("/fonts/Satoshi-Bold.woff2") format("woff2");
-  font-weight: 700;
-  font-style: normal;
-  font-display: swap;
-}
-
 :root {
   --background: #f8fafc;
   --card: #ffffff;
@@ -20,11 +12,21 @@
   --text-muted: #94a3b8;
 }
 @theme inline {
-  --font-sans: var(--font-inter);
+  --font-sans: var(--font-geist);
+  --font-body: var(--font-geist);
+  --font-display: var(--font-satoshi);
   --color-primary: var(--primary);
   --color-primary-hover: var(--primary-hover);
   --color-primary-light: var(--primary-light);
 }
+
+@utility font-display {
+  font-family: var(--font-satoshi), var(--font-geist), system-ui, sans-serif;
+}
+@utility font-body {
+  font-family: var(--font-geist), var(--font-inter), system-ui, sans-serif;
+}
+
 * {
   border-color: var(--border);
 }
@@ -34,7 +36,13 @@ html {
 body {
   background: #ffffff;
   color: var(--text-primary);
-  font-family: var(--font-inter), Inter, system-ui, sans-serif;
+  font-family: var(--font-geist), var(--font-inter), Inter, system-ui, sans-serif;
+}
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-satoshi), var(--font-geist), system-ui, sans-serif;
 }
 button,
 a,
@@ -143,17 +151,15 @@ button:not(:disabled),
 }
 .crumb-button {
   display: grid;
-  width: 2.5rem;
-  height: 2.5rem;
+  width: 2.25rem;
+  height: 2.25rem;
   place-items: center;
   border-radius: 0.5rem;
-}
-.crumb-button {
-  background: #e6f8fb;
+  background: #f0f9ff;
   color: #0284c7;
 }
-.crumb-button:hover {
-  background: #d8f3f8;
+.crumb-button:hover:not(:disabled) {
+  background: #e0f2fe;
 }
 /* =========================================================
    FLOATING ACTION BAR
@@ -169,21 +175,21 @@ button:not(:disabled),
   align-items: center;
   flex-wrap: nowrap;
 
-  border: 2px solid #06b6d4;
+  border: 2px solid rgba(6, 182, 212, 0.55);
   border-radius: 100px;
 
-  background: rgba(255, 255, 255, 0.96);
+  background: rgba(255, 255, 255, 0.62);
 
   padding: 7px 10px;
 
   color: #0284c7;
 
   box-shadow:
-    0 4px 9px rgba(0, 0, 0, 0.17),
+    0 8px 28px rgba(15, 23, 42, 0.16),
     0 1px 2px rgba(16, 24, 40, 0.05);
 
-  backdrop-filter: blur(7px);
-  -webkit-backdrop-filter: blur(7px);
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
 
   white-space: nowrap;
 }
@@ -566,7 +572,7 @@ button:not(:disabled),
 
 .notification-page-title-row h1 {
   color: #101828;
-  font-family: Satoshi, var(--font-inter), sans-serif;
+  font-family: var(--font-satoshi), var(--font-inter), sans-serif;
   font-size: 30px;
   font-weight: 700;
   line-height: 38px;
@@ -796,17 +802,18 @@ button:not(:disabled),
 }
 .ticket-table-frame {
   display: flex;
-  overflow: hidden;
-  border: 1px solid #e2e8f0;
-  border-radius: 0.7rem;
-  background: white;
-  box-shadow: 0 1px 3px rgb(15 23 42 / 0.05);
+  align-items: flex-start;
+  gap: 0.75rem;
 }
+/* Priority rail — its own detached panel beside the table (item 9). */
 .priority-rail {
   width: 5.25rem;
   flex: none;
-  border-right: 1px solid #e2e8f0;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.7rem;
   background: #f8fafc;
+  box-shadow: 0 1px 3px rgb(15 23 42 / 0.05);
 }
 .priority-rail-title {
   height: 3.8rem;
@@ -826,11 +833,16 @@ button:not(:disabled),
   align-items: center;
   justify-content: center;
   gap: 0.35rem;
-  border-bottom: 1px solid white;
+  border-bottom: 1px solid #e8edf3;
+  background: #f8fafc;
   color: #64748b;
 }
-.priority-drop:hover,
-.priority-drop:focus {
+/* Alternating bands on the priority numbers (item 9). */
+.priority-drop-alt {
+  background: #eef2f7;
+}
+.priority-rail-drag .priority-drop:hover,
+.priority-rail-drag .priority-drop:focus {
   background: #e6f8fb;
   color: #0284c7;
 }
@@ -870,19 +882,23 @@ button:not(:disabled),
 .ticket-pill {
   display: inline-flex;
   min-width: 7.5rem;
+  align-items: center;
   justify-content: center;
   border-radius: 9999px;
   padding: 0.28rem 0.75rem;
   font-size: 0.76rem;
-  line-height: 1.1;
+  line-height: 1.2;
+  white-space: nowrap;
 }
 .ticket-type-pill {
   display: inline-flex;
   min-width: 7.5rem;
+  align-items: center;
   justify-content: center;
   border-radius: 9999px;
   padding: 0.28rem 0.7rem;
   font-size: 0.73rem;
+  white-space: nowrap;
 }
 .row-icon {
   display: grid;
@@ -1131,11 +1147,11 @@ button:not(:disabled),
 }
 .ticket-detail-page {
   color: #475467;
-  font-family: Geist, Arial, sans-serif;
+  font-family: var(--font-geist), Arial, sans-serif;
 }
 .detail-page-title,
 .detail-heading {
-  font-family: Satoshi, Arial, sans-serif;
+  font-family: var(--font-satoshi), Arial, sans-serif;
   font-size: 24px;
   font-weight: 700;
   line-height: 32px;
@@ -1147,7 +1163,7 @@ button:not(:disabled),
   line-height: 40px;
 }
 .detail-body {
-  font-family: Geist, Arial, sans-serif;
+  font-family: var(--font-geist), Arial, sans-serif;
   font-size: 16px;
   font-weight: 400;
   line-height: 24px;
@@ -1155,7 +1171,7 @@ button:not(:disabled),
   color: #475467;
 }
 .detail-subheading {
-  font-family: Geist, Arial, sans-serif;
+  font-family: var(--font-geist), Arial, sans-serif;
   font-size: 16px;
   font-weight: 600;
   line-height: 24px;
@@ -1243,11 +1259,13 @@ button:not(:disabled),
 .detail-tag {
   display: inline-flex;
   min-width: 6.3rem;
+  align-items: center;
   justify-content: center;
   border-radius: 9999px;
   padding: 0.2rem 0.7rem;
   font-size: 0.75rem;
   font-weight: 500;
+  white-space: nowrap;
 }
 .comments-panel {
   overflow: hidden;
@@ -1278,7 +1296,7 @@ button:not(:disabled),
 .activity-summary {
   padding-left: 1.5rem;
   color: #475467;
-  font-family: Geist, Arial, sans-serif;
+  font-family: var(--font-geist), Arial, sans-serif;
   font-size: 16px;
   line-height: 24px;
   list-style: disc;
@@ -1531,7 +1549,7 @@ button:not(:disabled),
   background: #ffffff;
   padding: 10px 14px;
   color: #344054;
-  font-family: var(--font-inter), Inter, Geist, system-ui, sans-serif;
+  font-family: var(--font-inter), Inter, var(--font-geist), system-ui, sans-serif;
   font-size: 16px;
   font-weight: 400;
   line-height: 24px;
@@ -1604,8 +1622,6 @@ input.field:-webkit-autofill,
   width: 100%;
 
   min-height: 560px;
-
-  padding-bottom: 120px;
 }
 
 .role-form-actions {
@@ -1642,7 +1658,7 @@ input.field:-webkit-autofill,
 
   color: #344054;
 
-  font-family: Geist, Inter, sans-serif;
+  font-family: var(--font-geist), Inter, sans-serif;
 
   font-size: 14px;
   font-weight: 600;
@@ -1687,7 +1703,7 @@ input.field:-webkit-autofill,
 
   color: #ffffff;
 
-  font-family: Geist, Inter, sans-serif;
+  font-family: var(--font-geist), Inter, sans-serif;
 
   font-size: 14px;
   font-weight: 600;
@@ -1717,7 +1733,7 @@ input.field:-webkit-autofill,
 
   color: #101828;
 
-  font-family: Satoshi, Geist, sans-serif;
+  font-family: var(--font-satoshi), var(--font-geist), sans-serif;
 
   font-size: 24px;
   font-weight: 700;
@@ -1749,7 +1765,7 @@ input.field:-webkit-autofill,
 
   color: #344054;
 
-  font-family: Geist, Inter, sans-serif;
+  font-family: var(--font-geist), Inter, sans-serif;
 
   font-size: 14px;
   font-weight: 500;
@@ -1774,7 +1790,7 @@ input.field:-webkit-autofill,
 
   color: #344054;
 
-  font-family: Geist, Inter, sans-serif;
+  font-family: var(--font-geist), Inter, sans-serif;
 
   font-size: 16px;
   font-weight: 400;
@@ -1860,7 +1876,7 @@ input.field:-webkit-autofill,
 
   color: #0284c7;
 
-  font-family: Geist, Inter, sans-serif;
+  font-family: var(--font-geist), Inter, sans-serif;
 
   font-size: 14px;
   font-weight: 600;
@@ -1900,7 +1916,7 @@ input.field:-webkit-autofill,
 
   color: #667085;
 
-  font-family: Geist, Inter, sans-serif;
+  font-family: var(--font-geist), Inter, sans-serif;
 
   font-size: 16px;
   font-weight: 400;
@@ -1999,7 +2015,7 @@ input.field:-webkit-autofill,
 .role-permission-group-row > span {
   color: #101828;
 
-  font-family: Geist, Inter, sans-serif;
+  font-family: var(--font-geist), Inter, sans-serif;
 
   font-size: 20px;
   font-weight: 600;
@@ -2031,7 +2047,7 @@ input.field:-webkit-autofill,
 .role-permission-item > span {
   color: #344054;
 
-  font-family: Inter, Geist, sans-serif;
+  font-family: var(--font-geist), Inter, var(--font-geist), sans-serif;
 
   font-size: 14px;
   font-weight: 500;
@@ -2118,7 +2134,6 @@ input.field:-webkit-autofill,
 
 .new-resource-page {
   width: 100%;
-  padding-bottom: 120px;
 }
 
 /* =========================================================
@@ -2159,7 +2174,7 @@ input.field:-webkit-autofill,
 
   color: #101828;
 
-  font-family: Satoshi, var(--font-inter), Inter, sans-serif;
+  font-family: var(--font-satoshi), var(--font-inter), Inter, sans-serif;
 
   font-size: 30px;
   font-weight: 700;
@@ -2438,7 +2453,7 @@ input.field:-webkit-autofill,
 
   color: #101828;
 
-  font-family: Satoshi, var(--font-inter), Inter, sans-serif;
+  font-family: var(--font-satoshi), var(--font-inter), Inter, sans-serif;
 
   font-size: 24px;
   font-weight: 700;
@@ -3581,8 +3596,19 @@ input.field:-webkit-autofill,
    EMPTY STATE
    ========================================================= */
 
-.resource-table td[colspan="8"] {
+.resource-table td[colspan] {
+  width: auto;
+  padding: 32px 12px;
   color: #667085;
+  text-align: center;
+}
+
+.resource-table td[colspan]:first-child {
+  padding-left: 12px;
+}
+
+.resource-table tbody tr:last-child td[colspan] {
+  border-bottom: 0;
 }
 
 /* =========================================================
@@ -3781,7 +3807,7 @@ input.field:-webkit-autofill,
   color: #0284c7;
 
   font-family:
-    Satoshi, var(--font-satoshi), var(--font-inter), Inter, sans-serif;
+    var(--font-satoshi), var(--font-inter), Inter, sans-serif;
 
   font-size: 30px;
   font-weight: 700;
@@ -3797,7 +3823,7 @@ input.field:-webkit-autofill,
 
   color: #475467;
 
-  font-family: Geist, var(--font-inter), Inter, sans-serif;
+  font-family: var(--font-geist), var(--font-inter), Inter, sans-serif;
 
   font-size: 16px;
   font-weight: 400;
@@ -3841,7 +3867,7 @@ input.field:-webkit-autofill,
 
   color: #344054;
 
-  font-family: Geist, var(--font-inter), Inter, sans-serif;
+  font-family: var(--font-geist), var(--font-inter), Inter, sans-serif;
 
   font-size: 14px;
   font-weight: 500;
@@ -3870,7 +3896,7 @@ input.field:-webkit-autofill,
 
   color: #344054;
 
-  font-family: Geist, var(--font-inter), Inter, sans-serif;
+  font-family: var(--font-geist), var(--font-inter), Inter, sans-serif;
 
   font-size: 16px;
   font-weight: 400;
@@ -3912,7 +3938,7 @@ input.field:-webkit-autofill,
 
   color: #d92d20;
 
-  font-family: Geist, var(--font-inter), Inter, sans-serif;
+  font-family: var(--font-geist), var(--font-inter), Inter, sans-serif;
 
   font-size: 12px;
   font-weight: 500;
@@ -3950,7 +3976,7 @@ input.field:-webkit-autofill,
 
   color: #667085;
 
-  font-family: Geist, var(--font-inter), Inter, sans-serif;
+  font-family: var(--font-geist), var(--font-inter), Inter, sans-serif;
 
   font-size: 16px;
   font-weight: 400;
@@ -4041,7 +4067,7 @@ input.field:-webkit-autofill,
 
   color: #344054;
 
-  font-family: Geist, var(--font-inter), Inter, sans-serif;
+  font-family: var(--font-geist), var(--font-inter), Inter, sans-serif;
 
   font-size: 14px;
   font-weight: 400;
@@ -4085,7 +4111,7 @@ input.field:-webkit-autofill,
 
   color: #ffffff;
 
-  font-family: Geist, var(--font-inter), Inter, sans-serif;
+  font-family: var(--font-geist), var(--font-inter), Inter, sans-serif;
 
   font-size: 16px;
   font-weight: 600;
@@ -4126,7 +4152,7 @@ input.field:-webkit-autofill,
 .auth-bottom-link a {
   color: #06b6d4;
 
-  font-family: Geist, var(--font-inter), Inter, sans-serif;
+  font-family: var(--font-geist), var(--font-inter), Inter, sans-serif;
 
   font-size: 14px;
   font-weight: 600;
@@ -4170,7 +4196,7 @@ input.field:-webkit-autofill,
 
   color: #067647;
 
-  font-family: Geist, var(--font-inter), Inter, sans-serif;
+  font-family: var(--font-geist), var(--font-inter), Inter, sans-serif;
 
   font-size: 14px;
   line-height: 20px;
@@ -4248,7 +4274,7 @@ input.field:-webkit-autofill,
   color: #101828;
 
   font-family:
-    Satoshi, var(--font-satoshi), var(--font-inter), Inter, sans-serif;
+    var(--font-satoshi), var(--font-inter), Inter, sans-serif;
 
   font-size: 30px;
   font-weight: 700;
@@ -4279,7 +4305,7 @@ input.field:-webkit-autofill,
 
   padding: 10px 14px;
 
-  font-family: Geist, var(--font-inter), Inter, sans-serif;
+  font-family: var(--font-geist), var(--font-inter), Inter, sans-serif;
 
   font-size: 14px;
   font-weight: 600;
@@ -4380,7 +4406,7 @@ input.field:-webkit-autofill,
 
   color: #0284c7;
 
-  font-family: Satoshi, sans-serif;
+  font-family: var(--font-satoshi), sans-serif;
 
   font-size: 20px;
   font-weight: 700;
@@ -4397,7 +4423,7 @@ input.field:-webkit-autofill,
 
   color: #101828;
 
-  font-family: Satoshi, var(--font-satoshi), sans-serif;
+  font-family: var(--font-satoshi), var(--font-satoshi), sans-serif;
 
   font-size: 24px;
   font-weight: 700;
@@ -4409,7 +4435,7 @@ input.field:-webkit-autofill,
 
   color: #101828;
 
-  font-family: Geist, var(--font-inter), sans-serif;
+  font-family: var(--font-geist), var(--font-inter), sans-serif;
 
   font-size: 20px;
   font-weight: 500;
@@ -4435,7 +4461,7 @@ input.field:-webkit-autofill,
 
   color: #101828;
 
-  font-family: Geist, var(--font-inter), sans-serif;
+  font-family: var(--font-geist), var(--font-inter), sans-serif;
 
   font-size: 20px;
   font-weight: 600;
@@ -4464,7 +4490,7 @@ input.field:-webkit-autofill,
 .profile-value-label {
   color: #344054;
 
-  font-family: Inter, var(--font-inter), sans-serif;
+  font-family: var(--font-geist), Inter, var(--font-inter), sans-serif;
 
   font-size: 14px;
   font-weight: 500;
@@ -4474,7 +4500,7 @@ input.field:-webkit-autofill,
 .profile-value-text {
   color: #667085;
 
-  font-family: Geist, var(--font-inter), sans-serif;
+  font-family: var(--font-geist), var(--font-inter), sans-serif;
 
   font-size: 16px;
   font-weight: 400;
@@ -4614,7 +4640,7 @@ input.field:-webkit-autofill,
 .profile-field > span {
   color: #344054;
 
-  font-family: Geist, var(--font-inter), sans-serif;
+  font-family: var(--font-geist), var(--font-inter), sans-serif;
 
   font-size: 14px;
   font-weight: 500;
@@ -4646,7 +4672,7 @@ input.field:-webkit-autofill,
 
   color: #101828;
 
-  font-family: Geist, var(--font-inter), sans-serif;
+  font-family: var(--font-geist), var(--font-inter), sans-serif;
 
   font-size: 16px;
   font-weight: 400;
@@ -4936,7 +4962,7 @@ input.field:-webkit-autofill,
 
   color: #101828;
 
-  font-family: Satoshi, var(--font-satoshi), sans-serif;
+  font-family: var(--font-satoshi), var(--font-satoshi), sans-serif;
 
   font-size: 30px;
   font-weight: 700;
@@ -4971,7 +4997,7 @@ input.field:-webkit-autofill,
 
   color: #0284c7;
 
-  font-family: Geist, var(--font-inter), sans-serif;
+  font-family: var(--font-geist), var(--font-inter), sans-serif;
 
   font-size: 14px;
   font-weight: 600;
@@ -5100,7 +5126,7 @@ input.field:-webkit-autofill,
 
   color: #101828;
 
-  font-family: Satoshi, var(--font-satoshi), sans-serif;
+  font-family: var(--font-satoshi), var(--font-satoshi), sans-serif;
 
   font-size: 24px;
   font-weight: 700;
@@ -5112,7 +5138,7 @@ input.field:-webkit-autofill,
 
   color: #101828;
 
-  font-family: Geist, sans-serif;
+  font-family: var(--font-geist), sans-serif;
 
   font-size: 20px;
   font-weight: 500;
@@ -5162,7 +5188,7 @@ input.field:-webkit-autofill,
 
   color: #667085;
 
-  font-family: Geist, sans-serif;
+  font-family: var(--font-geist), sans-serif;
 
   font-size: 16px;
   font-weight: 600;
@@ -5216,7 +5242,7 @@ input.field:-webkit-autofill,
 
   color: #101828;
 
-  font-family: Geist, sans-serif;
+  font-family: var(--font-geist), sans-serif;
 
   font-size: 20px;
   font-weight: 600;
@@ -5244,7 +5270,7 @@ input.field:-webkit-autofill,
 .client-detail-value > span {
   color: #344054;
 
-  font-family: Inter, sans-serif;
+  font-family: var(--font-geist), Inter, sans-serif;
 
   font-size: 14px;
   font-weight: 500;
@@ -5257,7 +5283,7 @@ input.field:-webkit-autofill,
 
   color: #667085;
 
-  font-family: Geist, sans-serif;
+  font-family: var(--font-geist), sans-serif;
 
   font-size: 16px;
   font-weight: 400;
@@ -6022,7 +6048,7 @@ input.field:-webkit-autofill,
 
   color: #101828;
 
-  font-family: Satoshi, var(--font-satoshi), sans-serif;
+  font-family: var(--font-satoshi), var(--font-satoshi), sans-serif;
 
   font-size: 30px;
   font-weight: 700;
@@ -6054,7 +6080,7 @@ input.field:-webkit-autofill,
 
   color: #0284c7;
 
-  font-family: Geist, sans-serif;
+  font-family: var(--font-geist), sans-serif;
 
   font-size: 14px;
   font-weight: 600;
@@ -6181,7 +6207,7 @@ input.field:-webkit-autofill,
 
   color: #101828;
 
-  font-family: Satoshi, var(--font-satoshi), sans-serif;
+  font-family: var(--font-satoshi), var(--font-satoshi), sans-serif;
 
   font-size: 24px;
   font-weight: 700;
@@ -6193,7 +6219,7 @@ input.field:-webkit-autofill,
 
   color: #101828;
 
-  font-family: Geist, sans-serif;
+  font-family: var(--font-geist), sans-serif;
 
   font-size: 20px;
   font-weight: 500;
@@ -6219,7 +6245,7 @@ input.field:-webkit-autofill,
 
   padding: 2px 8px;
 
-  font-family: Inter, sans-serif;
+  font-family: var(--font-geist), Inter, sans-serif;
 
   font-size: 12px;
   font-weight: 500;
@@ -6280,7 +6306,7 @@ input.field:-webkit-autofill,
 
   color: #667085;
 
-  font-family: Geist, sans-serif;
+  font-family: var(--font-geist), sans-serif;
 
   font-size: 16px;
   font-weight: 600;
@@ -6336,7 +6362,7 @@ input.field:-webkit-autofill,
 
   color: #101828;
 
-  font-family: Geist, sans-serif;
+  font-family: var(--font-geist), sans-serif;
 
   font-size: 20px;
   font-weight: 600;
@@ -6362,10 +6388,16 @@ input.field:-webkit-autofill,
   gap: 8px;
 }
 
+/* Badges hug their content instead of stretching the whole grid cell (item 21). */
+.resource-detail-value > .resource-status-badge {
+  align-self: flex-start;
+  width: auto;
+}
+
 .resource-detail-value > span:first-child {
   color: #344054;
 
-  font-family: Inter, sans-serif;
+  font-family: var(--font-geist), Inter, sans-serif;
 
   font-size: 14px;
   font-weight: 500;
@@ -6377,7 +6409,7 @@ input.field:-webkit-autofill,
 
   color: #667085;
 
-  font-family: Geist, sans-serif;
+  font-family: var(--font-geist), sans-serif;
 
   font-size: 16px;
   font-weight: 400;
@@ -6508,7 +6540,7 @@ input.field:-webkit-autofill,
 
   color: #475467;
 
-  font-family: Geist, sans-serif;
+  font-family: var(--font-geist), sans-serif;
 
   font-size: 12px;
   font-weight: 600;
@@ -6526,7 +6558,7 @@ input.field:-webkit-autofill,
 
   color: #475467;
 
-  font-family: Geist, sans-serif;
+  font-family: var(--font-geist), sans-serif;
 
   font-size: 14px;
   font-weight: 400;
@@ -6582,7 +6614,7 @@ input.field:-webkit-autofill,
 
   color: #067647;
 
-  font-family: Inter, sans-serif;
+  font-family: var(--font-geist), Inter, sans-serif;
 
   font-size: 12px;
   font-weight: 500;
@@ -6726,7 +6758,7 @@ input.field:-webkit-autofill,
 
   padding: 2px 8px;
 
-  font-family: Inter, sans-serif;
+  font-family: var(--font-geist), Inter, sans-serif;
 
   font-size: 12px;
   font-weight: 500;
@@ -7046,7 +7078,7 @@ input.field:-webkit-autofill,
 
   color: #101828;
 
-  font-family: Satoshi, var(--font-satoshi), sans-serif;
+  font-family: var(--font-satoshi), var(--font-satoshi), sans-serif;
 
   font-size: 30px;
   font-weight: 700;
@@ -7078,7 +7110,7 @@ input.field:-webkit-autofill,
 
   color: #ffffff;
 
-  font-family: Geist, sans-serif;
+  font-family: var(--font-geist), sans-serif;
 
   font-size: 14px;
   font-weight: 600;
@@ -7124,7 +7156,7 @@ input.field:-webkit-autofill,
 
   color: #344054;
 
-  font-family: Geist, sans-serif;
+  font-family: var(--font-geist), sans-serif;
 
   font-size: 14px;
   font-weight: 600;
@@ -7245,7 +7277,7 @@ input.field:-webkit-autofill,
 
   color: #667085;
 
-  font-family: Geist, sans-serif;
+  font-family: var(--font-geist), sans-serif;
 
   font-size: 16px;
   font-weight: 600;
@@ -7280,7 +7312,7 @@ input.field:-webkit-autofill,
 .admin-users-table {
   width: 100%;
 
-  min-width: 1100px;
+  min-width: 1240px;
 
   table-layout: fixed;
 
@@ -7300,7 +7332,7 @@ input.field:-webkit-autofill,
 
   color: #475467;
 
-  font-family: Geist, sans-serif;
+  font-family: var(--font-geist), sans-serif;
 
   font-size: 12px;
   font-weight: 600;
@@ -7336,7 +7368,7 @@ input.field:-webkit-autofill,
 }
 
 .admin-users-actions-head {
-  width: 100px;
+  width: 132px;
 }
 
 .admin-users-table td {
@@ -7348,7 +7380,7 @@ input.field:-webkit-autofill,
 
   color: #475467;
 
-  font-family: Geist, sans-serif;
+  font-family: var(--font-geist), sans-serif;
 
   font-size: 14px;
   font-weight: 400;
@@ -7420,7 +7452,7 @@ input.field:-webkit-autofill,
 
   padding: 2px 8px;
 
-  font-family: Inter, sans-serif;
+  font-family: var(--font-geist), Inter, sans-serif;
 
   font-size: 12px;
   font-weight: 500;
@@ -7450,14 +7482,19 @@ input.field:-webkit-autofill,
    ========================================================= */
 
 .admin-users-row-actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  justify-content: center;
   white-space: nowrap;
 }
 
 .admin-users-icon-action {
   display: inline-grid;
 
-  width: 40px;
-  height: 40px;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
 
   place-items: center;
 
@@ -7533,7 +7570,7 @@ input.field:-webkit-autofill,
 .admin-users-pagination > span {
   color: #475467;
 
-  font-family: Inter, sans-serif;
+  font-family: var(--font-geist), Inter, sans-serif;
 
   font-size: 12px;
   font-weight: 400;
@@ -7687,7 +7724,7 @@ input.field:-webkit-autofill,
 
   color: #101828;
 
-  font-family: Satoshi, sans-serif;
+  font-family: var(--font-satoshi), sans-serif;
 
   font-size: 30px;
   font-weight: 700;
@@ -7717,7 +7754,7 @@ input.field:-webkit-autofill,
 
   padding: 10px 14px;
 
-  font-family: Geist, sans-serif;
+  font-family: var(--font-geist), sans-serif;
 
   font-size: 14px;
   font-weight: 600;
@@ -7863,7 +7900,7 @@ input.field:-webkit-autofill,
 .admin-form-step-copy strong {
   color: #344054;
 
-  font-family: Geist, sans-serif;
+  font-family: var(--font-geist), sans-serif;
 
   font-size: 14px;
   font-weight: 600;
@@ -7875,7 +7912,7 @@ input.field:-webkit-autofill,
 
   color: #667085;
 
-  font-family: Geist, sans-serif;
+  font-family: var(--font-geist), sans-serif;
 
   font-size: 12px;
   font-weight: 400;
@@ -7936,7 +7973,7 @@ input.field:-webkit-autofill,
 
   color: #101828;
 
-  font-family: Satoshi, sans-serif;
+  font-family: var(--font-satoshi), sans-serif;
 
   font-size: 24px;
   font-weight: 700;
@@ -7966,7 +8003,7 @@ input.field:-webkit-autofill,
 .admin-form-field-label {
   color: #344054;
 
-  font-family: Geist, sans-serif;
+  font-family: var(--font-geist), sans-serif;
 
   font-size: 14px;
   font-weight: 500;
@@ -7992,7 +8029,7 @@ input.field:-webkit-autofill,
 
   color: #344054;
 
-  font-family: Geist, sans-serif;
+  font-family: var(--font-geist), sans-serif;
 
   font-size: 16px;
   font-weight: 400;
@@ -8292,7 +8329,7 @@ input.field:-webkit-autofill,
 
   padding: 2px 8px;
 
-  font-family: Inter, sans-serif;
+  font-family: var(--font-geist), Inter, sans-serif;
 
   font-size: 12px;
   font-weight: 500;
@@ -8384,7 +8421,7 @@ input.field:-webkit-autofill,
 
   padding: 14px 16px;
 
-  font-family: Geist, sans-serif;
+  font-family: var(--font-geist), sans-serif;
 
   font-size: 14px;
   font-weight: 500;
@@ -8513,7 +8550,7 @@ input.field:-webkit-autofill,
 
   color: #101828;
 
-  font-family: Geist, var(--font-inter), sans-serif;
+  font-family: var(--font-geist), var(--font-inter), sans-serif;
 }
 
 /* =========================================================
@@ -8540,7 +8577,7 @@ input.field:-webkit-autofill,
 
   color: #101828;
 
-  font-family: Satoshi, sans-serif;
+  font-family: var(--font-satoshi), sans-serif;
 
   font-size: 30px;
   font-weight: 700;
@@ -8599,7 +8636,7 @@ input.field:-webkit-autofill,
 
   color: #101828;
 
-  font-family: Satoshi, sans-serif;
+  font-family: var(--font-satoshi), sans-serif;
 
   font-size: 24px;
   font-weight: 700;
@@ -8941,7 +8978,7 @@ input.field:-webkit-autofill,
 .admin-dashboard-health-box > strong {
   color: #101828;
 
-  font-family: Satoshi, sans-serif;
+  font-family: var(--font-satoshi), sans-serif;
 
   font-size: 24px;
   font-weight: 700;
@@ -8953,7 +8990,7 @@ input.field:-webkit-autofill,
 }
 
 .admin-dashboard-health-summary strong {
-  font-family: Geist, sans-serif;
+  font-family: var(--font-geist), sans-serif;
 
   font-size: 14px;
   font-weight: 600;
@@ -9162,7 +9199,7 @@ input.field:-webkit-autofill,
 
   padding: 2px 8px;
 
-  font-family: Inter, sans-serif;
+  font-family: var(--font-geist), Inter, sans-serif;
 
   font-size: 12px;
   font-weight: 500;
@@ -9369,7 +9406,7 @@ input.field:-webkit-autofill,
   width: 100%;
   min-width: 0;
   color: #101828;
-  font-family: Geist, var(--font-inter), Inter, Arial, sans-serif;
+  font-family: var(--font-geist), var(--font-inter), Inter, Arial, sans-serif;
 }
 
 .project-details-view *,
@@ -9388,7 +9425,7 @@ input.field:-webkit-autofill,
   border-radius: 8px;
   padding: 10px 14px;
   color: #0284c7;
-  font-family: Geist, var(--font-inter), Inter, sans-serif;
+  font-family: var(--font-geist), var(--font-inter), Inter, sans-serif;
   font-size: 14px;
   font-weight: 600;
   line-height: 20px;
@@ -9417,7 +9454,7 @@ input.field:-webkit-autofill,
 .project-metric-label {
   margin: 0;
   color: #475467;
-  font-family: Geist, var(--font-inter), Inter, sans-serif;
+  font-family: var(--font-geist), var(--font-inter), Inter, sans-serif;
   font-size: 14px;
   font-weight: 600;
   line-height: 20px;
@@ -9429,12 +9466,24 @@ input.field:-webkit-autofill,
   margin-top: 8px;
   overflow: hidden;
   color: #101828;
-  font-family: Satoshi, var(--font-inter), Inter, sans-serif;
+  font-family: var(--font-satoshi), var(--font-inter), Inter, sans-serif;
   font-size: 28px;
   font-weight: 700;
   line-height: 38px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* "Last Updated" metric — allow the date/time to break onto a second line. */
+.project-metric-value--wrap {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 20px;
+  line-height: 26px;
+  white-space: normal;
+  text-overflow: clip;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .project-details-view .project-tabs {
@@ -9458,7 +9507,7 @@ input.field:-webkit-autofill,
   border-bottom: 2px solid transparent;
   padding: 0 10px 12px;
   color: #667085;
-  font-family: Geist, var(--font-inter), Inter, sans-serif;
+  font-family: var(--font-geist), var(--font-inter), Inter, sans-serif;
   font-size: 16px;
   font-weight: 600;
   line-height: 24px;
@@ -9512,7 +9561,7 @@ input.field:-webkit-autofill,
   table-layout: fixed;
   background: #ffffff;
   color: #475467;
-  font-family: Geist, var(--font-inter), Inter, sans-serif;
+  font-family: var(--font-geist), var(--font-inter), Inter, sans-serif;
 }
 
 .project-detail-data-table thead {

@@ -358,7 +358,7 @@ export default function ClientDashboardView({
           background: #f0f9ff;
           padding: 2px 8px;
           color: #026aa2;
-          font-family: Inter, sans-serif;
+          font-family: var(--font-geist), Inter, sans-serif;
           font-size: 12px;
           font-weight: 500;
           line-height: 18px;

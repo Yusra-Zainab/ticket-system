@@ -921,7 +921,7 @@ export default function NewProjectForm({
           <h1
             className="text-[30px] font-bold leading-[38px] text-[#101828]"
             style={{
-              fontFamily: "Satoshi, Arial, sans-serif",
+              fontFamily: "var(--font-satoshi), Arial, sans-serif",
             }}
           >
             {initialProject ? "Edit Project" : "New Project"}
@@ -1647,7 +1647,7 @@ export default function NewProjectForm({
                 <h2
                   id="project-module-modal-title"
                   className="text-[20px] font-semibold leading-[30px] text-[#344054]"
-                  style={{ fontFamily: "Geist, sans-serif" }}
+                  style={{ fontFamily: "var(--font-geist), sans-serif" }}
                 >
                   {moduleModal.mode === "module" ? "Add New Module" : "Add New Sub Module"}
                 </h2>
@@ -1770,7 +1770,7 @@ function FormSection({
           <h2
             className="text-[24px] font-bold leading-8 text-[#101828]"
             style={{
-              fontFamily: "Satoshi, Arial, sans-serif",
+              fontFamily: "var(--font-satoshi), Arial, sans-serif",
             }}
           >
             {title}

@@ -9,7 +9,7 @@ import {
   isResourceRole,
 } from "@/lib/auth";
 
-import { db } from "@/lib/db";
+import { db, getRolePermissions } from "@/lib/db";
 
 import { listClientTickets } from "@/lib/clientPortal";
 
@@ -58,6 +58,8 @@ type Portal = z.infer<typeof portalSchema>;
 type Scope = {
   userId: number;
 
+  role: string;
+
   allowedIds: Set<string> | null;
 };
 
@@ -80,6 +82,8 @@ async function getScope(portal: Portal): Promise<Scope | null> {
     return {
       userId: user.id,
 
+      role: user.role,
+
       allowedIds: null,
     };
   }
@@ -94,6 +98,8 @@ async function getScope(portal: Portal): Promise<Scope | null> {
     return {
       userId: user.id,
 
+      role: user.role,
+
       allowedIds: new Set(tickets.map((ticket) => String(ticket.id))),
     };
   }
@@ -106,6 +112,8 @@ async function getScope(portal: Portal): Promise<Scope | null> {
 
   return {
     userId: user.id,
+
+    role: user.role,
 
     allowedIds: new Set(tickets.map((ticket) => String(ticket.id))),
   };
@@ -169,6 +177,26 @@ export async function PATCH(
           status: 403,
         },
       );
+    }
+
+    const touchesPriority = updates.some(
+      (update) =>
+        update.priorityNumber !== undefined || update.priorityType !== undefined,
+    );
+
+    if (touchesPriority) {
+      const permissions = await getRolePermissions(scope.role);
+
+      if (!permissions.includes("Change Ticket Priority")) {
+        return Response.json(
+          {
+            error: "You do not have permission to change ticket priority.",
+          },
+          {
+            status: 403,
+          },
+        );
+      }
     }
 
     connection = await db.getConnection();

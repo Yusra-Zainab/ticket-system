@@ -85,6 +85,8 @@ export interface ClientListRow {
 
   primaryContact: string;
 
+  primaryContactAvatar?: string | null;
+
   contactMethod: string;
 
   assignedProjects: ClientAssignedProject[];
@@ -112,6 +114,8 @@ export interface ClientTeamMemberInput {
   contactChannel: string;
 
   accessLevel: string;
+
+  avatar?: string | null;
 }
 
 export interface ClientFormData {
@@ -129,6 +133,8 @@ export interface ClientFormData {
   primaryEmail: string;
   primaryPhone: string;
   preferredContact: string;
+  /* Resolved live from the contact's user account (F26) — not persisted. */
+  primaryContactAvatar?: string | null;
 
   /* Upwork */
   upworkProfileName: string;

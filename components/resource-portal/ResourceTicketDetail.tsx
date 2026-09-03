@@ -898,7 +898,7 @@ function TicketDetailStyles() {
     <style>{`
       .resource-admin-ticket-detail-page {
         color: #475467;
-        font-family: Geist, var(--font-inter), Inter, Arial, sans-serif;
+        font-family: var(--font-geist), var(--font-inter), Inter, Arial, sans-serif;
       }
 
       .resource-admin-ticket-detail-header {
@@ -919,7 +919,7 @@ function TicketDetailStyles() {
       .resource-admin-ticket-detail-header h1 {
         margin: 0;
         color: #101828;
-        font-family: Satoshi, Geist, Arial, sans-serif;
+        font-family: var(--font-satoshi), var(--font-geist), Arial, sans-serif;
         font-size: 32px;
         font-weight: 700;
         line-height: 40px;
@@ -1141,7 +1141,7 @@ function TicketDetailStyles() {
       .resource-admin-ticket-detail-heading {
         margin: 0;
         color: #101828;
-        font-family: Satoshi, Geist, Arial, sans-serif;
+        font-family: var(--font-satoshi), var(--font-geist), Arial, sans-serif;
         font-size: 24px;
         font-weight: 700;
         line-height: 32px;
@@ -1791,7 +1791,7 @@ function TicketDetailStyles() {
       .resource-admin-ticket-modal-header h2 {
         margin: 0;
         color: #334155;
-        font-family: Satoshi, Geist, Arial, sans-serif;
+        font-family: var(--font-satoshi), var(--font-geist), Arial, sans-serif;
         font-size: 26px;
         font-weight: 700;
       }

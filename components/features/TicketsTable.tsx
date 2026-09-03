@@ -24,6 +24,7 @@ import {
   X,
 } from "lucide-react";
 
+import { SortArrows } from "@/components/ui/SortArrows";
 import { cn, formatDate } from "@/lib/utils";
 
 import {
@@ -75,7 +76,7 @@ const statusColors: Record<TicketStatus, string> = {
 
   Awaiting: "bg-pink-600 text-white ring-1 ring-pink-700",
 
-  "Ready for Review": "bg-violet-600 text-white ring-1 ring-violet-700",
+  "Ready for Review": "bg-green-600 text-white ring-1 ring-green-700",
 
   QA: "bg-green-600 text-white ring-1 ring-green-700",
 
@@ -83,11 +84,11 @@ const statusColors: Record<TicketStatus, string> = {
 
   Resolved: "bg-green-600 text-white ring-1 ring-green-700",
 
-  Closed: "bg-gray-700 text-white ring-1 ring-gray-800",
+  Closed: "bg-slate-700 text-white ring-1 ring-slate-800",
 
   Reopened: "bg-red-600 text-white ring-1 ring-red-700",
 
-  Cancelled: "bg-gray-400 text-white ring-1 ring-gray-500",
+  Cancelled: "bg-slate-400 text-white ring-1 ring-slate-500",
 };
 
 const statusDescriptions: Record<TicketStatus, string> = {
@@ -555,15 +556,8 @@ function SortButton({
     >
       {label}
 
-      <ChevronDown
-        size={13}
-        className={cn(
-          "transition-transform",
-
-          sort?.key === sortKey && sort.direction === "asc" && "rotate-180",
-
-          sort?.key !== sortKey && "opacity-40",
-        )}
+      <SortArrows
+        direction={sort?.key === sortKey ? sort.direction : null}
       />
     </button>
   );
@@ -615,7 +609,7 @@ function TagDropdown({
             <span className="flex min-w-0 items-center gap-3">
               <span
                 className={cn(
-                  "inline-flex w-28 shrink-0 items-center justify-center rounded-full px-3 py-1 text-center text-xs font-semibold ring-1 ring-inset",
+                  "inline-flex min-w-28 shrink-0 items-center justify-center whitespace-nowrap rounded-full px-3 py-1 text-center text-xs font-semibold ring-1 ring-inset",
 
                   selected.color,
                 )}
@@ -669,7 +663,7 @@ function TagDropdown({
               <span className="flex items-center gap-3">
                 <span
                   className={cn(
-                    "inline-flex w-28 shrink-0 items-center justify-center rounded-full px-3 py-1.5 text-center text-xs font-semibold ring-1 ring-inset",
+                    "inline-flex min-w-28 shrink-0 items-center justify-center whitespace-nowrap rounded-full px-3 py-1.5 text-center text-xs font-semibold ring-1 ring-inset",
 
                     option.color,
                   )}
@@ -977,6 +971,9 @@ export default function TicketsTable({
   portal,
   detailBaseHref,
   draftsBaseHref,
+  canChangePriority = false,
+  hidePriority = false,
+  readOnly = false,
 }: {
   initialTickets: TicketListRow[];
 
@@ -987,6 +984,15 @@ export default function TicketsTable({
   detailBaseHref: string;
 
   draftsBaseHref?: string;
+
+  /** Gate the drag-to-reprioritise rail on "Change Ticket Priority" (item 10). */
+  canChangePriority?: boolean;
+
+  /** Drop the Priority Type column and the priority rail entirely (item 18). */
+  hidePriority?: boolean;
+
+  /** Read-only embed: no bulk actions, no rename/delete, no checkboxes (item 18). */
+  readOnly?: boolean;
 }) {
   const [tickets, setTickets] = useState<SafeTicketRow[]>(() =>
     normalizeRows(initialTickets),
@@ -1278,7 +1284,7 @@ export default function TicketsTable({
 
     group: PriorityGroup,
   ) {
-    if (busy) {
+    if (busy || !canChangePriority) {
       return;
     }
 
@@ -1722,23 +1728,27 @@ export default function TicketsTable({
             Filters
           </button>
 
-          <button
-            type="button"
-            disabled={!selected.length || busy}
-            onClick={() => setBulkDialog("status")}
-            className="ticket-tool-button disabled:cursor-not-allowed disabled:opacity-45"
-          >
-            Change Status of Selected
-          </button>
+          {!readOnly && selected.length > 0 && (
+            <>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => setBulkDialog("status")}
+                className="ticket-tool-button disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                Change Status of Selected
+              </button>
 
-          <button
-            type="button"
-            disabled={!selected.length || busy}
-            onClick={() => setBulkDialog("priority")}
-            className="ticket-tool-button disabled:cursor-not-allowed disabled:opacity-45"
-          >
-            Change Priority Type of Selected
-          </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => setBulkDialog("priority")}
+                className="ticket-tool-button disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                Change Priority Type of Selected
+              </button>
+            </>
+          )}
         </div>
 
         <label className="relative ml-auto w-64 min-w-[220px]">
@@ -1765,8 +1775,8 @@ export default function TicketsTable({
          ================================================= */}
 
       {filtersOpen && (
-        <div className="space-y-4 rounded-xl border border-slate-200 bg-[#F8FAFC] p-4">
-          <div className="grid gap-3 md:grid-cols-3">
+        <div className="rounded-xl border border-slate-200 bg-[#F8FAFC] p-4">
+          <div className="grid gap-3 md:grid-cols-[1fr_1fr_1fr_auto] md:items-end">
             <TagDropdown
               label="Status"
               value={status}
@@ -1823,9 +1833,6 @@ export default function TicketsTable({
                 setPage(1);
               }}
             />
-          </div>
-
-          <div className="flex justify-end">
             <button
               type="button"
               disabled={
@@ -1845,7 +1852,7 @@ export default function TicketsTable({
 
                 setPage(1);
               }}
-              className="self-end rounded-lg border border-red-500 px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-600 hover:text-white disabled:cursor-not-allowed disabled:border-slate-300 disabled:text-slate-400 disabled:hover:bg-transparent"
+              className="h-[46px] shrink-0 rounded-lg border border-red-500 px-3 text-sm font-semibold text-red-600 hover:bg-red-600 hover:text-white disabled:cursor-not-allowed disabled:border-slate-300 disabled:text-slate-400 disabled:hover:bg-transparent"
             >
               Clear filters
             </button>
@@ -1862,84 +1869,104 @@ export default function TicketsTable({
             SEPARATE DRAGGABLE PRIORITY RAIL
            =============================================== */}
 
-        <aside className="priority-rail">
-          <div className="priority-rail-title">Priority</div>
+        {!hidePriority && (
+          <aside
+            className={cn("priority-rail", canChangePriority && "priority-rail-drag")}
+          >
+            <div className="priority-rail-title">Priority</div>
 
-          {priorityGroups.map((group) => {
-            const preview =
-              resizePreview?.key === group.key ? resizePreview : undefined;
+            {priorityGroups.map((group, index) => {
+              const preview =
+                resizePreview?.key === group.key ? resizePreview : undefined;
 
-            return (
-              <div
-                key={group.key}
-                className="priority-drop group"
-                style={{
-                  height: `${group.count * 6.2}rem`,
-                }}
-              >
-                {preview && (
-                  <div
-                    className="pointer-events-none absolute inset-x-1 top-1 z-10 rounded-md border-2 border-dashed border-cyan-500 bg-cyan-50/40"
-                    style={{
-                      height: `${preview.count * 6.2 - 0.5}rem`,
-                    }}
-                  />
-                )}
-
-                <Grip size={16} className="relative z-20 text-gray-400" />
-
-                <strong className="relative z-20">
-                  {group.priorityNumber}
-                </strong>
-
-                <span className="relative z-20 bg-slate-300" />
-
-                <button
-                  type="button"
-                  disabled={busy}
-                  title="Drag to extend or shrink this priority"
-                  aria-label={`Resize priority ${group.priorityNumber}`}
-                  onPointerDown={(event) => beginPriorityResize(event, group)}
-                  className="absolute bottom-1 right-1/2 z-30 grid h-5 w-8 translate-x-1/2 touch-none place-items-center rounded-md border border-sky-200 bg-white text-sky-600 opacity-0 shadow-sm transition-opacity group-hover:opacity-100 focus:opacity-100 disabled:cursor-not-allowed"
+              return (
+                <div
+                  key={group.key}
+                  className={cn(
+                    "priority-drop group",
+                    index % 2 === 1 && "priority-drop-alt",
+                  )}
+                  style={{
+                    height: `${group.count * 6.2}rem`,
+                  }}
                 >
-                  <GripHorizontal size={14} />
-                </button>
+                  {preview && (
+                    <div
+                      className="pointer-events-none absolute inset-x-1 top-1 z-10 rounded-md border-2 border-dashed border-cyan-500 bg-cyan-50/40"
+                      style={{
+                        height: `${preview.count * 6.2 - 0.5}rem`,
+                      }}
+                    />
+                  )}
+
+                  <Grip size={16} className="relative z-20 text-gray-400" />
+
+                  <strong className="relative z-20">
+                    {group.priorityNumber}
+                  </strong>
+
+                  <span className="relative z-20 bg-slate-300" />
+
+                  {canChangePriority && (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      title="Drag to extend or shrink this priority"
+                      aria-label={`Resize priority ${group.priorityNumber}`}
+                      onPointerDown={(event) =>
+                        beginPriorityResize(event, group)
+                      }
+                      className="absolute bottom-1 right-1/2 z-30 grid h-5 w-8 translate-x-1/2 touch-none place-items-center rounded-md border border-sky-200 bg-white text-sky-600 opacity-0 shadow-sm transition-opacity group-hover:opacity-100 focus:opacity-100 disabled:cursor-not-allowed"
+                    >
+                      <GripHorizontal size={14} />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+
+            {!visible.length && (
+              <div className="priority-drop">
+                <strong>-</strong>
               </div>
-            );
-          })}
+            )}
 
-          {!visible.length && (
-            <div className="priority-drop">
-              <strong>-</strong>
-            </div>
-          )}
-
-          <div className="h-[65px] border-t border-slate-200 bg-white" />
-        </aside>
+            <div className="h-[65px] border-t border-slate-200 bg-white" />
+          </aside>
+        )}
 
         {/* ===============================================
             ORIGINAL TABLE DESIGN
            =============================================== */}
 
-        <div className="min-w-0 flex-1 overflow-x-auto">
-          <table className="w-full min-w-[1420px] table-fixed text-left">
+        <div className="min-w-0 flex-1 overflow-x-auto rounded-[0.7rem] border border-[#e2e8f0] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.05)]">
+          <table
+            className={cn(
+              "w-full table-fixed text-left",
+              hidePriority ? "min-w-[1120px]" : "min-w-[1420px]",
+            )}
+          >
             <thead>
               <tr>
-                <th className="w-14">
-                  <input
-                    type="checkbox"
-                    className="ticket-checkbox"
-                    checked={allSelected}
-                    onChange={() =>
-                      setSelected(
-                        allSelected
-                          ? selected.filter((id) => !visibleIds.includes(id))
-                          : Array.from(new Set([...selected, ...visibleIds])),
-                      )
-                    }
-                    aria-label="Select all tickets"
-                  />
-                </th>
+                {!readOnly && (
+                  <th className="w-14">
+                    <input
+                      type="checkbox"
+                      className="ticket-checkbox"
+                      checked={allSelected}
+                      onChange={() =>
+                        setSelected(
+                          allSelected
+                            ? selected.filter((id) => !visibleIds.includes(id))
+                            : Array.from(
+                                new Set([...selected, ...visibleIds]),
+                              ),
+                        )
+                      }
+                      aria-label="Select all tickets"
+                    />
+                  </th>
+                )}
 
                 <th className="w-[200px]">
                   <SortButton
@@ -1950,15 +1977,17 @@ export default function TicketsTable({
                   />
                 </th>
 
-                <th className="w-[150px] text-center">
-                  <SortButton
-                    label="Priority Type"
-                    sortKey="priorityType"
-                    sort={sort}
-                    onSort={toggleSort}
-                    centered
-                  />
-                </th>
+                {!hidePriority && (
+                  <th className="w-[150px] text-center">
+                    <SortButton
+                      label="Priority Type"
+                      sortKey="priorityType"
+                      sort={sort}
+                      onSort={toggleSort}
+                      centered
+                    />
+                  </th>
+                )}
 
                 <th className="w-[210px]">
                   <SortButton
@@ -2023,7 +2052,7 @@ export default function TicketsTable({
               {visible.map((ticket, index) => {
                 const ticketStatus = normalizeTicketStatus(ticket.status);
 
-                const creatorCanRename = canRename(ticket);
+                const creatorCanRename = !readOnly && canRename(ticket);
 
                 const detailHref = `${detailBaseHref}/${encodeURIComponent(
                   ticket.id,
@@ -2046,21 +2075,23 @@ export default function TicketsTable({
                         "outline outline-2 -outline-offset-2 outline-slate-400",
                     )}
                   >
-                    <td>
-                      <input
-                        type="checkbox"
-                        className="ticket-checkbox"
-                        checked={selected.includes(ticket.id)}
-                        onChange={() =>
-                          setSelected((ids) =>
-                            ids.includes(ticket.id)
-                              ? ids.filter((id) => id !== ticket.id)
-                              : [...ids, ticket.id],
-                          )
-                        }
-                        aria-label={`Select ${ticket.title}`}
-                      />
-                    </td>
+                    {!readOnly && (
+                      <td>
+                        <input
+                          type="checkbox"
+                          className="ticket-checkbox"
+                          checked={selected.includes(ticket.id)}
+                          onChange={() =>
+                            setSelected((ids) =>
+                              ids.includes(ticket.id)
+                                ? ids.filter((id) => id !== ticket.id)
+                                : [...ids, ticket.id],
+                            )
+                          }
+                          aria-label={`Select ${ticket.title}`}
+                        />
+                      </td>
+                    )}
 
                     {/* =================================
                           ORIGINAL TITLE HOVER
@@ -2120,17 +2151,19 @@ export default function TicketsTable({
                           ORIGINAL FULLY COLORED PRIORITY TAG
                          ================================= */}
 
-                    <td className="text-center">
-                      <span
-                        className={cn(
-                          "ticket-pill",
+                    {!hidePriority && (
+                      <td className="text-center">
+                        <span
+                          className={cn(
+                            "ticket-pill",
 
-                          priorityTypeColors[ticket.priorityType],
-                        )}
-                      >
-                        {ticket.priorityType}
-                      </span>
-                    </td>
+                            priorityTypeColors[ticket.priorityType],
+                          )}
+                        >
+                          {ticket.priorityType}
+                        </span>
+                      </td>
+                    )}
 
                     <td>
                       <span className="flex items-center gap-2">
@@ -2183,35 +2216,37 @@ export default function TicketsTable({
                           FILES / EDIT / DELETE
                          ================================= */}
 
-                    <td>
-                      <div className="flex items-center justify-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() => void openFiles(ticket)}
-                          className="row-icon hover:!bg-transparent hover:text-[#0284C7]"
-                          title="Ticket files"
-                        >
-                          <FolderOpen />
-                        </button>
+                    {!readOnly && (
+                      <td>
+                        <div className="flex items-center justify-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => void openFiles(ticket)}
+                            className="row-icon hover:!bg-transparent hover:text-[#0284C7]"
+                            title="Ticket files"
+                          >
+                            <FolderOpen />
+                          </button>
 
-                        <Link
-                          href={editHref}
-                          className="row-icon hover:!bg-transparent hover:text-[#0284C7]"
-                          title="Edit ticket"
-                        >
-                          <Edit3 />
-                        </Link>
+                          <Link
+                            href={editHref}
+                            className="row-icon hover:!bg-transparent hover:text-[#0284C7]"
+                            title="Edit ticket"
+                          >
+                            <Edit3 />
+                          </Link>
 
-                        <button
-                          type="button"
-                          onClick={() => setDeleteId(ticket.id)}
-                          className="row-icon text-slate-500 hover:!bg-transparent hover:!text-red-600"
-                          title="Delete ticket"
-                        >
-                          <Trash2 />
-                        </button>
-                      </div>
-                    </td>
+                          <button
+                            type="button"
+                            onClick={() => setDeleteId(ticket.id)}
+                            className="row-icon text-slate-500 hover:!bg-transparent hover:!text-red-600"
+                            title="Delete ticket"
+                          >
+                            <Trash2 />
+                          </button>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 );
               })}

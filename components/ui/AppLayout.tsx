@@ -15,6 +15,7 @@ import { useState } from "react";
 import { AppProvider, useApp } from "@/components/providers/AppProvider";
 import { PageSearchProvider } from "@/components/providers/PageSearchProvider";
 import FloatingActionBar from "./FloatingActionBar";
+import { useNavHistory } from "./useNavHistory";
 
 export interface AppLayoutProps {
   children: React.ReactNode;
@@ -241,6 +242,7 @@ function Shell({ children, breadcrumbs }: AppLayoutProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const { canBack, canForward } = useNavHistory();
   const { unreadCount } = useApp();
 
   if (bareRoutes.some((route) => pathname.startsWith(route))) {
@@ -252,17 +254,17 @@ function Shell({ children, breadcrumbs }: AppLayoutProps) {
   return (
     <PageSearchProvider key={pathname}>
       <div className="min-h-screen bg-white">
-        <div className="mx-auto max-w-[1800px] px-5 pb-36 pt-7 sm:px-8 lg:px-12 xl:px-16">
+        <div className="w-full px-8 pb-24 pt-8">
           <nav
             aria-label="Breadcrumbs"
-            className="mb-7 flex min-h-12 items-center gap-2.5 rounded-lg border-b border-[#0284C7]/10 px-3 py-2 text-sm font-semibold text-[#0284C7]"
+            className="mb-7 flex min-h-12 items-center gap-2.5 border-b border-[#0284C7]/10 px-5 py-2 text-sm font-semibold text-[#0284C7]"
           >
             <Link
               href="/"
               aria-label="Dashboard"
-              className="crumb-button text-sky-600"
+              className="crumb-button text-[#0284C7]"
             >
-              <Home size={17} />
+              <Home size={16} />
             </Link>
 
             {crumbs.map((crumb) => (
@@ -270,36 +272,38 @@ function Shell({ children, breadcrumbs }: AppLayoutProps) {
                 className="flex items-center gap-2.5"
                 key={`${crumb.label}-${crumb.href ?? "current"}`}
               >
-                <ChevronRight size={15} className="text-[#0284C7]" />
+                <ChevronRight size={16} className="text-[#0284C7]" />
                 {crumb.href ? (
                   <Link
                     href={crumb.href}
-                    className="rounded-lg px-2 py-1.5 text-sky-600 hover:bg-sky-50"
+                    className="rounded-lg px-2.5 py-1.5 text-[#0284C7] hover:bg-[#F0F9FF]"
                   >
                     {crumb.label}
                   </Link>
                 ) : (
-                  <span className="rounded-lg bg-sky-50 px-3 py-2 text-sky-600">
+                  <span className="rounded-lg bg-[#F0F9FF] px-2.5 py-1.5 text-[#0284C7]">
                     {crumb.label}
                   </span>
                 )}
               </span>
             ))}
 
-            <span className="ml-2 flex overflow-hidden rounded-lg bg-sky-50 text-sky-600">
+            <span className="ml-2 flex overflow-hidden rounded-lg">
               <button
                 aria-label="Go back"
                 onClick={() => router.back()}
-                className="crumb-button"
+                disabled={!canBack}
+                className="crumb-button disabled:cursor-not-allowed disabled:opacity-40"
               >
-                <ArrowLeft size={17} />
+                <ArrowLeft size={16} />
               </button>
               <button
                 aria-label="Go forward"
                 onClick={() => router.forward()}
-                className="crumb-button border-l border-white"
+                disabled={!canForward}
+                className="crumb-button border-l border-white disabled:cursor-not-allowed disabled:opacity-40"
               >
-                <ArrowRight size={17} />
+                <ArrowRight size={16} />
               </button>
             </span>
 
@@ -314,7 +318,7 @@ function Shell({ children, breadcrumbs }: AppLayoutProps) {
               className="crumb-button ml-1 text-[#0284C7]"
             >
               <RotateCw
-                size={17}
+                size={16}
                 className={isRefreshing ? "animate-spin" : ""}
               />
             </button>

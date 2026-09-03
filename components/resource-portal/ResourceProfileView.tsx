@@ -920,7 +920,7 @@ function ResourceDetailsStyles() {
 
   color: #101828;
 
-  font-family: Satoshi, var(--font-satoshi), sans-serif;
+  font-family: var(--font-satoshi), var(--font-satoshi), sans-serif;
 
   font-size: 30px;
   font-weight: 700;
@@ -952,7 +952,7 @@ function ResourceDetailsStyles() {
 
   color: #0284c7;
 
-  font-family: Geist, sans-serif;
+  font-family: var(--font-geist), sans-serif;
 
   font-size: 14px;
   font-weight: 600;
@@ -1079,7 +1079,7 @@ function ResourceDetailsStyles() {
 
   color: #101828;
 
-  font-family: Satoshi, var(--font-satoshi), sans-serif;
+  font-family: var(--font-satoshi), var(--font-satoshi), sans-serif;
 
   font-size: 24px;
   font-weight: 700;
@@ -1091,7 +1091,7 @@ function ResourceDetailsStyles() {
 
   color: #101828;
 
-  font-family: Geist, sans-serif;
+  font-family: var(--font-geist), sans-serif;
 
   font-size: 20px;
   font-weight: 500;
@@ -1117,7 +1117,7 @@ function ResourceDetailsStyles() {
 
   padding: 2px 8px;
 
-  font-family: Inter, sans-serif;
+  font-family: var(--font-geist), Inter, sans-serif;
 
   font-size: 12px;
   font-weight: 500;
@@ -1178,7 +1178,7 @@ function ResourceDetailsStyles() {
 
   color: #667085;
 
-  font-family: Geist, sans-serif;
+  font-family: var(--font-geist), sans-serif;
 
   font-size: 16px;
   font-weight: 600;
@@ -1234,7 +1234,7 @@ function ResourceDetailsStyles() {
 
   color: #101828;
 
-  font-family: Geist, sans-serif;
+  font-family: var(--font-geist), sans-serif;
 
   font-size: 20px;
   font-weight: 600;
@@ -1263,7 +1263,7 @@ function ResourceDetailsStyles() {
 .resource-detail-value > span:first-child {
   color: #344054;
 
-  font-family: Inter, sans-serif;
+  font-family: var(--font-geist), Inter, sans-serif;
 
   font-size: 14px;
   font-weight: 500;
@@ -1275,7 +1275,7 @@ function ResourceDetailsStyles() {
 
   color: #667085;
 
-  font-family: Geist, sans-serif;
+  font-family: var(--font-geist), sans-serif;
 
   font-size: 16px;
   font-weight: 400;
@@ -1406,7 +1406,7 @@ function ResourceDetailsStyles() {
 
   color: #475467;
 
-  font-family: Geist, sans-serif;
+  font-family: var(--font-geist), sans-serif;
 
   font-size: 12px;
   font-weight: 600;
@@ -1424,7 +1424,7 @@ function ResourceDetailsStyles() {
 
   color: #475467;
 
-  font-family: Geist, sans-serif;
+  font-family: var(--font-geist), sans-serif;
 
   font-size: 14px;
   font-weight: 400;
@@ -1480,7 +1480,7 @@ function ResourceDetailsStyles() {
 
   color: #067647;
 
-  font-family: Inter, sans-serif;
+  font-family: var(--font-geist), Inter, sans-serif;
 
   font-size: 12px;
   font-weight: 500;
@@ -1624,7 +1624,7 @@ function ResourceDetailsStyles() {
 
   padding: 2px 8px;
 
-  font-family: Inter, sans-serif;
+  font-family: var(--font-geist), Inter, sans-serif;
 
   font-size: 12px;
   font-weight: 500;

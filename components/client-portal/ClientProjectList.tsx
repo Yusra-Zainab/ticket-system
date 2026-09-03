@@ -263,7 +263,7 @@ export default function ClientProjectList({
           padding: 8px 14px;
           border-radius: 8px;
           border-color: #d0d5dd;
-          font-family: Inter, Arial, sans-serif;
+          font-family: var(--font-geist), Inter, Arial, sans-serif;
           font-size: 14px;
           font-weight: 600;
           line-height: 20px;
@@ -292,7 +292,7 @@ export default function ClientProjectList({
           background: #fff;
           padding: 10px 14px 10px 42px;
           color: #101828;
-          font-family: Inter, Arial, sans-serif;
+          font-family: var(--font-geist), Inter, Arial, sans-serif;
           font-size: 16px;
           line-height: 24px;
           box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
@@ -330,7 +330,7 @@ export default function ClientProjectList({
           display: block;
           margin-bottom: 8px;
           color: #344054;
-          font-family: Inter, Arial, sans-serif;
+          font-family: var(--font-geist), Inter, Arial, sans-serif;
           font-size: 14px;
           font-weight: 600;
           line-height: 20px;
@@ -348,7 +348,7 @@ export default function ClientProjectList({
           background: #fff;
           padding: 0 12px;
           color: #344054;
-          font-family: Inter, Arial, sans-serif;
+          font-family: var(--font-geist), Inter, Arial, sans-serif;
           font-size: 14px;
           font-weight: 500;
           line-height: 20px;
@@ -581,7 +581,7 @@ export default function ClientProjectList({
           border-bottom: 1px solid #eaecf0;
           padding: 0 18px;
           color: #475467;
-          font-family: Inter, Arial, sans-serif;
+          font-family: var(--font-geist), Inter, Arial, sans-serif;
           font-size: 12px;
           font-weight: 600;
           line-height: 18px;
@@ -604,7 +604,7 @@ export default function ClientProjectList({
         .client-project-table td {
           padding: 0 18px;
           color: #475467;
-          font-family: Geist, Inter, Arial, sans-serif;
+          font-family: var(--font-geist), Inter, Arial, sans-serif;
           font-size: 14px;
           font-weight: 400;
           line-height: 20px;
@@ -716,7 +716,7 @@ export default function ClientProjectList({
 
         .client-project-pagination-count {
           color: #475467;
-          font-family: Inter, Arial, sans-serif;
+          font-family: var(--font-geist), Inter, Arial, sans-serif;
           font-size: 12px;
           line-height: 15px;
         }

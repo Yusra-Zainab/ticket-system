@@ -29,6 +29,8 @@ import Combobox from "@/components/ui/Combobox";
 import RichTextEditor from "@/components/ui/RichTextEditor";
 import { cn } from "@/lib/utils";
 import { findProjectModule, normalizeProjectModules } from "@/lib/projectModules";
+import { captureDisplayFrame } from "@/lib/screenshot";
+import ScreenshotRegionOverlay from "@/components/features/ScreenshotRegionOverlay";
 import { useApp } from "@/components/providers/AppProvider";
 import type { Project, Ticket, TicketAttachment, User } from "@/types";
 
@@ -149,10 +151,16 @@ export default function TicketForm({
     String(savedForm?.projectId ?? initialSelection.projectId ?? ""),
   );
   const [uploadMenu, setUploadMenu] = useState(false);
+  const [snipFrame, setSnipFrame] = useState<HTMLCanvasElement | null>(null);
   const [confirmMode, setConfirmMode] = useState<ConfirmMode>();
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [notice, setNotice] = useState("");
+  const [notice, setNotice] = useState<{
+    text: string;
+    tone: "success" | "error";
+  } | null>(null);
+  const notify = (text: string, tone: "success" | "error" = "success") =>
+    setNotice({ text, tone });
   const [customTimeOpen, setCustomTimeOpen] = useState(false);
   const [customDateTime, setCustomDateTime] = useState("");
   const [customStartedAt, setCustomStartedAt] = useState(0);
@@ -220,7 +228,7 @@ export default function TicketForm({
   const uploadAttachments = (incoming: File[]) => {
     if (!incoming.length) return;
     setPendingFiles((current) => [...current, ...incoming]);
-    setNotice("Files are ready and will be uploaded when the ticket is saved.");
+    notify("Files are ready and will be uploaded when the ticket is saved.");
     setUploadMenu(false);
   };
 
@@ -248,35 +256,22 @@ export default function TicketForm({
       setUploading(false);
     }
   };
-  const captureScreenshot = async () => {
+  const startScreenshot = async () => {
+    setUploadMenu(false);
     try {
-      const stream = await navigator.mediaDevices.getDisplayMedia({
-        video: true,
-      });
-      const video = document.createElement("video");
-      video.srcObject = stream;
-      await video.play();
-      const canvas = document.createElement("canvas");
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      canvas.getContext("2d")?.drawImage(video, 0, 0);
-      stream.getTracks().forEach((track) => track.stop());
-      canvas.toBlob(
-        (blob) =>
-          blob &&
-          uploadAttachments([
-            new globalThis.File([blob], `screenshot-${Date.now()}.png`, {
-              type: "image/png",
-            }),
-          ]),
-        "image/png",
-      );
+      const frame = await captureDisplayFrame();
+      if (!frame) return; // picker dismissed
+      setSnipFrame(frame);
     } catch {
-      setNotice(
-        "Screenshot capture was cancelled or is not supported by this browser.",
+      notify(
+        "Screenshot capture failed. Please try again or upload a file instead.",
+        "error",
       );
-      setUploadMenu(false);
     }
+  };
+  const finishScreenshot = (file: File) => {
+    setSnipFrame(null);
+    uploadAttachments([file]);
   };
   const perform = async (mode: ConfirmMode) => {
     setConfirmMode(undefined);
@@ -286,7 +281,7 @@ export default function TicketForm({
       setAttachments([]);
       setPendingFiles([]);
       setSelectedProjectId("");
-      setNotice("Form reset.");
+      notify("Form reset.");
       jump("project");
       return;
     }
@@ -348,8 +343,9 @@ export default function TicketForm({
         router.push(ticketDraftsHref);
       }
     } catch (error) {
-      setNotice(
+      notify(
         error instanceof Error ? error.message : "Unable to save the ticket.",
+        "error",
       );
     } finally {
       setLoading(false);
@@ -386,6 +382,13 @@ export default function TicketForm({
       onSubmit={(event) => event.preventDefault()}
       className="ticket-create-page"
     >
+      {snipFrame && (
+        <ScreenshotRegionOverlay
+          source={snipFrame}
+          onSelect={finishScreenshot}
+          onCancel={() => setSnipFrame(null)}
+        />
+      )}
       <header className="sticky top-0 z-30 -mx-3 mb-7 flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 bg-white/95 px-3 py-3 backdrop-blur">
         <h1 className="text-[2rem] font-bold tracking-tight text-slate-950">
           Create a Ticket
@@ -1012,17 +1015,20 @@ export default function TicketForm({
                 detail="Browse local files"
                 onClick={() => fileInput.current?.click()}
               />
+              {/* TODO(drive-picker): wire the Google Drive Picker (needs a
+                  NEXT_PUBLIC_GOOGLE_CLIENT_ID + API key + OAuth consent). Until
+                  then this falls back to the local file browser. */}
               <UploadChoice
                 icon={HardDrive}
                 title="Drive"
-                detail="Choose a drive file"
+                detail="Choose a file to upload"
                 onClick={() => fileInput.current?.click()}
               />
               <UploadChoice
                 icon={Camera}
                 title="Screenshot"
-                detail="Capture your screen"
-                onClick={captureScreenshot}
+                detail="Pick a screen, then snip an area"
+                onClick={() => void startScreenshot()}
               />
             </div>
             <p className="mt-5 rounded-lg bg-slate-50 p-3 text-xs text-slate-500">
@@ -1120,18 +1126,16 @@ export default function TicketForm({
           role="status"
           className={cn(
             "ticket-toast",
-            notice.toLowerCase().includes("correct") ||
-              notice.toLowerCase().includes("cancelled") ||
-              notice.toLowerCase().includes("unable")
+            notice.tone === "error"
               ? "ticket-toast-error"
               : "ticket-toast-success",
           )}
         >
-          <p className="text-sm font-medium">{notice}</p>
+          <p className="text-sm font-medium">{notice.text}</p>
           <button
             type="button"
             className="ml-auto"
-            onClick={() => setNotice("")}
+            onClick={() => setNotice(null)}
             aria-label="Dismiss"
           >
             <X size={17} />

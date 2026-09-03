@@ -374,6 +374,28 @@ client detail — team-member cards + the project-team stack) and `ProjectDetail
 `Avatar` now takes an optional `src` and renders `<img class="object-cover">` when set;
 `ClientDetailsView` + `ProjectDetailsView` (added `imageSrc` to `RecordItem`, thread
 `member.avatar`) now pass it. `GET /api/avatars/[userId]` also marked `dynamic = "force-dynamic"`.
+
+**Follow-up 3 — the admin client views never resolved team/contact photos:**
+- `listClientRows` mapped every team member to `avatar: null` **hard-coded** — the
+  `/clients` list + `/admin/users` Clients tab stacked avatars were always initials.
+- `findClientRecord` returned the raw `form_data.teamMembers` snapshot (photo goes stale
+  when the member later changes it).
+- The **primary contact** (i.e. the client-portal user who logs in and uploads "the client
+  profile image") was shown as **plain text** in the list, detail and edit-client views —
+  their photo lived on their own `users` row and nothing linked to it.
+Fixes: new `lib/db.ts` helpers `resolveUserAvatars(ids)` and `resolveUserAvatarsByEmail(emails)`.
+`listClientRows` + `findClientRecord` now resolve each team member's avatar live by id and
+the primary contact's avatar live by email (`ClientListRow.primaryContactAvatar`,
+`ClientFormData.primaryContactAvatar` — resolved, not persisted). `ClientsTable` shows the
+contact + team avatars, `ClientDetailsView` shows the contact photo in the Primary Contact
+section, `NewClientForm` shows the contact photo (read-only) + team-member avatars in the
+team table (`ClientTeamMemberInput` / the team `<Avatar src>`).
+**Verified:** `testclient` uploads a photo in the client portal → it now shows in
+`/clients` (list), `/clients/{id}` (detail) and `/clients/{id}/edit` — all resolve
+`/api/avatars/20`. `tsc` + `eslint` clean, `next build` exit 0.
+**Known limitation:** team members added directly in `NewClientForm` get a random UUID id
+(they're contact records, not user accounts) — they have no photo mechanism. Only members
+added through the client portal (`/api/client-portal/team`, real accounts) can have one.
 **Verified end-to-end:** upload via resource / client / admin-own profile, admin-creates-resource,
 admin-edits-user, client-team-create → all store bytes + set the pointer; `GET /api/avatars/{id}`
 returns the PNG (200, `image/png`, cache header); no-auth → 401; missing → 404; DELETE → 204

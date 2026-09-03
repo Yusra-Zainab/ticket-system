@@ -1057,6 +1057,30 @@ export async function findClientRecord(
     formData.clientStatus = row.status === "active" ? "Active" : "Inactive";
   }
 
+  // Resolve each team member's photo live from `users` — the snapshot in
+  // form_data goes stale when the member later changes their own photo (F26).
+  if (Array.isArray(formData.teamMembers) && formData.teamMembers.length) {
+    const avatarById = await resolveUserAvatars(
+      formData.teamMembers.map((member) => member.id),
+    );
+    formData.teamMembers = formData.teamMembers.map((member) => ({
+      ...member,
+      avatar: avatarById.get(String(member.id)) ?? member.avatar ?? null,
+    }));
+  }
+
+  // The primary contact's photo is on their own user account (F26).
+  const contactAvatarByEmail = await resolveUserAvatarsByEmail([
+    formData.primaryEmail,
+    row.email,
+  ]);
+  formData.primaryContactAvatar =
+    contactAvatarByEmail.get(
+      (formData.primaryEmail || "").trim().toLowerCase(),
+    ) ??
+    contactAvatarByEmail.get((row.email || "").trim().toLowerCase()) ??
+    null;
+
   return {
     id: String(row.id),
 
@@ -1554,6 +1578,62 @@ function newestDate(...values: Array<string | null | undefined>) {
   return newest;
 }
 
+/**
+ * Live avatar URLs for a set of user ids, keyed by string id. Client team
+ * members are stored as a snapshot in `clients.form_data.teamMembers`, so
+ * their photo can change after they were added — admin client views resolve
+ * it fresh from `users.avatar` instead of trusting the snapshot (F26).
+ */
+export async function resolveUserAvatars(
+  ids: Array<string | number | null | undefined>,
+): Promise<Map<string, string | null>> {
+  const numeric = [
+    ...new Set(
+      ids
+        .map((id) => Number(id))
+        .filter((id) => Number.isInteger(id) && id > 0),
+    ),
+  ];
+  if (!numeric.length) return new Map();
+
+  const [rows] = await db.query<
+    (RowDataPacket & { id: number; avatar: string | null })[]
+  >(
+    `SELECT id, avatar FROM users WHERE id IN (${numeric
+      .map(() => "?")
+      .join(",")})`,
+    numeric,
+  );
+  return new Map(rows.map((row) => [String(row.id), row.avatar]));
+}
+
+/**
+ * Avatar URLs keyed by lower-cased email — for resolving a client's primary
+ * contact photo, since that contact is identified by email, not id (F26).
+ */
+export async function resolveUserAvatarsByEmail(
+  emails: Array<string | null | undefined>,
+): Promise<Map<string, string | null>> {
+  const clean = [
+    ...new Set(
+      emails
+        .map((email) => (email ?? "").trim().toLowerCase())
+        .filter(Boolean),
+    ),
+  ];
+  if (!clean.length) return new Map();
+
+  const [rows] = await db.query<
+    (RowDataPacket & { email: string; avatar: string | null })[]
+  >(
+    `SELECT email, avatar FROM users WHERE LOWER(email) IN (${clean
+      .map(() => "?")
+      .join(",")})`,
+    clean,
+  );
+  return new Map(rows.map((row) => [row.email.toLowerCase(), row.avatar]));
+}
+
 export async function listClientRows(): Promise<ClientListRow[]> {
   /*
    * DRAFT clients are intentionally
@@ -1669,6 +1749,21 @@ export async function listClientRows(): Promise<ClientListRow[]> {
     ticketsByClient.set(row.client_id, row);
   }
 
+  const teamAvatarById = await resolveUserAvatars(
+    clientRows.flatMap((client) =>
+      parseClientFormData(client.form_data).teamMembers.map(
+        (member) => member.id,
+      ),
+    ),
+  );
+
+  const contactAvatarByEmail = await resolveUserAvatarsByEmail(
+    clientRows.flatMap((client) => {
+      const form = parseClientFormData(client.form_data);
+      return [form.primaryEmail, client.email];
+    }),
+  );
+
   return clientRows.map((client): ClientListRow => {
     const form = parseClientFormData(client.form_data);
 
@@ -1678,12 +1773,20 @@ export async function listClientRows(): Promise<ClientListRow[]> {
 
     const clientStatus = form.clientStatus || client.status;
 
+    const primaryContactAvatar =
+      contactAvatarByEmail.get(
+        (form.primaryEmail || "").trim().toLowerCase(),
+      ) ??
+      contactAvatarByEmail.get((client.email || "").trim().toLowerCase()) ??
+      null;
+
     const clientTeam = form.teamMembers.map((member) => ({
       id: member.id,
 
       name: member.name,
 
-      avatar: null,
+      avatar:
+        teamAvatarById.get(String(member.id)) ?? member.avatar ?? null,
     }));
 
     return {
@@ -1693,6 +1796,8 @@ export async function listClientRows(): Promise<ClientListRow[]> {
         form.clientName.trim() || client.company?.trim() || client.name,
 
       primaryContact: form.primaryContactName.trim() || client.name,
+
+      primaryContactAvatar,
 
       contactMethod:
         form.preferredContact || (client.phone?.trim() ? "WhatsApp" : "Email"),

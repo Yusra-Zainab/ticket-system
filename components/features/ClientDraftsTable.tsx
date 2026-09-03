@@ -172,13 +172,15 @@ export default function ClientDraftsTable({
               {!drafts.length && (
                 <tr>
                   <td colSpan={7} className="h-40 text-center">
-                    <p className="text-sm font-semibold text-[#101828]">
-                      No client drafts
-                    </p>
+                    <div className="mx-auto max-w-sm">
+                      <p className="text-sm font-semibold text-[#101828]">
+                        No client drafts
+                      </p>
 
-                    <p className="mt-1 text-sm text-[#667085]">
-                      Saved client drafts will appear here.
-                    </p>
+                      <p className="mt-1 text-sm text-[#667085]">
+                        Saved client drafts will appear here.
+                      </p>
+                    </div>
                   </td>
                 </tr>
               )}

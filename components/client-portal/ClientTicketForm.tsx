@@ -26,6 +26,8 @@ import type { LucideIcon } from "lucide-react";
 
 import Combobox from "@/components/ui/Combobox";
 import RichTextEditor from "@/components/ui/RichTextEditor";
+import ScreenshotRegionOverlay from "@/components/features/ScreenshotRegionOverlay";
+import { captureDisplayFrame } from "@/lib/screenshot";
 import { cn } from "@/lib/utils";
 import type {
   ClientPortalProject,
@@ -158,6 +160,7 @@ export default function ClientTicketForm({
   const [urls, setUrls] = useState<string[]>(initialUrls);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [uploadMenu, setUploadMenu] = useState(false);
+  const [snipFrame, setSnipFrame] = useState<HTMLCanvasElement | null>(null);
   const [confirmMode, setConfirmMode] = useState<ConfirmMode>();
   const [saving, setSaving] = useState<"DRAFT" | "OPEN" | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -281,36 +284,22 @@ export default function ClientTicketForm({
     setUploadMenu(false);
   }
 
-  async function captureScreenshot() {
+  async function startScreenshot() {
+    setUploadMenu(false);
     try {
-      const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-      const video = document.createElement("video");
-      video.srcObject = stream;
-      await video.play();
-
-      const canvas = document.createElement("canvas");
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      canvas.getContext("2d")?.drawImage(video, 0, 0);
-      stream.getTracks().forEach((track) => track.stop());
-
-      canvas.toBlob(
-        (blob) => {
-          if (!blob) return;
-          queueFiles([
-            new globalThis.File([blob], `screenshot-${Date.now()}.png`, {
-              type: "image/png",
-            }),
-          ]);
-        },
-        "image/png",
-      );
+      const frame = await captureDisplayFrame();
+      if (!frame) return; // picker dismissed
+      setSnipFrame(frame);
     } catch {
       setNotice(
-        "Screenshot capture was cancelled or is not supported by this browser.",
+        "Unable to capture a screenshot. Please try again or upload a file instead.",
       );
-      setUploadMenu(false);
     }
+  }
+
+  function finishScreenshot(file: File) {
+    setSnipFrame(null);
+    queueFiles([file]);
   }
 
   async function uploadPendingFiles(ticketId: string) {
@@ -410,6 +399,13 @@ export default function ClientTicketForm({
       onSubmit={(event) => event.preventDefault()}
       className="ticket-create-page"
     >
+      {snipFrame && (
+        <ScreenshotRegionOverlay
+          source={snipFrame}
+          onSelect={finishScreenshot}
+          onCancel={() => setSnipFrame(null)}
+        />
+      )}
       <header className="sticky top-0 z-30 -mx-3 mb-7 flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 bg-white/95 px-3 py-3 backdrop-blur">
         <h1 className="text-[2rem] font-bold tracking-tight text-slate-950">
           Create a Ticket
@@ -897,8 +893,8 @@ export default function ClientTicketForm({
               <UploadChoice
                 icon={Camera}
                 title="Screenshot"
-                detail="Capture your screen"
-                onClick={() => void captureScreenshot()}
+                detail="Pick a screen, then snip an area"
+                onClick={() => void startScreenshot()}
               />
             </div>
 

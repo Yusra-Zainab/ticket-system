@@ -22,6 +22,7 @@ import {
 import { type ReactNode, useMemo, useState } from "react";
 
 import { Avatar } from "@/components/ui/Avatar";
+import { SortArrows } from "@/components/ui/SortArrows";
 
 import ClientsTable from "@/components/features/ClientsTable";
 
@@ -684,23 +685,7 @@ function AdminHeader({
       >
         {label}
 
-        <span className="grid">
-          <ChevronDown
-            size={12}
-            className={cn(
-              "rotate-180",
-              active && sort.direction === "asc" ? "text-[#0284C7]" : "text-[#98A2B3]",
-            )}
-          />
-
-          <ChevronDown
-            size={12}
-            className={cn(
-              "-mt-[5px]",
-              active && sort.direction === "desc" ? "text-[#0284C7]" : "text-[#98A2B3]",
-            )}
-          />
-        </span>
+        <SortArrows direction={active ? sort.direction : null} size={12} />
       </button>
     </th>
   );

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Geist, Inter } from "next/font/google";
+import localFont from "next/font/local";
 import AppLayout from '@/components/ui/AppLayout';
 import { getSessionUser, isAdminRole } from '@/lib/auth';
 import { listAdminNotifications } from '@/lib/db';
@@ -8,6 +9,21 @@ import "./globals.css";
 const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin"],
+});
+
+const geist = Geist({
+  variable: "--font-geist",
+  subsets: ["latin"],
+  display: "swap",
+});
+
+const satoshi = localFont({
+  variable: "--font-satoshi",
+  display: "swap",
+  src: [
+    { path: "../public/fonts/Satoshi-Variable.woff2", style: "normal" },
+    { path: "../public/fonts/Satoshi-VariableItalic.woff2", style: "italic" },
+  ],
 });
 
 export const metadata: Metadata = {
@@ -28,7 +44,7 @@ export default async function RootLayout({
   return (
     <html
       lang="en"
-      className={`${inter.variable} h-full antialiased`}
+      className={`${inter.variable} ${geist.variable} ${satoshi.variable} h-full antialiased`}
     >
       <body className="min-h-full bg-slate-50">
         <AppLayout

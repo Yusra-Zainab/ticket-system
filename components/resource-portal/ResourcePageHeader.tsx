@@ -170,7 +170,7 @@ export default function ResourcePageHeader({
           min-height: 28px;
           border-radius: 6px;
           text-decoration: none;
-          font-family: Inter, Arial, sans-serif;
+          font-family: var(--font-geist), Inter, Arial, sans-serif;
           font-size: 14px;
           line-height: 20px;
         }
@@ -252,7 +252,7 @@ export default function ResourcePageHeader({
 
         .resource-page-title-copy h1 {
           margin: 0;
-          font-family: Satoshi, var(--font-satoshi), Geist, sans-serif;
+          font-family: var(--font-satoshi), var(--font-satoshi), var(--font-geist), sans-serif;
           font-size: 30px;
           font-weight: 700;
           line-height: 38px;
@@ -261,7 +261,7 @@ export default function ResourcePageHeader({
 
         .resource-page-supporting-text {
           margin-top: 4px;
-          font-family: Inter, Arial, sans-serif;
+          font-family: var(--font-geist), Inter, Arial, sans-serif;
           font-size: 16px;
           line-height: 24px;
           color: #475467;
@@ -278,7 +278,7 @@ export default function ResourcePageHeader({
           box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
           color: #ffffff;
           text-decoration: none;
-          font-family: Geist, sans-serif;
+          font-family: var(--font-geist), sans-serif;
           font-size: 14px;
           font-weight: 600;
           line-height: 20px;

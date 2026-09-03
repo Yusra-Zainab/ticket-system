@@ -453,21 +453,21 @@ function ResourceFloatingStyles() {
         align-items: center;
         flex-wrap: nowrap;
 
-        border: 2px solid #06b6d4;
+        border: 2px solid rgba(6, 182, 212, 0.55);
         border-radius: 100px;
 
-        background: rgba(255, 255, 255, 0.96);
+        background: rgba(255, 255, 255, 0.62);
 
         padding: 7px 10px;
 
         color: #0284c7;
 
         box-shadow:
-          0 4px 9px rgba(0, 0, 0, 0.17),
+          0 8px 28px rgba(15, 23, 42, 0.16),
           0 1px 2px rgba(16, 24, 40, 0.05);
 
-        backdrop-filter: blur(7px);
-        -webkit-backdrop-filter: blur(7px);
+        backdrop-filter: blur(18px) saturate(150%);
+        -webkit-backdrop-filter: blur(18px) saturate(150%);
 
         white-space: nowrap;
       }

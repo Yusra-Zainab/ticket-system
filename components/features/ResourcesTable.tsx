@@ -12,6 +12,7 @@ import {
 import { type ReactNode, useMemo, useState } from "react";
 
 import { Avatar } from "@/components/ui/Avatar";
+import { SortArrows } from "@/components/ui/SortArrows";
 import { resourceStatusDescriptions } from "@/lib/statusOptions";
 import { cn } from "@/lib/utils";
 import type { ResourceListRow } from "@/types";
@@ -289,8 +290,8 @@ export default function ResourcesTable({
 
           {filtersOpen && (
             <section className="rounded-[12px] border border-[#EAECF0] bg-[#F9FAFB] p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-end">
-                <div className="grid flex-1 gap-4 md:grid-cols-2">
+              <div className="flex flex-wrap items-end gap-4">
+                <div className="grid min-w-[260px] flex-1 gap-4 md:grid-cols-2">
                   <ResourceFilterDropdown
                     label="Job Title"
                     value={jobTitle}
@@ -629,23 +630,7 @@ function ResourceHeader({
       >
         {label}
 
-        <span className="resource-sort-arrows">
-          <ChevronDown
-            size={13}
-            className={cn(
-              "rotate-180",
-              active && sort.direction === "asc" && "text-[#0284C7]",
-            )}
-          />
-
-          <ChevronDown
-            size={13}
-            className={cn(
-              "-mt-[5px]",
-              active && sort.direction === "desc" && "text-[#0284C7]",
-            )}
-          />
-        </span>
+        <SortArrows direction={active ? sort.direction : null} />
       </button>
     </th>
   );

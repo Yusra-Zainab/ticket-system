@@ -769,7 +769,7 @@ function TagDropdown({
             <span className="flex min-w-0 items-center gap-3">
               <span
                 className={cn(
-                  "inline-flex w-28 shrink-0 items-center justify-center rounded-full px-3 py-1 text-center text-xs font-semibold ring-1 ring-inset",
+                  "inline-flex min-w-28 shrink-0 items-center justify-center whitespace-nowrap rounded-full px-3 py-1 text-center text-xs font-semibold ring-1 ring-inset",
                   selected.color,
                 )}
               >
@@ -826,7 +826,7 @@ function TagDropdown({
                 <span className="flex items-center gap-3">
                   <span
                     className={cn(
-                      "inline-flex w-28 shrink-0 items-center justify-center rounded-full px-3 py-1.5 text-center text-xs font-semibold ring-1 ring-inset",
+                      "inline-flex min-w-28 shrink-0 items-center justify-center whitespace-nowrap rounded-full px-3 py-1.5 text-center text-xs font-semibold ring-1 ring-inset",
                       option.color,
                     )}
                   >

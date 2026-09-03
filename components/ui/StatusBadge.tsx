@@ -36,7 +36,6 @@ export default function StatusBadge({ status, size = "md" }: StatusBadgeProps) {
         size === "lg" && "px-3 py-1.5 text-sm",
       )}
     >
-      <span className="mr-1.5 size-1.5 rounded-full bg-current" />
       {status}
     </span>
   );

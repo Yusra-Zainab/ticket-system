@@ -16,6 +16,7 @@ import {
   X,
 } from "lucide-react";
 
+import Combobox from "@/components/ui/Combobox";
 import StatusBadge from "@/components/ui/StatusBadge";
 import {
   ticketPriorityDescriptions,
@@ -623,6 +624,7 @@ export default function TicketDetailsView({
               <Meta label="Due Date" value={formatDate(persistedDueDate)} />
               <Meta label="Estimated Time" value={persistedEstimatedTime || "Not set"} />
               <Meta label="Created Date" value={formatDate(ticket.created)} />
+              <Meta label="Last Updated" value={formatDate(ticket.updatedAt)} />
               <Meta label="Ticket ID" value={ticket.id} />
             </dl>
           )}
@@ -822,7 +824,7 @@ function ChoiceTag({ label, colors }: { label: string; colors: string }) {
   return (
     <span
       className={cn(
-        "inline-flex min-w-24 justify-center rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-inset",
+        "inline-flex min-w-24 items-center justify-center whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-inset",
         colors,
       )}
     >
@@ -1169,14 +1171,17 @@ function ActionModal({
 
         {action === "Assign Resource" && (
           <div className="mt-5">
-            <select className="field" value={assigneeDraft} onChange={(event) => setAssigneeDraft(event.target.value)}>
-              <option value="">Select resource</option>
-              {resources.map((resource) => (
-                <option key={resource} value={resource}>
-                  {resource}
-                </option>
-              ))}
-            </select>
+            <label className="mb-1.5 block text-sm font-medium text-slate-700">
+              Resource
+            </label>
+            <Combobox
+              value={assigneeDraft}
+              onChange={(value) => setAssigneeDraft(value)}
+              placeholder="Select resource"
+              searchPlaceholder="Search resources..."
+              options={resources.map((resource) => ({ label: resource }))}
+              emptyMessage="No resources found."
+            />
             <ModalActions
               onClose={onClose}
               onSave={() => confirm(`Assign this ticket to ${assigneeDraft || "the selected resource"}?`, () => applyAssignee(assigneeDraft))}
