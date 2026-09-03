@@ -1170,9 +1170,16 @@ function ActionModal({
 
         {action === "Assign Resource" && (
           <div className="mt-5">
+            <label
+              htmlFor="assign-resource-select"
+              className="mb-1.5 block text-sm font-medium text-slate-700"
+            >
+              Resource
+            </label>
             <div className="relative">
               <select
-                className="field pr-10 [appearance:none]! [-webkit-appearance:none]!"
+                id="assign-resource-select"
+                className="w-full appearance-none rounded-lg border border-[#d8dee7] bg-white py-2.5 pl-3.5 pr-10 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.025)] transition focus:border-[#0ea5e9] focus:outline-none focus:ring-2 focus:ring-sky-500/15"
                 value={assigneeDraft}
                 onChange={(event) => setAssigneeDraft(event.target.value)}
               >
