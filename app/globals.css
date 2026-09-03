@@ -3596,8 +3596,19 @@ input.field:-webkit-autofill,
    EMPTY STATE
    ========================================================= */
 
-.resource-table td[colspan="8"] {
+.resource-table td[colspan] {
+  width: auto;
+  padding: 32px 12px;
   color: #667085;
+  text-align: center;
+}
+
+.resource-table td[colspan]:first-child {
+  padding-left: 12px;
+}
+
+.resource-table tbody tr:last-child td[colspan] {
+  border-bottom: 0;
 }
 
 /* =========================================================

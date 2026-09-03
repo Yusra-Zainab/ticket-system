@@ -16,6 +16,7 @@ import {
   X,
 } from "lucide-react";
 
+import Combobox from "@/components/ui/Combobox";
 import StatusBadge from "@/components/ui/StatusBadge";
 import {
   ticketPriorityDescriptions,
@@ -1170,31 +1171,17 @@ function ActionModal({
 
         {action === "Assign Resource" && (
           <div className="mt-5">
-            <label
-              htmlFor="assign-resource-select"
-              className="mb-1.5 block text-sm font-medium text-slate-700"
-            >
+            <label className="mb-1.5 block text-sm font-medium text-slate-700">
               Resource
             </label>
-            <div className="relative">
-              <select
-                id="assign-resource-select"
-                className="w-full appearance-none rounded-lg border border-[#d8dee7] bg-white py-2.5 pl-3.5 pr-10 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.025)] transition focus:border-[#0ea5e9] focus:outline-none focus:ring-2 focus:ring-sky-500/15"
-                value={assigneeDraft}
-                onChange={(event) => setAssigneeDraft(event.target.value)}
-              >
-                <option value="">Select resource</option>
-                {resources.map((resource) => (
-                  <option key={resource} value={resource}>
-                    {resource}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown
-                size={16}
-                className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#667085]"
-              />
-            </div>
+            <Combobox
+              value={assigneeDraft}
+              onChange={(value) => setAssigneeDraft(value)}
+              placeholder="Select resource"
+              searchPlaceholder="Search resources..."
+              options={resources.map((resource) => ({ label: resource }))}
+              emptyMessage="No resources found."
+            />
             <ModalActions
               onClose={onClose}
               onSave={() => confirm(`Assign this ticket to ${assigneeDraft || "the selected resource"}?`, () => applyAssignee(assigneeDraft))}
