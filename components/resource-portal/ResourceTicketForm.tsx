@@ -27,7 +27,7 @@ import type { LucideIcon } from "lucide-react";
 import Combobox from "@/components/ui/Combobox";
 import RichTextEditor from "@/components/ui/RichTextEditor";
 import ScreenshotRegionOverlay from "@/components/features/ScreenshotRegionOverlay";
-import { captureRegion, type ScreenshotRect } from "@/lib/screenshot";
+import { captureDisplayFrame } from "@/lib/screenshot";
 import { cn } from "@/lib/utils";
 import type {
   ResourcePortalProject,
@@ -161,7 +161,7 @@ export default function ResourceTicketForm({
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [selfAssign, setSelfAssign] = useState(false);
   const [uploadMenu, setUploadMenu] = useState(false);
-  const [snipping, setSnipping] = useState(false);
+  const [snipFrame, setSnipFrame] = useState<HTMLCanvasElement | null>(null);
   const [confirmMode, setConfirmMode] = useState<ConfirmMode>();
   const [saving, setSaving] = useState<"DRAFT" | "OPEN" | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -288,22 +288,22 @@ export default function ResourceTicketForm({
     setUploadMenu(false);
   }
 
-  function startScreenshot() {
+  async function startScreenshot() {
     setUploadMenu(false);
-    setSnipping(true);
-  }
-
-  async function captureScreenshot(rect: ScreenshotRect) {
-    setSnipping(false);
     try {
-      const file = await captureRegion(rect);
-      if (!file) return;
-      queueFiles([file]);
+      const frame = await captureDisplayFrame();
+      if (!frame) return; // picker dismissed
+      setSnipFrame(frame);
     } catch {
       setNotice(
         "Unable to capture a screenshot. Please try again or upload a file instead.",
       );
     }
+  }
+
+  function finishScreenshot(file: File) {
+    setSnipFrame(null);
+    queueFiles([file]);
   }
 
   async function uploadPendingFiles(ticketId: string) {
@@ -404,10 +404,11 @@ export default function ResourceTicketForm({
       onSubmit={(event) => event.preventDefault()}
       className="ticket-create-page"
     >
-      {snipping && (
+      {snipFrame && (
         <ScreenshotRegionOverlay
-          onSelect={captureScreenshot}
-          onCancel={() => setSnipping(false)}
+          source={snipFrame}
+          onSelect={finishScreenshot}
+          onCancel={() => setSnipFrame(null)}
         />
       )}
       <header className="sticky top-0 z-30 -mx-3 mb-7 flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 bg-white/95 px-3 py-3 backdrop-blur">
@@ -909,8 +910,8 @@ export default function ResourceTicketForm({
               <UploadChoice
                 icon={Camera}
                 title="Screenshot"
-                detail="Drag to snip part of the page"
-                onClick={startScreenshot}
+                detail="Pick a screen, then snip an area"
+                onClick={() => void startScreenshot()}
               />
             </div>
 

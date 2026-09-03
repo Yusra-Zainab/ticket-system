@@ -1,53 +1,101 @@
 /**
- * Region screenshot helper for the ticket attachment flows.
+ * Screenshot helper for the ticket attachment flows.
  *
- * Works like a snipping tool: the caller shows `ScreenshotRegionOverlay`, the
- * user drags a rectangle over the page, and `captureRegion` renders the page
- * and crops it to that rectangle, returning a PNG `File`.
+ * Two-step "snipping tool" flow:
+ *  1. `captureDisplayFrame()` opens the browser's native "Choose what to share"
+ *     picker (screen / window / tab), grabs one frame and returns it as a canvas.
+ *  2. `ScreenshotRegionOverlay` shows that frame and lets the user drag a
+ *     rectangle; `cropCanvasToFile()` crops the frame to that rectangle.
  */
 
 export type ScreenshotRect = {
-  /** viewport-relative CSS pixels */
   x: number;
   y: number;
   width: number;
   height: number;
 };
 
-export async function captureRegion(
+/**
+ * Opens `getDisplayMedia`'s picker, captures a single frame of the chosen
+ * surface and returns it as a canvas. Returns `null` if the user dismisses
+ * the picker.
+ */
+export async function captureDisplayFrame(): Promise<HTMLCanvasElement | null> {
+  const media =
+    typeof navigator !== "undefined" ? navigator.mediaDevices : undefined;
+
+  if (!media?.getDisplayMedia) {
+    throw new Error("Screen capture is not supported in this browser.");
+  }
+
+  let stream: MediaStream;
+
+  try {
+    stream = await media.getDisplayMedia({ video: true, audio: false });
+  } catch (error) {
+    if (
+      error instanceof DOMException &&
+      (error.name === "NotAllowedError" || error.name === "AbortError")
+    ) {
+      return null;
+    }
+    throw error;
+  }
+
+  try {
+    const video = document.createElement("video");
+    video.srcObject = stream;
+    video.muted = true;
+
+    await video.play();
+
+    if (!video.videoWidth) {
+      await new Promise<void>((resolve) => {
+        video.addEventListener("loadedmetadata", () => resolve(), {
+          once: true,
+        });
+      });
+    }
+
+    await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
+
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    const context = canvas.getContext("2d");
+
+    if (!context || !canvas.width || !canvas.height) {
+      throw new Error("Could not read the captured frame.");
+    }
+
+    context.drawImage(video, 0, 0);
+
+    return canvas;
+  } finally {
+    stream.getTracks().forEach((track) => track.stop());
+  }
+}
+
+/**
+ * Crops `source` to `rect` (in source-canvas pixels) and returns a PNG File.
+ */
+export async function cropCanvasToFile(
+  source: HTMLCanvasElement,
   rect: ScreenshotRect,
 ): Promise<File | null> {
-  if (rect.width < 2 || rect.height < 2) {
+  const x = Math.max(0, Math.round(rect.x));
+  const y = Math.max(0, Math.round(rect.y));
+  const width = Math.min(source.width - x, Math.round(rect.width));
+  const height = Math.min(source.height - y, Math.round(rect.height));
+
+  if (width < 2 || height < 2) {
     return null;
   }
 
-  const { toCanvas } = await import("html-to-image");
-
-  // Let the selection overlay finish unmounting so it isn't in the shot.
-  await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
-  await new Promise((resolve) => window.setTimeout(resolve, 30));
-
-  const target = document.body;
-  const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
-
-  const full = await toCanvas(target, {
-    backgroundColor: "#ffffff",
-    pixelRatio,
-    cacheBust: true,
-  });
-
-  // Map the viewport-relative selection into the rendered canvas.
-  const layoutWidth = target.getBoundingClientRect().width || target.scrollWidth;
-  const scale = full.width / layoutWidth;
-
-  const sx = (rect.x + window.scrollX) * scale;
-  const sy = (rect.y + window.scrollY) * scale;
-  const sw = rect.width * scale;
-  const sh = rect.height * scale;
-
   const out = document.createElement("canvas");
-  out.width = Math.max(1, Math.round(sw));
-  out.height = Math.max(1, Math.round(sh));
+  out.width = width;
+  out.height = height;
 
   const context = out.getContext("2d");
 
@@ -55,7 +103,7 @@ export async function captureRegion(
     throw new Error("Could not crop the screenshot.");
   }
 
-  context.drawImage(full, sx, sy, sw, sh, 0, 0, out.width, out.height);
+  context.drawImage(source, x, y, width, height, 0, 0, width, height);
 
   const blob = await new Promise<Blob | null>((resolve) =>
     out.toBlob((result) => resolve(result), "image/png"),

@@ -29,7 +29,7 @@ import Combobox from "@/components/ui/Combobox";
 import RichTextEditor from "@/components/ui/RichTextEditor";
 import { cn } from "@/lib/utils";
 import { findProjectModule, normalizeProjectModules } from "@/lib/projectModules";
-import { captureRegion, type ScreenshotRect } from "@/lib/screenshot";
+import { captureDisplayFrame } from "@/lib/screenshot";
 import ScreenshotRegionOverlay from "@/components/features/ScreenshotRegionOverlay";
 import { useApp } from "@/components/providers/AppProvider";
 import type { Project, Ticket, TicketAttachment, User } from "@/types";
@@ -151,7 +151,7 @@ export default function TicketForm({
     String(savedForm?.projectId ?? initialSelection.projectId ?? ""),
   );
   const [uploadMenu, setUploadMenu] = useState(false);
-  const [snipping, setSnipping] = useState(false);
+  const [snipFrame, setSnipFrame] = useState<HTMLCanvasElement | null>(null);
   const [confirmMode, setConfirmMode] = useState<ConfirmMode>();
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -256,22 +256,22 @@ export default function TicketForm({
       setUploading(false);
     }
   };
-  const startScreenshot = () => {
+  const startScreenshot = async () => {
     setUploadMenu(false);
-    setSnipping(true);
-  };
-  const captureScreenshot = async (rect: ScreenshotRect) => {
-    setSnipping(false);
     try {
-      const file = await captureRegion(rect);
-      if (!file) return;
-      uploadAttachments([file]);
+      const frame = await captureDisplayFrame();
+      if (!frame) return; // picker dismissed
+      setSnipFrame(frame);
     } catch {
       notify(
         "Screenshot capture failed. Please try again or upload a file instead.",
         "error",
       );
     }
+  };
+  const finishScreenshot = (file: File) => {
+    setSnipFrame(null);
+    uploadAttachments([file]);
   };
   const perform = async (mode: ConfirmMode) => {
     setConfirmMode(undefined);
@@ -382,10 +382,11 @@ export default function TicketForm({
       onSubmit={(event) => event.preventDefault()}
       className="ticket-create-page"
     >
-      {snipping && (
+      {snipFrame && (
         <ScreenshotRegionOverlay
-          onSelect={captureScreenshot}
-          onCancel={() => setSnipping(false)}
+          source={snipFrame}
+          onSelect={finishScreenshot}
+          onCancel={() => setSnipFrame(null)}
         />
       )}
       <header className="sticky top-0 z-30 -mx-3 mb-7 flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 bg-white/95 px-3 py-3 backdrop-blur">
@@ -1026,8 +1027,8 @@ export default function TicketForm({
               <UploadChoice
                 icon={Camera}
                 title="Screenshot"
-                detail="Drag to snip part of the page"
-                onClick={startScreenshot}
+                detail="Pick a screen, then snip an area"
+                onClick={() => void startScreenshot()}
               />
             </div>
             <p className="mt-5 rounded-lg bg-slate-50 p-3 text-xs text-slate-500">
