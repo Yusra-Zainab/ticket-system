@@ -191,7 +191,7 @@ export default function ClientTeamTable({
           height: 72px;
           padding: 16px 20px;
           color: #475467;
-          font-family: Geist, var(--font-inter), Inter, sans-serif;
+          font-family: var(--font-geist), var(--font-inter), Inter, sans-serif;
           font-size: 14px;
           font-weight: 400;
           line-height: 20px;
@@ -271,7 +271,7 @@ export default function ClientTeamTable({
           border: 1px solid;
           border-radius: 16px;
           padding: 2px 8px;
-          font-family: Inter, sans-serif;
+          font-family: var(--font-geist), Inter, sans-serif;
           font-size: 12px;
           font-weight: 500;
           line-height: 18px;

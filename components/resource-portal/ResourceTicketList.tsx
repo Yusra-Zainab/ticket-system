@@ -732,7 +732,7 @@ function TicketListStyles() {
         width: 100%;
         min-width: 0;
         color: #475569;
-        font-family: Geist, var(--font-inter), Inter, Arial, sans-serif;
+        font-family: var(--font-geist), var(--font-inter), Inter, Arial, sans-serif;
       }
 
       .resource-admin-ticket-toolbar {

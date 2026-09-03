@@ -25,7 +25,7 @@ export default async function ResourceLayout({
           min-height: 100vh;
           background: #ffffff;
           color: #101828;
-          font-family: Geist, var(--font-inter), Inter, Arial, sans-serif;
+          font-family: var(--font-geist), var(--font-inter), Inter, Arial, sans-serif;
         }
 
         .resource-portal-shell *,

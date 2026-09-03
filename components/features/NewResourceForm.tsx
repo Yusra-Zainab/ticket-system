@@ -776,7 +776,7 @@ export default function NewResourceForm({
           <h1
             className="text-[30px] font-bold leading-[38px] text-[#101828]"
             style={{
-              fontFamily: "Satoshi, Arial, sans-serif",
+              fontFamily: "var(--font-satoshi), Arial, sans-serif",
             }}
           >
             {initialResource ? "Edit Resource" : "New Resource"}

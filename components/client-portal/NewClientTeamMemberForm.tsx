@@ -323,7 +323,7 @@ export default function NewClientTeamMemberForm({
           background: #f9fafb;
           padding: 10px 14px;
           color: #475467;
-          font-family: Geist, Inter, sans-serif;
+          font-family: var(--font-geist), Inter, sans-serif;
           font-size: 16px;
           line-height: 24px;
         }
@@ -403,7 +403,7 @@ export default function NewClientTeamMemberForm({
           <h1
             className="text-[30px] font-bold leading-[38px] text-[#101828]"
             style={{
-              fontFamily: "Satoshi, Arial, sans-serif",
+              fontFamily: "var(--font-satoshi), Arial, sans-serif",
             }}
           >
             {editing ? "Edit Team Member" : "New Team Member"}

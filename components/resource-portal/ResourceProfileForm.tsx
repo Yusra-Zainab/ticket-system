@@ -441,7 +441,7 @@ function ResourceEditDetailsStyles() {
         padding: 0 0 120px;
         background: #ffffff;
         color: #101828;
-        font-family: Geist, var(--font-inter), Inter, Arial, sans-serif;
+        font-family: var(--font-geist), var(--font-inter), Inter, Arial, sans-serif;
       }
 
       .resource-edit-details-header {
@@ -468,7 +468,7 @@ function ResourceEditDetailsStyles() {
       .resource-edit-details-header h1 {
         margin: 0;
         color: #101828;
-        font-family: Satoshi, var(--font-satoshi), sans-serif;
+        font-family: var(--font-satoshi), var(--font-satoshi), sans-serif;
         font-size: 30px;
         font-weight: 700;
         line-height: 38px;
@@ -491,7 +491,7 @@ function ResourceEditDetailsStyles() {
         gap: 4px;
         border-radius: 8px;
         padding: 10px 14px;
-        font-family: Geist, sans-serif;
+        font-family: var(--font-geist), sans-serif;
         font-size: 14px;
         font-weight: 600;
         line-height: 20px;
@@ -606,7 +606,7 @@ function ResourceEditDetailsStyles() {
       .resource-edit-details-identity-copy h2 {
         margin: 0;
         color: #101828;
-        font-family: Satoshi, var(--font-satoshi), Geist, sans-serif;
+        font-family: var(--font-satoshi), var(--font-satoshi), var(--font-geist), sans-serif;
         font-size: 24px;
         font-weight: 700;
         line-height: 32px;
@@ -638,7 +638,7 @@ function ResourceEditDetailsStyles() {
       .resource-edit-details-section h2 {
         margin: 0;
         color: #101828;
-        font-family: Geist, sans-serif;
+        font-family: var(--font-geist), sans-serif;
         font-size: 20px;
         font-weight: 600;
         line-height: 30px;
@@ -660,7 +660,7 @@ function ResourceEditDetailsStyles() {
 
       .resource-edit-details-field > span:first-child {
         color: #344054;
-        font-family: Inter, sans-serif;
+        font-family: var(--font-geist), Inter, sans-serif;
         font-size: 14px;
         font-weight: 500;
         line-height: 20px;
@@ -684,7 +684,7 @@ function ResourceEditDetailsStyles() {
       .resource-edit-input {
         padding: 10px 14px;
         color: #101828;
-        font-family: Inter, sans-serif;
+        font-family: var(--font-geist), Inter, sans-serif;
         font-size: 16px;
         font-weight: 400;
         line-height: 24px;
@@ -728,7 +728,7 @@ function ResourceEditDetailsStyles() {
         background: transparent;
         padding: 9px 0 9px 14px;
         color: #101828;
-        font-family: Inter, sans-serif;
+        font-family: var(--font-geist), Inter, sans-serif;
         font-size: 16px;
         line-height: 24px;
         outline: none;

@@ -227,7 +227,7 @@ export default function ResourceNotificationStyles() {
       .resource-portal-shell .notification-page-title-row h1 {
         margin: 0;
         color: #101828;
-        font-family: Satoshi, var(--font-inter), Inter, sans-serif;
+        font-family: var(--font-satoshi), var(--font-inter), Inter, sans-serif;
         font-size: 30px;
         font-weight: 700;
         line-height: 38px;

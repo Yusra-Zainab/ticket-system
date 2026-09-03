@@ -246,7 +246,7 @@ export default function ClientProfileForm({
           align-items: center;
           gap: 10px;
           color: #667085;
-          font-family: Geist, var(--font-inter), Inter, sans-serif;
+          font-family: var(--font-geist), var(--font-inter), Inter, sans-serif;
           font-size: 16px;
           line-height: 24px;
         }

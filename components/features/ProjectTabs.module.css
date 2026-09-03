@@ -49,7 +49,7 @@
 
   color: #667085;
 
-  font-family: Geist, Inter, Arial, sans-serif;
+  font-family: var(--font-geist), Inter, Arial, sans-serif;
 
   font-size: 15px;
 

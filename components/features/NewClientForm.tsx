@@ -568,7 +568,7 @@ export default function NewClientForm({
           <h1
             className="text-[30px] font-bold leading-[38px] text-[#101828]"
             style={{
-              fontFamily: "Satoshi, Arial, sans-serif",
+              fontFamily: "var(--font-satoshi), Arial, sans-serif",
             }}
           >
             {isEditing ? "Edit Client" : "New Client"}
@@ -1333,7 +1333,7 @@ function FormSection({
           <h2
             className="text-[24px] font-bold leading-8 text-[#101828]"
             style={{
-              fontFamily: "Satoshi, Arial, sans-serif",
+              fontFamily: "var(--font-satoshi), Arial, sans-serif",
             }}
           >
             {title}
