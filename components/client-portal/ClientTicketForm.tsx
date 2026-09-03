@@ -26,6 +26,7 @@ import type { LucideIcon } from "lucide-react";
 
 import Combobox from "@/components/ui/Combobox";
 import RichTextEditor from "@/components/ui/RichTextEditor";
+import { captureScreenSelection } from "@/lib/screenshot";
 import { cn } from "@/lib/utils";
 import type {
   ClientPortalProject,
@@ -284,21 +285,9 @@ export default function ClientTicketForm({
   async function captureScreenshot() {
     setUploadMenu(false);
     try {
-      const { toBlob } = await import("html-to-image");
-      await new Promise((resolve) => window.setTimeout(resolve, 200));
-      const blob = await toBlob(document.body, {
-        backgroundColor: "#ffffff",
-        pixelRatio: Math.min(window.devicePixelRatio || 1, 2),
-        cacheBust: true,
-      });
-      if (!blob) {
-        throw new Error("Screenshot could not be encoded.");
-      }
-      queueFiles([
-        new globalThis.File([blob], `screenshot-${Date.now()}.png`, {
-          type: "image/png",
-        }),
-      ]);
+      const file = await captureScreenSelection();
+      if (!file) return; // picker dismissed
+      queueFiles([file]);
     } catch {
       setNotice(
         "Unable to capture a screenshot. Please try again or upload a file instead.",
@@ -890,7 +879,7 @@ export default function ClientTicketForm({
               <UploadChoice
                 icon={Camera}
                 title="Screenshot"
-                detail="Capture your screen"
+                detail="Pick a screen, window, or tab"
                 onClick={() => void captureScreenshot()}
               />
             </div>

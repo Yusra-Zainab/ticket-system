@@ -29,6 +29,7 @@ import Combobox from "@/components/ui/Combobox";
 import RichTextEditor from "@/components/ui/RichTextEditor";
 import { cn } from "@/lib/utils";
 import { findProjectModule, normalizeProjectModules } from "@/lib/projectModules";
+import { captureScreenSelection } from "@/lib/screenshot";
 import { useApp } from "@/components/providers/AppProvider";
 import type { Project, Ticket, TicketAttachment, User } from "@/types";
 
@@ -256,22 +257,9 @@ export default function TicketForm({
   const captureScreenshot = async () => {
     setUploadMenu(false);
     try {
-      const { toBlob } = await import("html-to-image");
-      // Let the attachment dialog unmount before snapshotting the page.
-      await new Promise((resolve) => window.setTimeout(resolve, 200));
-      const blob = await toBlob(document.body, {
-        backgroundColor: "#ffffff",
-        pixelRatio: Math.min(window.devicePixelRatio || 1, 2),
-        cacheBust: true,
-      });
-      if (!blob) {
-        throw new Error("Screenshot could not be encoded.");
-      }
-      uploadAttachments([
-        new globalThis.File([blob], `screenshot-${Date.now()}.png`, {
-          type: "image/png",
-        }),
-      ]);
+      const file = await captureScreenSelection();
+      if (!file) return; // picker dismissed
+      uploadAttachments([file]);
     } catch {
       notify(
         "Screenshot capture failed. Please try again or upload a file instead.",
@@ -1026,7 +1014,7 @@ export default function TicketForm({
               <UploadChoice
                 icon={Camera}
                 title="Screenshot"
-                detail="Capture your screen"
+                detail="Pick a screen, window, or tab"
                 onClick={captureScreenshot}
               />
             </div>
