@@ -36,7 +36,7 @@ Recommended local tools:
 ## 3. Clone the Repository
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/Yusra-Zainab/ticket-system.git
 cd ticket-system
 ```
 
@@ -369,7 +369,59 @@ For fast local setup:
 8. Run `npm run dev`.
 9. Open `http://localhost:3000`.
 
-## 18. Summary
+## 18. Deployment
+Use these commands whenever you want to deploy the latest version of the Ticket System to the VPS.
+
+```bash
+ssh root@203.161.56.220
+```
+Enter the password when prompted
+
+```bash
+cd /var/www/ticket-system
+
+git checkout main
+git pull origin main
+
+npm install
+
+node database/migrate.mjs
+
+npm run build
+
+pm2 restart ticket-system
+pm2 save
+
+pm2 status
+```
+Optional verification:
+
+```bash
+curl -I http://127.0.0.1:3002
+
+curl -I https://stagesupport.datapulsetechnologies.org
+```
+
+### Deployment Notes
+Deployment Notes
+- Ticket System directory:
+/var/www/ticket-system
+- Git branch used for deployment:
+main
+- PM2 process name:
+ticket-system
+- Internal application port:
+3002
+- Public URL:
+`https://stagesupport.datapulsetechnologies.org`
+- Database migrations:
+node database/migrate.mjs
+-- Do not re-import the full SQL schema or database dump during normal deployments.
+-- Run npm run build before restarting PM2.
+-- Do not use port 3000 or 3001 for the Ticket System because other applications on the VPS already use those ports.
+-- Nginx proxies `stagesupport.datapulsetechnologies.org` to `127.0.0.1:3002`.
+
+## 19. Summary
 
 This project is a MySQL-backed, permission-driven Next.js 16 application with multiple portals and shared backend routes. A clean developer setup requires:
 
@@ -380,3 +432,6 @@ This project is a MySQL-backed, permission-driven Next.js 16 application with mu
 - seeded or created accounts with the right role data
 
 Once those pieces are in place, the admin, resource, and client portals can be exercised locally in the same way the production app does.
+
+
+(For live DB connection, run `ssh -L 3307:127.0.0.1:3306 root@203.161.56.220` or `ssh -N -L 3307:127.0.0.1:3306 root@203.161.56.220` - for not opening the VPS tunnel)
