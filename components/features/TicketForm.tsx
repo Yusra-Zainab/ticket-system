@@ -249,33 +249,33 @@ export default function TicketForm({
     }
   };
   const captureScreenshot = async () => {
+    setUploadMenu(false);
     try {
-      const stream = await navigator.mediaDevices.getDisplayMedia({
-        video: true,
+      const { default: html2canvas } = await import("html2canvas");
+      // Let the attachment dialog unmount before snapshotting the page.
+      await new Promise((resolve) => window.setTimeout(resolve, 150));
+      const canvas = await html2canvas(document.body, {
+        useCORS: true,
+        backgroundColor: "#ffffff",
+        scale: Math.min(window.devicePixelRatio || 1, 2),
+        windowWidth: document.documentElement.scrollWidth,
+        windowHeight: document.documentElement.scrollHeight,
       });
-      const video = document.createElement("video");
-      video.srcObject = stream;
-      await video.play();
-      const canvas = document.createElement("canvas");
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      canvas.getContext("2d")?.drawImage(video, 0, 0);
-      stream.getTracks().forEach((track) => track.stop());
-      canvas.toBlob(
-        (blob) =>
-          blob &&
-          uploadAttachments([
-            new globalThis.File([blob], `screenshot-${Date.now()}.png`, {
-              type: "image/png",
-            }),
-          ]),
-        "image/png",
+      const blob = await new Promise<Blob | null>((resolve) =>
+        canvas.toBlob((result) => resolve(result), "image/png"),
       );
+      if (!blob) {
+        throw new Error("Screenshot could not be encoded.");
+      }
+      uploadAttachments([
+        new globalThis.File([blob], `screenshot-${Date.now()}.png`, {
+          type: "image/png",
+        }),
+      ]);
     } catch {
       setNotice(
-        "Screenshot capture was cancelled or is not supported by this browser.",
+        "Screenshot capture failed. Please try again or upload a file instead.",
       );
-      setUploadMenu(false);
     }
   };
   const perform = async (mode: ConfirmMode) => {
@@ -1012,10 +1012,13 @@ export default function TicketForm({
                 detail="Browse local files"
                 onClick={() => fileInput.current?.click()}
               />
+              {/* TODO(drive-picker): wire the Google Drive Picker (needs a
+                  NEXT_PUBLIC_GOOGLE_CLIENT_ID + API key + OAuth consent). Until
+                  then this falls back to the local file browser. */}
               <UploadChoice
                 icon={HardDrive}
                 title="Drive"
-                detail="Choose a drive file"
+                detail="Choose a file to upload"
                 onClick={() => fileInput.current?.click()}
               />
               <UploadChoice
