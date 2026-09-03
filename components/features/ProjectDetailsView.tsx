@@ -765,7 +765,7 @@ export default function ProjectDetailsView({
               <h2>Modules</h2>
 
               <p>
-                Module and submodule structure with live open-ticket activity.
+                Module and sub-module structure with live open-ticket activity.
               </p>
             </div>
 
@@ -1307,7 +1307,7 @@ function ModuleTable({
             <tr>
               <th>Module</th>
 
-              <th>SubModule</th>
+              <th>Sub-Module</th>
 
               <th>Open Tickets</th>
 
